@@ -21,4 +21,3 @@ function Image({
 }
 
 export default Image;
-s
