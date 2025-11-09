@@ -1,42 +1,36 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "./supabaseClient";
+import React, { createContext, useContext, useState } from "react";
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider = ({ children }) => {
+export default function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null); // { role, tenant_id }
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, []);
-
-  // cargar perfil (rol, tenant)
-  useEffect(() => {
-    if (session?.user) {
-      supabase
-        .from("profiles")
-        .select("role, tenant_id")
-        .eq("user_id", session.user.id)
-        .single()
-        .then(({ data }) => setProfile(data));
+  const login = async (email, password) => {
+    if (email === "tenant@business.com" && password === "tenant123") {
+      setSession({ user: { id: "tenant-1", email } });
+      setProfile({ role: "tenant", tenant_id: "t-digitalmatch" });
+      return true;
     }
-  }, [session]);
+    if (email === "admin@whatsappbot.com" && password === "admin123") {
+      setSession({ user: { id: "admin-1", email } });
+      setProfile({ role: "admin", tenant_id: null });
+      return true;
+    }
+    alert("Credenciales inválidas (usa admin@whatsappbot.com / tenant@business.com)");
+    return false;
+  };
+
+  const logout = () => {
+    setSession(null);
+    setProfile(null);
+  };
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading }}>
+    <AuthContext.Provider value={{ session, profile, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}

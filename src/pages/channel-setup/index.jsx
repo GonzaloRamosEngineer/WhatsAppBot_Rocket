@@ -8,7 +8,14 @@ import WebhookConfigCard from './components/WebhookConfigCard';
 import ChannelStatusCard from './components/ChannelStatusCard';
 import TroubleshootingCard from './components/TroubleshootingCard';
 
+// ⬇️ NUEVO: sesión + API mock
+import { useAuth } from '@/lib/AuthProvider';
+import { useMockApi } from '@/lib/useMockApi';
+
 const ChannelSetup = () => {
+  const { profile } = useAuth();
+  const { tenant, channel, testConnection } = useMockApi();
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [credentials, setCredentials] = useState({
     phoneNumberId: '',
@@ -20,44 +27,45 @@ const ChannelSetup = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [channelData, setChannelData] = useState(null);
 
-  // Mock user data
-  const currentUser = {
-    name: 'Sarah Johnson',
-    email: 'sarah@techstartup.com',
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-    role: 'Tenant'
-  };
-
-  // Mock existing channel data for demonstration
+  // Prefill mock de canal si hay datos (desde nuestro useMockApi)
   useEffect(() => {
-    // Simulate loading existing channel data
-    const mockChannelData = {
-      businessName: 'Tech Startup Solutions',
-      phoneNumber: '+1 (555) 123-4567',
-      phoneNumberId: '123456789012345',
-      wabaId: 'waba_123456789',
-      isActive: true,
-      lastSync: new Date()?.toISOString(),
-      stats: {
-        messagesToday: 47,
-        messagesThisMonth: 1284,
-        activeChats: 23
-      }
-    };
+    const saved = localStorage.getItem('whatsapp_credentials');
 
-    // Check if we have saved credentials (mock check)
-    const hasCredentials = localStorage.getItem('whatsapp_credentials');
-    if (hasCredentials) {
+    if (saved) {
+      // Si ya guardaste antes, “levanta” los datos previos
+      const parsed = JSON.parse(saved);
+      setCredentials(parsed);
       setIsConnected(true);
-      setChannelData(mockChannelData);
-      setCredentials({
-        phoneNumberId: '123456789012345',
-        wabaId: 'waba_123456789',
-        accessToken: 'EAABwzLixnjY...',
-        businessName: 'Tech Startup Solutions'
+      setChannelData({
+        businessName: parsed.businessName || tenant?.name || 'Your Business',
+        phoneNumber: channel?.display_phone_number,
+        phoneNumberId: parsed.phoneNumberId,
+        wabaId: parsed.wabaId,
+        isActive: true,
+        lastSync: new Date()?.toISOString(),
+        stats: { messagesToday: 47, messagesThisMonth: 1284, activeChats: 23 }
       });
+    } else if (channel) {
+      // Si no hay saved, inicializa con el mock del canal
+      setCredentials((prev) => ({
+        ...prev,
+        phoneNumberId: channel.phone_number_id || '',
+        wabaId: channel.waba_id || '',
+        businessName: tenant?.name || 'Your Business'
+      }));
+      setChannelData({
+        businessName: tenant?.name || 'Your Business',
+        phoneNumber: channel?.display_phone_number,
+        phoneNumberId: channel?.phone_number_id,
+        wabaId: channel?.waba_id,
+        isActive: channel?.status === 'active',
+        lastSync: new Date()?.toISOString(),
+        stats: { messagesToday: 0, messagesThisMonth: 0, activeChats: 0 }
+      });
+      setIsConnected(channel?.status === 'active');
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel, tenant]);
 
   const handleCredentialsChange = (newCredentials) => {
     setCredentials(newCredentials);
@@ -66,15 +74,10 @@ const ChannelSetup = () => {
   const handleSaveCredentials = async (credentialsData) => {
     setIsSaving(true);
     try {
-      // Simulate API call to save credentials
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock save success
+      // Simula persistencia local (en real: llamarías a tu backend / Supabase)
+      await new Promise(resolve => setTimeout(resolve, 800));
       localStorage.setItem('whatsapp_credentials', JSON.stringify(credentialsData));
-      
-      // Show success message (in real app, you'd use a toast/notification)
       console.log('Credentials saved successfully');
-      
     } catch (error) {
       console.error('Failed to save credentials:', error);
     } finally {
@@ -82,21 +85,25 @@ const ChannelSetup = () => {
     }
   };
 
-  const handleConnectionTest = (testResult) => {
-    if (testResult?.success) {
+  // 🔌 Aquí adaptamos el resultado de nuestro mock testConnection()
+  // a la forma que espera tu handler (success + details.phoneNumber)
+  const handleConnectionTest = () => {
+    const result = testConnection(); // { ok, timestamp }
+    const mapped = {
+      success: !!result?.ok,
+      details: { phoneNumber: channel?.display_phone_number || '+0 000 000 000' }
+    };
+
+    if (mapped.success) {
       setIsConnected(true);
       setChannelData({
-        businessName: credentials?.businessName,
-        phoneNumber: testResult?.details?.phoneNumber,
-        phoneNumberId: credentials?.phoneNumberId,
-        wabaId: credentials?.wabaId,
-        isActive: false, // Initially inactive until user activates
+        businessName: credentials?.businessName || tenant?.name || 'Your Business',
+        phoneNumber: mapped.details.phoneNumber,
+        phoneNumberId: credentials?.phoneNumberId || channel?.phone_number_id,
+        wabaId: credentials?.wabaId || channel?.waba_id,
+        isActive: false, // queda inactivo hasta que el usuario active
         lastSync: new Date()?.toISOString(),
-        stats: {
-          messagesToday: 0,
-          messagesThisMonth: 0,
-          activeChats: 0
-        }
+        stats: { messagesToday: 0, messagesThisMonth: 0, activeChats: 0 }
       });
     } else {
       setIsConnected(false);
@@ -107,15 +114,21 @@ const ChannelSetup = () => {
   const handleToggleChannel = (isActive) => {
     setChannelData(prev => ({
       ...prev,
-      isActive: isActive,
+      isActive,
       lastSync: new Date()?.toISOString()
     }));
   };
 
   const handleLogout = () => {
     localStorage.removeItem('whatsapp_credentials');
-    // In real app, redirect to login
     console.log('Logging out...');
+  };
+
+  const currentUser = {
+    name: tenant?.name || 'Tenant',
+    email: profile?.role === 'tenant' ? 'tenant@business.com' : 'admin@whatsappbot.com',
+    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+    role: profile?.role || 'tenant'
   };
 
   return (
@@ -126,6 +139,7 @@ const ChannelSetup = () => {
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         userRole="tenant"
       />
+
       {/* Main Content */}
       <div className={`transition-all duration-200 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-60'}`}>
         {/* Header */}
@@ -203,6 +217,7 @@ const ChannelSetup = () => {
                 isLoading={isSaving}
               />
               
+              {/* 🔌 ahora usamos nuestra función de test */}
               <ConnectionTestCard
                 credentials={credentials}
                 onTestConnection={handleConnectionTest}
