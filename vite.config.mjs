@@ -5,10 +5,10 @@ import tagger from "@dhiwise/component-tagger";
 import path from "path";
 
 export default defineConfig({
-build: {
-  outDir: "dist",
-  chunkSizeWarningLimit: 2000,
-},
+  build: {
+    outDir: "build",
+    chunkSizeWarningLimit: 2000,
+  },
   plugins: [tsconfigPaths(), react(), tagger()],
   resolve: {
     alias: {
