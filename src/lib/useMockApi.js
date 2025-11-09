@@ -79,9 +79,16 @@ export function useMockApi() {
     return newFlow;
   };
 
-  const testConnection = () => {
-    return { ok: true, timestamp: new Date().toISOString() };
+const testConnection = () => {
+  const ok = Boolean(mockChannel?.phone_number_id && mockChannel?.waba_id);
+  return {
+    success: ok,
+    details: ok
+      ? { phoneNumber: mockChannel.display_phone_number }
+      : { error: "Missing/invalid credentials" },
   };
+};
+
 
   return {
     tenant: mockTenants[0],
