@@ -1,98 +1,118 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Button from '../../../components/ui/Button';
-import Input from '../../../components/ui/Input';
-import { Checkbox } from '../../../components/ui/Checkbox';
-import Icon from '../../../components/AppIcon';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Button from "../../../components/ui/Button";
+import Input from "../../../components/ui/Input";
+import { Checkbox } from "../../../components/ui/Checkbox";
+import Icon from "../../../components/AppIcon";
+import { supabase } from "../../../lib/supabaseClient";
+import { useAuth } from "../../../lib/AuthProvider";
 
 const LoginForm = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
+
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    rememberMe: false
+    email: "",
+    password: "",
+    rememberMe: false,
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Mock credentials for different user roles
-  const mockCredentials = {
-    admin: { email: 'admin@whatsappbot.com', password: 'admin123' },
-    tenant: { email: 'tenant@business.com', password: 'tenant123' }
-  };
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState("");
+  const [forgotError, setForgotError] = useState("");
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e?.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     }));
-    
-    // Clear error when user starts typing
+
     if (errors?.[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData?.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/?.test(formData?.email)) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(formData?.email)) {
+      newErrors.email = "Please enter a valid email address";
     }
-    
+
     if (!formData?.password) {
-      newErrors.password = 'Password is required';
+      newErrors.password = "Password is required";
     } else if (formData?.password?.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+      newErrors.password = "Password must be at least 6 characters";
     }
-    
+
     setErrors(newErrors);
-    return Object.keys(newErrors)?.length === 0;
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      const { email, password } = formData;
-      
-      // Check credentials and determine role
-      if (email === mockCredentials?.admin?.email && password === mockCredentials?.admin?.password) {
-        // Admin login - redirect to admin dashboard (placeholder)
-        localStorage.setItem('userRole', 'admin');
-        localStorage.setItem('userEmail', email);
-        navigate('/tenant-dashboard'); // Using available route
-      } else if (email === mockCredentials?.tenant?.email && password === mockCredentials?.tenant?.password) {
-        // Tenant login - redirect to tenant dashboard
-        localStorage.setItem('userRole', 'tenant');
-        localStorage.setItem('userEmail', email);
-        navigate('/tenant-dashboard');
-      } else {
-        // Invalid credentials
-        setErrors({
-          general: `Invalid credentials. Use admin@whatsappbot.com/admin123 or tenant@business.com/tenant123`
-        });
-      }
-      
-      setIsLoading(false);
-    }, 1500);
+    setErrors((prev) => ({ ...prev, general: "" }));
+
+    const { email, password } = formData;
+    const result = await login(email, password);
+
+    setIsLoading(false);
+
+    if (!result.ok) {
+      setErrors((prev) => ({
+        ...prev,
+        general: result.error?.message || "Invalid credentials",
+      }));
+      return;
+    }
+
+    // Login OK → vamos al dashboard del tenant
+    navigate("/tenant-dashboard");
   };
 
-  const handleForgotPassword = () => {
-    // Placeholder for forgot password functionality
-    alert('Password reset functionality will be implemented in the next phase.');
+  const handleForgotPassword = async () => {
+    setForgotError("");
+    setForgotMessage("");
+
+    if (!formData?.email) {
+      setForgotError("Please enter your email to receive the reset link.");
+      return;
+    }
+
+    try {
+      setForgotLoading(true);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        formData.email,
+        {
+          redirectTo: `${window.location.origin}/auth/reset-password`,
+        }
+      );
+
+      if (error) {
+        console.error(error);
+        setForgotError(error.message || "Could not send reset email.");
+      } else {
+        setForgotMessage(
+          "If this email exists, we sent you a password reset link."
+        );
+      }
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   const handleCreateAccount = () => {
-    navigate('/tenant-registration');
+    navigate("/tenant-registration");
   };
 
   return (
@@ -108,6 +128,18 @@ const LoginForm = () => {
           </div>
         )}
 
+        {forgotError && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+            {forgotError}
+          </div>
+        )}
+
+        {forgotMessage && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md text-sm text-emerald-700">
+            {forgotMessage}
+          </div>
+        )}
+
         {/* Email Input */}
         <Input
           label="Email Address"
@@ -118,7 +150,7 @@ const LoginForm = () => {
           onChange={handleInputChange}
           error={errors?.email}
           required
-          disabled={isLoading}
+          disabled={isLoading || forgotLoading}
         />
 
         {/* Password Input */}
@@ -131,7 +163,7 @@ const LoginForm = () => {
           onChange={handleInputChange}
           error={errors?.password}
           required
-          disabled={isLoading}
+          disabled={isLoading || forgotLoading}
         />
 
         {/* Remember Me Checkbox */}
@@ -140,7 +172,7 @@ const LoginForm = () => {
           name="rememberMe"
           checked={formData?.rememberMe}
           onChange={handleInputChange}
-          disabled={isLoading}
+          disabled={isLoading || forgotLoading}
         />
 
         {/* Sign In Button */}
@@ -162,18 +194,20 @@ const LoginForm = () => {
             type="button"
             onClick={handleForgotPassword}
             className="w-full text-center text-sm text-primary hover:text-primary/80 micro-animation"
-            disabled={isLoading}
+            disabled={isLoading || forgotLoading}
           >
-            Forgot your password?
+            {forgotLoading ? "Sending reset link…" : "Forgot your password?"}
           </button>
-          
+
           <div className="text-center">
-            <span className="text-sm text-muted-foreground">Don't have an account? </span>
+            <span className="text-sm text-muted-foreground">
+              Don't have an account?{" "}
+            </span>
             <button
               type="button"
               onClick={handleCreateAccount}
               className="text-sm text-primary hover:text-primary/80 font-medium micro-animation"
-              disabled={isLoading}
+              disabled={isLoading || forgotLoading}
             >
               Create Account
             </button>
