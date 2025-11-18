@@ -1,49 +1,51 @@
-import React from 'react';
-import RegistrationHeader from './components/RegistrationHeader';
-import RegistrationForm from './components/RegistrationForm';
-import FeatureHighlights from './components/FeatureHighlights';
+// C:\Projects\WhatsAppBot_Rocket\src\pages\tenant-registration\index.jsx
 
-const TenantRegistration = () => {
+import React from "react";
+import { Helmet } from "react-helmet";
+import TenantRegistrationForm from "./components/TenantRegistrationForm";
+
+const TenantRegistrationPage = () => {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <RegistrationHeader />
+    <>
+      <Helmet>
+        <title>Create Account - WhatsApp Bot Manager</title>
+        <meta
+          name="description"
+          content="Create your WhatsApp Bot Manager account to connect your WhatsApp number and start managing customer conversations."
+        />
+      </Helmet>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-            {/* Registration Form */}
-            <div className="order-2 lg:order-1">
-              <RegistrationForm />
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-lg">
+          <div className="bg-card border border-border rounded-xl shadow-lg p-8">
+            <div className="mb-6">
+              <h1 className="text-2xl font-semibold text-foreground">
+                Create your account
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Set up your workspace to start managing WhatsApp conversations
+                for your business or organization.
+              </p>
             </div>
 
-            {/* Feature Highlights */}
-            <div className="order-1 lg:order-2">
-              <FeatureHighlights />
-            </div>
+            <TenantRegistrationForm />
           </div>
 
-          {/* Footer */}
-          <div className="mt-16 pt-8 border-t border-border text-center">
-            <p className="text-sm text-muted-foreground">
-              © {new Date()?.getFullYear()} WhatsApp Bot Manager. All rights reserved.
+          <div className="mt-6 text-center">
+            <p className="text-xs text-muted-foreground">
+              Already have an account?{" "}
+              <a
+                href="/login"
+                className="text-xs text-primary hover:text-primary/80 font-medium micro-animation"
+              >
+                Sign in
+              </a>
             </p>
-            <div className="flex items-center justify-center space-x-6 mt-4">
-              <a href="#" className="text-sm text-muted-foreground hover:text-foreground">
-                Terms of Service
-              </a>
-              <a href="#" className="text-sm text-muted-foreground hover:text-foreground">
-                Privacy Policy
-              </a>
-              <a href="#" className="text-sm text-muted-foreground hover:text-foreground">
-                Support
-              </a>
-            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
-export default TenantRegistration;
+export default TenantRegistrationPage;
