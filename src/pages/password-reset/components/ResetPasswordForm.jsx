@@ -1,9 +1,10 @@
-// src/pages/password-reset/components/ResetPasswordForm.jsx
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import Button from "../../../components/ui/Button";
+import Input from "../../../components/ui/Input";
+import { supabase } from "../../../lib/supabaseClient";
+// si en supabaseClient exportaste default, usá:
+// import supabase from "../../../lib/supabaseClient";
 
 const ResetPasswordForm = () => {
   const [ready, setReady] = useState(false);
@@ -14,17 +15,17 @@ const ResetPasswordForm = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Chequeamos que haya una sesión de recuperación válida
+  // Verificamos que haya una sesión válida de recuperación
   useEffect(() => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
 
       if (error) {
         console.error(error);
-        setError("Ocurrió un error al validar el enlace.");
+        setError("There was an error validating the recovery link.");
       } else if (!data.session) {
         setError(
-          "El enlace de recuperación es inválido o ya expiró. Volvé a solicitar el correo desde la opción 'Olvidé mi contraseña'."
+          "The recovery link is invalid or has expired. Please request a new password reset email."
         );
       }
 
@@ -39,17 +40,17 @@ const ResetPasswordForm = () => {
     setError("");
 
     if (!password || !passwordConfirm) {
-      setError("Completá ambos campos de contraseña.");
+      setError("Please fill in both password fields.");
       return;
     }
 
     if (password !== passwordConfirm) {
-      setError("Las contraseñas no coinciden.");
+      setError("Passwords do not match.");
       return;
     }
 
     if (password.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres.");
+      setError("Password must be at least 8 characters long.");
       return;
     }
 
@@ -63,13 +64,12 @@ const ResetPasswordForm = () => {
 
     if (error) {
       console.error(error);
-      setError(error.message || "No se pudo actualizar la contraseña.");
+      setError(error.message || "Could not update password.");
       return;
     }
 
     setSuccess(true);
 
-    // después de unos segundos lo mandamos al login
     setTimeout(() => {
       navigate("/login");
     }, 2000);
@@ -77,22 +77,25 @@ const ResetPasswordForm = () => {
 
   if (!ready) {
     return (
-      <div className="text-slate-300 text-sm">Verificando enlace…</div>
+      <div className="text-sm text-muted-foreground">
+        Validating recovery link…
+      </div>
     );
   }
 
   if (error && !success) {
     return (
       <div className="space-y-4">
-        <div className="rounded-lg border border-red-500/60 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+        <div className="p-3 rounded-md border border-red-200 bg-red-50 text-sm text-red-700">
           {error}
         </div>
         <Button
+          type="button"
           variant="outline"
-          className="w-full"
+          fullWidth
           onClick={() => navigate("/login")}
         >
-          Volver al inicio de sesión
+          Back to Sign In
         </Button>
       </div>
     );
@@ -101,52 +104,53 @@ const ResetPasswordForm = () => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {success && (
-        <div className="rounded-lg border border-emerald-500/60 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-          Contraseña actualizada correctamente. Te estamos redirigiendo al
-          login…
+        <div className="p-3 rounded-md border border-emerald-200 bg-emerald-50 text-sm text-emerald-700">
+          Password updated successfully. Redirecting to sign in…
         </div>
       )}
 
       {!success && (
         <>
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              Nueva contraseña
+            <label className="block text-xs font-medium text-foreground mb-1">
+              New password
             </label>
             <Input
               type="password"
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="bg-slate-900/80 border-slate-700 text-slate-50"
+              disabled={loading}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              Repetí la contraseña
+            <label className="block text-xs font-medium text-foreground mb-1">
+              Confirm new password
             </label>
             <Input
               type="password"
               autoComplete="new-password"
               value={passwordConfirm}
               onChange={(e) => setPasswordConfirm(e.target.value)}
-              className="bg-slate-900/80 border-slate-700 text-slate-50"
+              disabled={loading}
             />
           </div>
 
           {error && (
-            <div className="rounded-lg border border-red-500/60 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            <div className="p-3 rounded-md border border-red-200 bg-red-50 text-sm text-red-700">
               {error}
             </div>
           )}
 
           <Button
             type="submit"
-            className="w-full"
-            disabled={loading}
+            variant="default"
+            size="lg"
+            fullWidth
+            loading={loading}
           >
-            {loading ? "Actualizando…" : "Actualizar contraseña"}
+            {loading ? "Updating…" : "Update password"}
           </Button>
         </>
       )}
