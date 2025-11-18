@@ -27,6 +27,8 @@ export default function AuthProvider({ children }) {
 
       if (!mounted) return;
 
+      console.log("[AuthProvider] init.getSession()", { data, error });
+
       if (error) {
         console.error("Error getting session", error);
         setLoading(false);
@@ -46,8 +48,10 @@ export default function AuthProvider({ children }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
+
+      console.log("[AuthProvider] onAuthStateChange", { event, session });
 
       setSession(session);
 
@@ -67,10 +71,14 @@ export default function AuthProvider({ children }) {
 
   const loadTenantsAndProfile = async (userId) => {
     try {
+      console.log("[AuthProvider] loadTenantsAndProfile userId", userId);
+
       const { data, error } = await supabase
         .from("tenant_members")
         .select("role, tenant_id, tenants ( name, slug )")
         .eq("user_id", userId);
+
+      console.log("[AuthProvider] tenant_members result", { data, error });
 
       if (error) {
         console.error("Error loading profile/tenants", error);
@@ -114,10 +122,14 @@ export default function AuthProvider({ children }) {
   const login = async (email, password) => {
     setLoading(true);
 
+    console.log("[AuthProvider] login() called", { email });
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
+    console.log("[AuthProvider] login result", { data, error });
 
     if (error) {
       setLoading(false);
