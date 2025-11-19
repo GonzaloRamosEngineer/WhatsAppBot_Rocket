@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\messages-log\index.jsx
+
 import React, { useMemo, useState, useEffect } from "react";
 import NavigationSidebar from "../../components/ui/NavigationSidebar";
 import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
@@ -6,8 +8,6 @@ import MessageTable from "./components/MessageTable";
 import ConversationSummary from "./components/ConversationSummary";
 import MessageStats from "./components/MessageStats";
 import Button from "../../components/ui/Button";
-
-// Sesión + Supabase
 import { useAuth } from "@/lib/AuthProvider";
 
 const MessagesLog = () => {
@@ -36,7 +36,6 @@ const MessagesLog = () => {
             id,
             body,
             direction,
-            status,
             created_at,
             meta,
             conversation_id,
@@ -76,6 +75,13 @@ const MessagesLog = () => {
             contact ||
             "Unknown";
 
+          // Derivar status desde meta (ya que no existe columna status)
+          const derivedStatus =
+            meta.status ||
+            meta.delivery_status ||
+            meta.message_status ||
+            "sent";
+
           return {
             id: m.id,
             messageId: meta.message_id || meta.id || `msg_${m.id}`,
@@ -83,7 +89,7 @@ const MessagesLog = () => {
             contactName,
             body: m.body || "",
             direction: isInbound ? "inbound" : "outbound",
-            status: m.status || meta.status || "sent",
+            status: derivedStatus,
             timestamp: m.created_at ? new Date(m.created_at) : new Date(),
             metadata: meta,
             conversationContext: meta.context || [],
@@ -161,7 +167,6 @@ const MessagesLog = () => {
       );
     }
 
-    // Si hay conversación seleccionada, filtrar por ese contacto
     if (selectedConversation?.contact) {
       data = data.filter(
         (m) => m.contact === selectedConversation.contact
@@ -271,20 +276,17 @@ const MessagesLog = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation Sidebar */}
       <NavigationSidebar
         isCollapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         userRole="tenant"
       />
 
-      {/* Main Content */}
       <div
         className={`transition-all duration-200 ${
           sidebarCollapsed ? "md:ml-16" : "md:ml-60"
         }`}
       >
-        {/* Top Header */}
         <header className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
@@ -317,7 +319,6 @@ const MessagesLog = () => {
           </div>
         </header>
 
-        {/* Main Content Area */}
         <main className="p-6">
           {loadError && (
             <div className="mb-4 p-4 border border-destructive rounded bg-destructive/10 text-destructive text-sm">
@@ -331,26 +332,21 @@ const MessagesLog = () => {
             </div>
           )}
 
-          {/* Stats Cards */}
           <MessageStats stats={stats} />
 
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            {/* Messages Section */}
             <div className="xl:col-span-3 space-y-6">
-              {/* Filters */}
               <MessageFilters
                 onFilterChange={handleFilterChange}
                 onExport={handleExport}
               />
 
-              {/* Messages Table */}
               <MessageTable
                 messages={filteredMessages}
                 onBulkAction={handleBulkAction}
               />
             </div>
 
-            {/* Conversations Sidebar */}
             <div className="xl:col-span-1">
               <ConversationSummary
                 conversations={conversations}

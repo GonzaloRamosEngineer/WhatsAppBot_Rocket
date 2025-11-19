@@ -1,27 +1,26 @@
-import React from 'react';
-import * as LucideIcons from 'lucide-react';
-import { HelpCircle } from 'lucide-react';
+// C:\Projects\WhatsAppBot_Rocket\src\components\AppIcon.jsx
 
-function Icon({
-    name,
-    size = 24,
-    color = "currentColor",
-    className = "",
-    strokeWidth = 2,
-    ...props
-}) {
-    const IconComponent = LucideIcons?.[name];
+import React from "react";
+import * as LucideIcons from "lucide-react";
 
-    if (!IconComponent) {
-        return <HelpCircle size={size} color="gray" strokeWidth={strokeWidth} className={className} {...props} />;
-    }
+/**
+ * Icon wrapper for lucide-react.
+ *
+ * Uso:
+ *   <Icon name="Check" size={16} />
+ *   <Icon name="MessageCircle" className="text-primary" />
+ */
+export default function Icon({ name, size = 16, className = "", ...props }) {
+  // Intentamos resolver el icono por nombre
+  const LucideIcon = LucideIcons[name];
 
-    return <IconComponent
-        size={size}
-        color={color}
-        strokeWidth={strokeWidth}
-        className={className}
-        {...props}
-    />;
+  // Si no existe, usamos HelpCircle como fallback
+  const FallbackIcon = LucideIcons.HelpCircle || (() => null);
+
+  if (!LucideIcon) {
+    console.warn(`[AppIcon] Icon "${name}" not found in lucide-react, using HelpCircle`);
+    return <FallbackIcon size={size} className={className} {...props} />;
+  }
+
+  return <LucideIcon size={size} className={className} {...props} />;
 }
-export default Icon;
