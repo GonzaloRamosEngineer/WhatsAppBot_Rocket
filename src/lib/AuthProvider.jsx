@@ -1,5 +1,3 @@
-// C:\Projects\WhatsAppBot_Rocket\src\lib\AuthProvider.jsx
-
 import React, {
   createContext,
   useContext,
@@ -155,13 +153,25 @@ export default function AuthProvider({ children }) {
     setTenants([]);
   };
 
+  // Conveniencia: tenant actual como objeto { id, name, slug }
+  const tenant =
+    profile?.tenant_id
+      ? {
+          id: profile.tenant_id,
+          name: profile.tenant?.name || null,
+          slug: profile.tenant?.slug || null,
+        }
+      : null;
+
   const value = {
     session,
     profile,   // { role, tenant_id, tenant }
+    tenant,    // { id, name, slug } o null
     tenants,   // lista completa de memberships
     loading,
     login,
     logout,
+    supabase,  // para usar en páginas / hooks
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
