@@ -68,13 +68,10 @@ export default function AuthProvider({ children }) {
 
   // Cargar sesión inicial + suscripción a cambios de auth
   useEffect(() => {
-    let mounted = true;
-
     const init = async () => {
+      setLoading(true);
       try {
         const { data, error } = await supabase.auth.getSession();
-
-        if (!mounted) return;
 
         console.log("[AuthProvider] init.getSession()", { data, error });
 
@@ -94,16 +91,13 @@ export default function AuthProvider({ children }) {
           }
         }
       } catch (e) {
-        if (!mounted) return;
         console.error("[AuthProvider] unexpected error in getSession", e);
-        // En cualquier error dejamos todo limpio pero NO nos quedamos cargando
         setSession(null);
         setProfile(null);
         setTenants([]);
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        // Muy importante: salir del estado de carga
+        setLoading(false);
       }
     };
 
@@ -112,9 +106,10 @@ export default function AuthProvider({ children }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-
       console.log("[AuthProvider] onAuthStateChange", { event, session });
+
+      // Mientras recalculamos contexto, marcamos loading
+      setLoading(true);
 
       setSession(session);
 
@@ -124,10 +119,12 @@ export default function AuthProvider({ children }) {
         setProfile(null);
         setTenants([]);
       }
+
+      // Después de procesar el evento, salimos de loading
+      setLoading(false);
     });
 
     return () => {
-      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -151,8 +148,8 @@ export default function AuthProvider({ children }) {
 
     setSession(data.session);
 
-    if (data.user) {
-      await loadTenantsAndProfile(data.user.id);
+    if (data.session?.user) {
+      await loadTenantsAndProfile(data.session.user.id);
     } else {
       setProfile(null);
       setTenants([]);
@@ -163,10 +160,18 @@ export default function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    setProfile(null);
-    setTenants([]);
+    console.log("[AuthProvider] logout() called");
+    setLoading(true);
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("[AuthProvider] logout error", e);
+    } finally {
+      setSession(null);
+      setProfile(null);
+      setTenants([]);
+      setLoading(false);
+    }
   };
 
   // Conveniencia: tenant actual como objeto { id, name, slug }
