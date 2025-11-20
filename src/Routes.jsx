@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\src\Routes.jsx
+
 import React from "react";
 import { BrowserRouter, Routes as RouterRoutes, Route } from "react-router-dom";
 
@@ -11,6 +13,7 @@ import LoginPage from "./pages/login";
 import ChannelSetup from "./pages/channel-setup";
 import MessagesLog from "./pages/messages-log";
 import TenantDashboard from "./pages/tenant-dashboard";
+import AgentInboxPage from "./pages/agent-inbox";   // 👈 NUEVO
 
 import ProtectedRoute from "./lib/ProtectedRoute";
 import PasswordResetPage from "./pages/password-reset";
@@ -21,7 +24,6 @@ const Routes = () => {
       <ErrorBoundary>
         <ScrollToTop />
         <RouterRoutes>
-
           {/* Login (default) */}
           <Route path="/" element={<LoginPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -69,9 +71,18 @@ const Routes = () => {
             }
           />
 
+          {/* 👇 NUEVA RUTA PROTEGIDA PARA EL INBOX DE AGENTE */}
+          <Route
+            path="/agent-inbox"
+            element={
+              <ProtectedRoute>
+                <AgentInboxPage />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Catch all */}
           <Route path="*" element={<NotFound />} />
-
         </RouterRoutes>
       </ErrorBoundary>
     </BrowserRouter>

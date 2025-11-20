@@ -1,4 +1,5 @@
-// src/pages/agent-inbox/index.jsx
+// C:\Projects\WhatsAppBot_Rocket\src\pages\agent-inbox\index.jsx
+
 import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../../lib/AuthProvider";
 import ConversationList from "./components/ConversationList";
@@ -44,7 +45,8 @@ export default function AgentInboxPage() {
       `
       )
       .eq("tenant_id", tenant.id)
-      .in("status", ["open", "pending_agent", "new", "closed"]) // ajustá según tus estados
+      // Ajustá los estados si usás otros
+      .in("status", ["open", "pending_agent", "new", "closed"])
       .order("last_message_at", { ascending: false });
 
     if (error) {
@@ -128,8 +130,7 @@ export default function AgentInboxPage() {
     setSending(true);
     setSendError(null);
 
-    try:
-      // llamamos a la Edge Function nueva
+    try {
       const { data, error } = await supabase.functions.invoke(
         "whatsapp-send-message",
         {
@@ -146,7 +147,6 @@ export default function AgentInboxPage() {
       } else {
         const inserted = data?.message;
 
-        // Mensaje optimista / desde backend
         const newMessage = inserted || {
           id:
             (crypto.randomUUID && crypto.randomUUID()) ||
@@ -154,7 +154,7 @@ export default function AgentInboxPage() {
           conversation_id: selectedConversation.id,
           tenant_id: tenant.id,
           channel_id: selectedConversation.channel_id,
-          direction: "out", // 👈 consistente con webhook
+          direction: "out", // 👈 consistente con whatsapp-webhook
           sender: session?.user?.id ?? "agent",
           body: text,
           meta: { via: "agent" },
@@ -162,6 +162,7 @@ export default function AgentInboxPage() {
         };
 
         setMessages((prev) => [...prev, newMessage]);
+        // refrescamos lista para actualizar last_message_at, status, etc
         loadConversations();
       }
     } catch (e) {

@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import Icon from '../AppIcon';
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import Icon from "../AppIcon";
 
-const NavigationSidebar = ({ 
-  isCollapsed = false, 
-  onToggle, 
-  userRole = 'tenant',
-  className = '' 
+const NavigationSidebar = ({
+  isCollapsed = false,
+  onToggle,
+  userRole = "tenant",
+  className = "",
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -14,29 +14,36 @@ const NavigationSidebar = ({
 
   const navigationItems = [
     {
-      label: 'Dashboard',
-      path: '/tenant-dashboard',
-      icon: 'LayoutDashboard',
-      tooltip: 'Overview and analytics'
+      label: "Dashboard",
+      path: "/tenant-dashboard",
+      icon: "LayoutDashboard",
+      tooltip: "Overview and analytics",
     },
     {
-      label: 'Channels',
-      path: '/channel-setup',
-      icon: 'MessageSquare',
-      tooltip: 'WhatsApp integration setup'
+      label: "Channels",
+      path: "/channel-setup",
+      icon: "MessageSquare",
+      tooltip: "WhatsApp integration setup",
     },
     {
-      label: 'Automation',
-      path: '/flow-builder',
-      icon: 'GitBranch',
-      tooltip: 'Build chatbot flows'
+      label: "Automation",
+      path: "/flow-builder",
+      icon: "GitBranch",
+      tooltip: "Build chatbot flows",
     },
     {
-      label: 'Messages',
-      path: '/messages-log',
-      icon: 'MessageCircle',
-      tooltip: 'Conversation history'
-    }
+      label: "Messages",
+      path: "/messages-log",
+      icon: "MessageCircle",
+      tooltip: "Conversation history",
+    },
+    // 👇 NUEVO: Inbox de agente
+    {
+      label: "Agent Inbox",
+      path: "/agent-inbox",
+      icon: "Headphones",
+      tooltip: "Responder como agente",
+    },
   ];
 
   const handleNavigation = (path) => {
@@ -55,8 +62,8 @@ const NavigationSidebar = ({
       }
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const sidebarContent = (
@@ -69,8 +76,12 @@ const NavigationSidebar = ({
           </div>
           {!isCollapsed && (
             <div className="flex flex-col">
-              <span className="text-lg font-semibold text-foreground">WhatsApp</span>
-              <span className="text-sm text-muted-foreground">Bot Manager</span>
+              <span className="text-lg font-semibold text-foreground">
+                WhatsApp
+              </span>
+              <span className="text-sm text-muted-foreground">
+                Bot Manager
+              </span>
             </div>
           )}
         </div>
@@ -80,7 +91,7 @@ const NavigationSidebar = ({
       <nav className="flex-1 px-4 py-6 space-y-2">
         {navigationItems?.map((item) => {
           const isActive = isActivePath(item?.path);
-          
+
           return (
             <button
               key={item?.path}
@@ -88,23 +99,26 @@ const NavigationSidebar = ({
               className={`
                 w-full flex items-center px-3 py-3 rounded-md text-left
                 micro-animation group relative
-                ${isActive 
-                  ? 'bg-primary text-primary-foreground shadow-sm' 
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                ${
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }
-                ${isCollapsed ? 'justify-center' : 'justify-start space-x-3'}
+                ${isCollapsed ? "justify-center" : "justify-start space-x-3"}
               `}
-              title={isCollapsed ? item?.tooltip : ''}
+              title={isCollapsed ? item?.tooltip : ""}
             >
-              <Icon 
-                name={item?.icon} 
-                size={20} 
-                className={`flex-shrink-0 ${isActive ? 'text-primary-foreground' : ''}`}
+              <Icon
+                name={item?.icon}
+                size={20}
+                className={`flex-shrink-0 ${
+                  isActive ? "text-primary-foreground" : ""
+                }`}
               />
               {!isCollapsed && (
                 <span className="font-medium">{item?.label}</span>
               )}
-              {/* Tooltip for collapsed state */}
+              {/* Tooltip para estado colapsado */}
               {isCollapsed && (
                 <div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-sm rounded-md shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-200">
                   {item?.label}
@@ -121,12 +135,9 @@ const NavigationSidebar = ({
           <button
             onClick={onToggle}
             className="w-full flex items-center justify-center p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md micro-animation"
-            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            <Icon 
-              name={isCollapsed ? 'ChevronRight' : 'ChevronLeft'} 
-              size={20} 
-            />
+            <Icon name={isCollapsed ? "ChevronRight" : "ChevronLeft"} size={20} />
           </button>
         </div>
       )}
@@ -144,10 +155,10 @@ const NavigationSidebar = ({
       </button>
 
       {/* Desktop Sidebar */}
-      <aside 
+      <aside
         className={`
           hidden md:block fixed left-0 top-0 h-full z-100 sidebar-transition
-          ${isCollapsed ? 'w-16' : 'w-60'}
+          ${isCollapsed ? "w-16" : "w-60"}
           ${className}
         `}
       >
@@ -157,7 +168,7 @@ const NavigationSidebar = ({
       {/* Mobile Sidebar Overlay */}
       {isMobileOpen && (
         <div className="md:hidden fixed inset-0 z-300">
-          <div 
+          <div
             className="absolute inset-0 bg-black bg-opacity-50"
             onClick={() => setIsMobileOpen(false)}
           />
