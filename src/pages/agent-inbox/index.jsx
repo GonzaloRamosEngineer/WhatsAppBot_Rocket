@@ -52,7 +52,7 @@ export default function AgentInboxPage() {
         channel_id,
         contact_phone,
         contact_name,
-        contact_note,
+        topic,
         status,
         assigned_agent,
         last_message_at
@@ -261,7 +261,7 @@ export default function AgentInboxPage() {
           channel_id,
           contact_phone,
           contact_name,
-          contact_note,
+          topic,
           status,
           assigned_agent,
           last_message_at
