@@ -1,11 +1,20 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\agent-inbox\index.jsx
+
 import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+
 import { useAuth } from "../../lib/AuthProvider";
+import NavigationSidebar from "../../components/ui/NavigationSidebar";
+
 import ConversationList from "./components/ConversationList";
 import ChatHeader from "./components/ChatHeader";
 import ChatMessages from "./components/ChatMessages";
 import MessageComposer from "./components/MessageComposer";
 
 export default function AgentInboxPage() {
+  const navigate = useNavigate();
+
+  // ProtectedRoute ya maneja loading; acá no bloqueamos render
   const { supabase, tenant, profile, session, loading: authLoading } =
     useAuth();
 
@@ -21,6 +30,10 @@ export default function AgentInboxPage() {
 
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
+
+  // Estado para updates de conversación (status / asignación)
+  const [updatingConversation, setUpdatingConversation] = useState(false);
+  const [updateConversationError, setUpdateConversationError] = useState(null);
 
   // 🔁 Cargar lista de conversaciones del tenant
   const loadConversations = useCallback(async () => {
@@ -159,6 +172,7 @@ export default function AgentInboxPage() {
         };
 
         setMessages((prev) => [...prev, newMessage]);
+        // Refrescamos lista para actualizar last_message_at
         loadConversations();
       }
     } catch (e) {
@@ -187,6 +201,7 @@ export default function AgentInboxPage() {
           const newMsg = payload.new;
           if (!newMsg) return;
 
+          // Si es de la conversación abierta, lo agregamos al chat
           setMessages((prev) => {
             if (!selectedConversation) return prev;
             if (newMsg.conversation_id !== selectedConversation.id) return prev;
@@ -194,6 +209,7 @@ export default function AgentInboxPage() {
             return [...prev, newMsg];
           });
 
+          // Actualizar lista de conversaciones (last_message_at y orden)
           setConversations((prev) => {
             const idx = prev.findIndex(
               (c) => c.id === newMsg.conversation_id
@@ -223,79 +239,201 @@ export default function AgentInboxPage() {
     };
   }, [supabase, tenant?.id, selectedConversation]);
 
-  // 📌 Estados de carga globales
-  if (authLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
-        Cargando sesión...
-      </div>
-    );
-  }
+  // 🧩 Helper para aplicar patch a la conversación seleccionada
+  const patchSelectedConversation = useCallback(
+    async (fields) => {
+      if (!selectedConversation?.id) return;
 
-  if (!tenant?.id) {
-    return (
-      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
-        No tenés un tenant asociado todavía.
-      </div>
-    );
-  }
+      setUpdatingConversation(true);
+      setUpdateConversationError(null);
+
+      const { data, error } = await supabase
+        .from("conversations")
+        .update(fields)
+        .eq("id", selectedConversation.id)
+        .select(
+          `
+          id,
+          tenant_id,
+          channel_id,
+          contact_phone,
+          status,
+          assigned_agent,
+          last_message_at
+        `
+        )
+        .single();
+
+      if (error) {
+        console.error("[AgentInbox] patchSelectedConversation error", error);
+        setUpdateConversationError(
+          error.message || "Error updating conversation"
+        );
+      } else if (data) {
+        // Actualizamos en lista
+        setConversations((prev) => {
+          const idx = prev.findIndex((c) => c.id === data.id);
+          if (idx === -1) return prev;
+          const updated = [...prev];
+          updated[idx] = data;
+          return updated;
+        });
+        // Actualizamos seleccionada
+        setSelectedConversation(data);
+      }
+
+      setUpdatingConversation(false);
+    },
+    [supabase, selectedConversation]
+  );
+
+  // 👤 Tomar conversación
+  const handleAssignToMe = async () => {
+    if (!session?.user?.id || !selectedConversation) return;
+
+    const nextStatus =
+      selectedConversation.status === "new"
+        ? "open"
+        : selectedConversation.status;
+
+    await patchSelectedConversation({
+      assigned_agent: session.user.id,
+      status: nextStatus,
+    });
+  };
+
+  // 👤 Liberar conversación
+  const handleUnassign = async () => {
+    if (!selectedConversation) return;
+    await patchSelectedConversation({
+      assigned_agent: null,
+    });
+  };
+
+  // 🔄 Cambiar estado (new | open | pending_agent | closed)
+  const handleChangeStatus = async (newStatus) => {
+    if (!selectedConversation) return;
+    if (newStatus === selectedConversation.status) return;
+
+    // Si está cerrada y la reabrimos, la ponemos en open
+    const finalStatus =
+      selectedConversation.status === "closed" && newStatus === "open"
+        ? "open"
+        : newStatus;
+
+    await patchSelectedConversation({
+      status: finalStatus,
+    });
+  };
+
+  const handleBackToDashboard = () => {
+    navigate("/tenant-dashboard");
+  };
+
+  const noTenant = !tenant?.id;
 
   return (
-    <div className="flex h-[calc(100vh-64px)] border border-border rounded-xl overflow-hidden bg-background">
-      {/* Lista de conversaciones */}
-      <div className="w-full max-w-xs border-r border-border bg-muted/30 flex flex-col">
-        <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold">
-            Conversaciones
-            {tenant?.name ? ` · ${tenant.name}` : ""}
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Seleccioná un chat para responder como agente.
-          </p>
-        </div>
+    <div className="flex min-h-screen bg-background">
+      {/* Sidebar global */}
+      <NavigationSidebar />
 
-        <ConversationList
-          conversations={conversations}
-          loading={conversationsLoading}
-          error={conversationsError}
-          selectedId={selectedConversation?.id || null}
-          onSelect={handleSelectConversation}
-        />
-      </div>
-
-      {/* Panel de chat */}
-      <div className="flex flex-1 flex-col">
-        {selectedConversation ? (
-          <>
-            <ChatHeader
-              conversation={selectedConversation}
-              profile={profile}
-              session={session}
-            />
-
-            <ChatMessages
-              messages={messages}
-              loading={messagesLoading}
-              error={messagesError}
-            />
-
-            <div className="border-t border-border">
-              <MessageComposer
-                disabled={sending}
-                onSend={handleSendMessage}
-                error={sendError}
-              />
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-1 flex-col items-center justify-center text-sm text-muted-foreground">
-            <p className="mb-2 font-medium">No hay conversación seleccionada</p>
-            <p className="text-xs text-muted-foreground">
-              Elegí un contacto de la lista para ver el historial y responder.
-            </p>
+      {/* Contenido principal */}
+      <main className="flex-1 ml-0 md:ml-60 flex flex-col">
+        {/* Header superior */}
+        <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card/60 backdrop-blur">
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-foreground">
+              Bandeja de agente
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Conversaciones · {tenant?.name || "DigitalMatch"}
+            </span>
           </div>
-        )}
-      </div>
+
+          <button
+            type="button"
+            onClick={handleBackToDashboard}
+            className="text-xs md:text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted micro-animation"
+          >
+            Volver al dashboard
+          </button>
+        </header>
+
+        {/* Contenido del inbox */}
+        <section className="flex-1 p-4">
+          {noTenant ? (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground border border-dashed border-border rounded-xl">
+              No tenés un tenant asociado todavía. Completá el registro de tu
+              organización para usar la bandeja de agente.
+            </div>
+          ) : (
+            <div className="flex h-full border border-border rounded-xl overflow-hidden bg-background">
+              {/* Lista de conversaciones */}
+              <div className="w-full max-w-xs border-right border-border bg-muted/30 flex flex-col border-r">
+                <div className="px-4 py-3 border-b border-border">
+                  <h2 className="text-sm font-semibold">
+                    Conversaciones
+                    {tenant?.name ? ` · ${tenant.name}` : ""}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Seleccioná un chat para responder como agente.
+                  </p>
+                </div>
+
+                <ConversationList
+                  conversations={conversations}
+                  loading={conversationsLoading}
+                  error={conversationsError}
+                  selectedId={selectedConversation?.id || null}
+                  onSelect={handleSelectConversation}
+                />
+              </div>
+
+              {/* Panel de chat */}
+              <div className="flex flex-1 flex-col">
+                {selectedConversation ? (
+                  <>
+                    <ChatHeader
+                      conversation={selectedConversation}
+                      profile={profile}
+                      session={session}
+                      updating={updatingConversation}
+                      updateError={updateConversationError}
+                      onAssignToMe={handleAssignToMe}
+                      onUnassign={handleUnassign}
+                      onChangeStatus={handleChangeStatus}
+                    />
+
+                    <ChatMessages
+                      messages={messages}
+                      loading={messagesLoading}
+                      error={messagesError}
+                    />
+
+                    <div className="border-t border-border">
+                      <MessageComposer
+                        disabled={sending || selectedConversation.status === "closed"}
+                        onSend={handleSendMessage}
+                        error={sendError}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-1 flex-col items-center justify-center text-sm text-muted-foreground">
+                    <p className="mb-2 font-medium">
+                      No hay conversación seleccionada
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Elegí un contacto de la lista para ver el historial y
+                      responder.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+      </main>
     </div>
   );
 }
