@@ -13,7 +13,7 @@ import LoginPage from "./pages/login";
 import ChannelSetup from "./pages/channel-setup";
 import MessagesLog from "./pages/messages-log";
 import TenantDashboard from "./pages/tenant-dashboard";
-import AgentInboxPage from "./pages/agent-inbox";   // 👈 NUEVO
+import AgentInboxPage from "./pages/agent-inbox";
 
 import ProtectedRoute from "./lib/ProtectedRoute";
 import PasswordResetPage from "./pages/password-reset";
@@ -32,7 +32,10 @@ const Routes = () => {
           <Route path="/auth/reset-password" element={<PasswordResetPage />} />
 
           {/* Public routes */}
-          <Route path="/tenant-registration" element={<TenantRegistration />} />
+          <Route
+            path="/tenant-registration"
+            element={<TenantRegistration />}
+          />
 
           {/* Protected routes (requieren usuario autenticado) */}
           <Route
@@ -71,7 +74,6 @@ const Routes = () => {
             }
           />
 
-          {/* 👇 NUEVA RUTA PROTEGIDA PARA EL INBOX DE AGENTE */}
           <Route
             path="/agent-inbox"
             element={

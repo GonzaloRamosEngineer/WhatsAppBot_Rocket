@@ -1,4 +1,5 @@
-// src/lib/ProtectedRoute.jsx
+// C:\Projects\WhatsAppBot_Rocket\src\lib\ProtectedRoute.jsx
+
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
@@ -38,7 +39,6 @@ export default function ProtectedRoute({ children, roles }) {
       have: profile?.role,
       needed: roles,
     });
-    // Podés mandarlo al dashboard o a / en general
     return <Navigate to="/" replace />;
   }
 
