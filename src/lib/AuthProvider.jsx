@@ -16,57 +16,6 @@ export default function AuthProvider({ children }) {
   const [tenants, setTenants] = useState([]);   // lista de memberships
   const [loading, setLoading] = useState(true);
 
-  // Cargar sesión inicial + suscripción a cambios de auth
-  useEffect(() => {
-    let mounted = true;
-
-    const init = async () => {
-      const { data, error } = await supabase.auth.getSession();
-
-      if (!mounted) return;
-
-      console.log("[AuthProvider] init.getSession()", { data, error });
-
-      if (error) {
-        console.error("Error getting session", error);
-        setLoading(false);
-        return;
-      }
-
-      setSession(data.session);
-
-      if (data.session?.user) {
-        await loadTenantsAndProfile(data.session.user.id);
-      }
-
-      setLoading(false);
-    };
-
-    init();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-
-      console.log("[AuthProvider] onAuthStateChange", { event, session });
-
-      setSession(session);
-
-      if (session?.user) {
-        await loadTenantsAndProfile(session.user.id);
-      } else {
-        setProfile(null);
-        setTenants([]);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
   const loadTenantsAndProfile = async (userId) => {
     try {
       console.log("[AuthProvider] loadTenantsAndProfile userId", userId);
@@ -117,6 +66,72 @@ export default function AuthProvider({ children }) {
     }
   };
 
+  // Cargar sesión inicial + suscripción a cambios de auth
+  useEffect(() => {
+    let mounted = true;
+
+    const init = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+
+        if (!mounted) return;
+
+        console.log("[AuthProvider] init.getSession()", { data, error });
+
+        if (error) {
+          console.error("Error getting session", error);
+          setSession(null);
+          setProfile(null);
+          setTenants([]);
+        } else {
+          setSession(data.session);
+
+          if (data.session?.user) {
+            await loadTenantsAndProfile(data.session.user.id);
+          } else {
+            setProfile(null);
+            setTenants([]);
+          }
+        }
+      } catch (e) {
+        if (!mounted) return;
+        console.error("[AuthProvider] unexpected error in getSession", e);
+        // En cualquier error dejamos todo limpio pero NO nos quedamos cargando
+        setSession(null);
+        setProfile(null);
+        setTenants([]);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    init();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      console.log("[AuthProvider] onAuthStateChange", { event, session });
+
+      setSession(session);
+
+      if (session?.user) {
+        await loadTenantsAndProfile(session.user.id);
+      } else {
+        setProfile(null);
+        setTenants([]);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const login = async (email, password) => {
     setLoading(true);
 
@@ -134,15 +149,16 @@ export default function AuthProvider({ children }) {
       return { ok: false, error };
     }
 
-    // data.session y data.user vienen de Supabase
     setSession(data.session);
 
     if (data.user) {
       await loadTenantsAndProfile(data.user.id);
+    } else {
+      setProfile(null);
+      setTenants([]);
     }
 
     setLoading(false);
-    // El LoginForm solo usa ok + error, pero dejamos session por si lo querés
     return { ok: true, session: data.session };
   };
 
