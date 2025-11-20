@@ -31,7 +31,7 @@ export default function AgentInboxPage() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
 
-  // Estado para updates de conversación (status / asignación)
+  // Estado para updates de conversación (status / asignación / nombre / topic)
   const [updatingConversation, setUpdatingConversation] = useState(false);
   const [updateConversationError, setUpdateConversationError] =
     useState(null);
@@ -51,6 +51,8 @@ export default function AgentInboxPage() {
         tenant_id,
         channel_id,
         contact_phone,
+        contact_name,
+        topic,
         status,
         assigned_agent,
         last_message_at
@@ -258,6 +260,8 @@ export default function AgentInboxPage() {
           tenant_id,
           channel_id,
           contact_phone,
+          contact_name,
+          topic,
           status,
           assigned_agent,
           last_message_at
@@ -318,6 +322,16 @@ export default function AgentInboxPage() {
 
     await patchSelectedConversation({
       status: newStatus,
+    });
+  };
+
+  // 🧾 Actualizar info del contacto (nombre / topic)
+  const handleUpdateContactInfo = async ({ contact_name, topic }) => {
+    if (!selectedConversation) return;
+
+    await patchSelectedConversation({
+      contact_name: contact_name || null,
+      topic: topic || null,
     });
   };
 
@@ -397,6 +411,7 @@ export default function AgentInboxPage() {
                       onAssignToMe={handleAssignToMe}
                       onUnassign={handleUnassign}
                       onChangeStatus={handleChangeStatus}
+                      onUpdateContactInfo={handleUpdateContactInfo}
                     />
 
                     <ChatMessages

@@ -1,4 +1,5 @@
 // src/pages/agent-inbox/components/ConversationList.jsx
+
 import React, { useMemo, useState } from "react";
 import ConversationListItem from "./ConversationListItem";
 
@@ -17,8 +18,13 @@ export default function ConversationList({
 
     return conversations.filter((c) => {
       const phone = (c.contact_phone || "").toLowerCase();
+      const name = (c.contact_name || "").toLowerCase();
       const status = (c.status || "").toLowerCase();
-      return phone.includes(term) || status.includes(term);
+      return (
+        phone.includes(term) ||
+        name.includes(term) ||
+        status.includes(term)
+      );
     });
   }, [conversations, search]);
 
@@ -29,7 +35,7 @@ export default function ConversationList({
         <input
           type="text"
           className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-          placeholder="Buscar por teléfono o estado..."
+          placeholder="Buscar por nombre, teléfono o estado..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
