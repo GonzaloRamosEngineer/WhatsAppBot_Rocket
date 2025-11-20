@@ -45,7 +45,6 @@ export default function AgentInboxPage() {
       `
       )
       .eq("tenant_id", tenant.id)
-      // Ajustá los estados si usás otros
       .in("status", ["open", "pending_agent", "new", "closed"])
       .order("last_message_at", { ascending: false });
 
@@ -154,7 +153,7 @@ export default function AgentInboxPage() {
           conversation_id: selectedConversation.id,
           tenant_id: tenant.id,
           channel_id: selectedConversation.channel_id,
-          direction: "out", // 👈 consistente con whatsapp-webhook
+          direction: "out",
           sender: session?.user?.id ?? "agent",
           body: text,
           meta: { via: "agent" },
@@ -162,7 +161,6 @@ export default function AgentInboxPage() {
         };
 
         setMessages((prev) => [...prev, newMessage]);
-        // refrescamos lista para actualizar last_message_at, status, etc
         loadConversations();
       }
     } catch (e) {
@@ -172,6 +170,64 @@ export default function AgentInboxPage() {
 
     setSending(false);
   };
+
+  // 🔔 Realtime: escuchar INSERTs en messages del tenant
+  useEffect(() => {
+    if (!tenant?.id) return;
+
+    const channel = supabase
+      .channel(`realtime-messages-tenant-${tenant.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `tenant_id=eq.${tenant.id}`,
+        },
+        (payload) => {
+          const newMsg = payload.new;
+          if (!newMsg) return;
+
+          // 👀 Si es de la conversación abierta, lo agregamos al chat
+          setMessages((prev) => {
+            if (!selectedConversation) return prev;
+            if (newMsg.conversation_id !== selectedConversation.id) return prev;
+            // evitar duplicar si ya está
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+
+          // 🔄 Actualizar lista de conversaciones (last_message_at y orden)
+          setConversations((prev) => {
+            const idx = prev.findIndex(
+              (c) => c.id === newMsg.conversation_id
+            );
+            if (idx === -1) return prev;
+
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              last_message_at: newMsg.created_at,
+            };
+
+            // ordenar por last_message_at desc
+            updated.sort((a, b) => {
+              const da = new Date(a.last_message_at || 0).getTime();
+              const db = new Date(b.last_message_at || 0).getTime();
+              return db - da;
+            });
+
+            return updated;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, tenant?.id, selectedConversation?.id]);
 
   // 📌 Estados de carga globales
   if (authLoading) {
