@@ -1,4 +1,4 @@
-// src/pages/agent-inbox/components/ConversationList.jsx
+// C:\Projects\WhatsAppBot_Rocket\src\pages\agent-inbox\components\ConversationList.jsx
 
 import React, { useMemo, useState } from "react";
 import ConversationListItem from "./ConversationListItem";
@@ -17,13 +17,15 @@ export default function ConversationList({
     if (!term) return conversations;
 
     return conversations.filter((c) => {
-      const phone = (c.contact_phone || "").toLowerCase();
       const name = (c.contact_name || "").toLowerCase();
+      const phone = (c.contact_phone || "").toLowerCase();
       const status = (c.status || "").toLowerCase();
+      const topic = (c.topic || "").toLowerCase();
       return (
-        phone.includes(term) ||
         name.includes(term) ||
-        status.includes(term)
+        phone.includes(term) ||
+        status.includes(term) ||
+        topic.includes(term)
       );
     });
   }, [conversations, search]);

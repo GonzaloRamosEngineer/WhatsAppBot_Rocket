@@ -3,27 +3,35 @@
 import React, { useEffect, useRef } from "react";
 import clsx from "clsx";
 
+function formatTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function ChatMessages({ messages, loading, error }) {
-  const endRef = useRef(null);
+  const containerRef = useRef(null);
 
   // Auto-scroll al último mensaje cuando cambia la lista
   useEffect(() => {
-    if (!endRef.current) return;
-    endRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages?.length, loading]);
+    const el = containerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages?.length]);
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto bg-background px-6 py-4">
+    <div
+      ref={containerRef}
+      className="flex-1 overflow-y-auto px-6 py-4 bg-background"
+    >
       {loading && (
-        <div className="text-xs text-muted-foreground mb-2">
+        <div className="text-xs text-muted-foreground">
           Cargando mensajes...
         </div>
       )}
 
-      {error && (
-        <div className="text-xs text-red-500 mb-2">
-          Error al cargar mensajes: {String(error)}
-        </div>
+      {error && !loading && (
+        <div className="text-xs text-red-500">Error: {String(error)}</div>
       )}
 
       {!loading && !error && (!messages || messages.length === 0) && (
@@ -33,53 +41,31 @@ export default function ChatMessages({ messages, loading, error }) {
       )}
 
       <div className="space-y-2">
-        {messages?.map((msg) => {
-          const isOutgoing = msg.direction === "out";
-          const isBot = msg.sender === "bot";
-
-          const createdAt = msg.created_at
-            ? new Date(msg.created_at)
-            : null;
-          const timeLabel = createdAt
-            ? createdAt.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "";
+        {messages.map((msg) => {
+          const isOut = msg.direction === "out";
+          const align = isOut ? "justify-end" : "justify-start";
 
           return (
-            <div
-              key={msg.id}
-              className={clsx(
-                "flex",
-                isOutgoing ? "justify-end" : "justify-start"
-              )}
-            >
-              <div className="max-w-[70%]">
-                <div
-                  className={clsx(
-                    "rounded-2xl px-3 py-2 text-xs leading-snug shadow-sm",
-                    isOutgoing
-                      ? "bg-primary text-primary-foreground rounded-br-sm"
-                      : "bg-muted text-foreground rounded-bl-sm"
-                  )}
-                >
-                  <div className="whitespace-pre-line break-words">
-                    {msg.body}
-                  </div>
+            <div key={msg.id} className={clsx("flex", align)}>
+              <div
+                className={clsx(
+                  "max-w-[70%] rounded-2xl px-3 py-2 text-xs shadow-sm",
+                  isOut
+                    ? "bg-primary text-primary-foreground rounded-br-sm"
+                    : "bg-muted text-foreground rounded-bl-sm"
+                )}
+              >
+                <div className="whitespace-pre-wrap break-words">
+                  {msg.body}
                 </div>
-                <div className="mt-0.5 text-[10px] text-muted-foreground text-right">
-                  {isBot ? "Bot · " : ""}
-                  {timeLabel}
+                <div className="mt-1 text-[10px] text-muted-foreground/80 text-right">
+                  {formatTime(msg.created_at)}
                 </div>
               </div>
             </div>
           );
         })}
       </div>
-
-      {/* ancla para el auto-scroll */}
-      <div ref={endRef} />
     </div>
   );
 }
