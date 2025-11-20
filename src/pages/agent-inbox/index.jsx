@@ -325,12 +325,13 @@ export default function AgentInboxPage() {
     });
   };
 
-  // 📝 Actualizar nombre / nota del contacto
-  const handleUpdateContactInfo = async ({ contact_name, topic }) => {
+  // 💾 Guardar/editar contacto (nombre + nota)
+  const handleSaveContact = async (contactName, topic) => {
     if (!selectedConversation) return;
+
     await patchSelectedConversation({
-      contact_name: contact_name ?? null,
-      topic: topic ?? null,
+      contact_name: contactName,
+      topic: topic,
     });
   };
 
@@ -368,7 +369,7 @@ export default function AgentInboxPage() {
         </header>
 
         {/* Contenido del inbox */}
-        <section className="flex-1 p-4">
+        <section className="flex-1 p-4 min-h-0">
           {noTenant ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground border border-dashed border-border rounded-xl">
               No tenés un tenant asociado todavía. Completá el registro de tu
@@ -398,7 +399,7 @@ export default function AgentInboxPage() {
               </div>
 
               {/* Panel de chat */}
-              <div className="flex flex-1 flex-col">
+              <div className="flex flex-1 flex-col min-h-0">
                 {selectedConversation ? (
                   <>
                     <ChatHeader
@@ -410,9 +411,10 @@ export default function AgentInboxPage() {
                       onAssignToMe={handleAssignToMe}
                       onUnassign={handleUnassign}
                       onChangeStatus={handleChangeStatus}
-                      onUpdateContactInfo={handleUpdateContactInfo}
+                      onSaveContact={handleSaveContact}
                     />
 
+                    {/* 👉 Contenedor con scroll interno */}
                     <ChatMessages
                       messages={messages}
                       loading={messagesLoading}
