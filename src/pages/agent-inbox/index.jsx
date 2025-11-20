@@ -31,7 +31,7 @@ export default function AgentInboxPage() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
 
-  // Estado para updates de conversación (status / asignación / nombre / topic)
+  // Estado para updates de conversación (status / asignación)
   const [updatingConversation, setUpdatingConversation] = useState(false);
   const [updateConversationError, setUpdateConversationError] =
     useState(null);
@@ -52,7 +52,7 @@ export default function AgentInboxPage() {
         channel_id,
         contact_phone,
         contact_name,
-        topic,
+        contact_note,
         status,
         assigned_agent,
         last_message_at
@@ -261,7 +261,7 @@ export default function AgentInboxPage() {
           channel_id,
           contact_phone,
           contact_name,
-          topic,
+          contact_note,
           status,
           assigned_agent,
           last_message_at
@@ -322,16 +322,6 @@ export default function AgentInboxPage() {
 
     await patchSelectedConversation({
       status: newStatus,
-    });
-  };
-
-  // 🧾 Actualizar info del contacto (nombre / topic)
-  const handleUpdateContactInfo = async ({ contact_name, topic }) => {
-    if (!selectedConversation) return;
-
-    await patchSelectedConversation({
-      contact_name: contact_name || null,
-      topic: topic || null,
     });
   };
 
@@ -399,7 +389,7 @@ export default function AgentInboxPage() {
               </div>
 
               {/* Panel de chat */}
-              <div className="flex flex-1 flex-col">
+              <div className="flex flex-1 flex-col min-h-0">
                 {selectedConversation ? (
                   <>
                     <ChatHeader
@@ -411,9 +401,9 @@ export default function AgentInboxPage() {
                       onAssignToMe={handleAssignToMe}
                       onUnassign={handleUnassign}
                       onChangeStatus={handleChangeStatus}
-                      onUpdateContactInfo={handleUpdateContactInfo}
                     />
 
+                    {/* ChatMessages ahora maneja scroll interno */}
                     <ChatMessages
                       messages={messages}
                       loading={messagesLoading}
