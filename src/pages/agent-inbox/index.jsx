@@ -33,7 +33,8 @@ export default function AgentInboxPage() {
 
   // Estado para updates de conversación (status / asignación)
   const [updatingConversation, setUpdatingConversation] = useState(false);
-  const [updateConversationError, setUpdateConversationError] = useState(null);
+  const [updateConversationError, setUpdateConversationError] =
+    useState(null);
 
   // 🔁 Cargar lista de conversaciones del tenant
   const loadConversations = useCallback(async () => {
@@ -56,7 +57,7 @@ export default function AgentInboxPage() {
       `
       )
       .eq("tenant_id", tenant.id)
-      .in("status", ["open", "pending_agent", "new", "closed"])
+      .in("status", ["new", "open", "pending", "closed"])
       .order("last_message_at", { ascending: false });
 
     if (error) {
@@ -310,19 +311,13 @@ export default function AgentInboxPage() {
     });
   };
 
-  // 🔄 Cambiar estado (new | open | pending_agent | closed)
+  // 🔄 Cambiar estado (new | open | pending | closed)
   const handleChangeStatus = async (newStatus) => {
     if (!selectedConversation) return;
     if (newStatus === selectedConversation.status) return;
 
-    // Si está cerrada y la reabrimos, la ponemos en open
-    const finalStatus =
-      selectedConversation.status === "closed" && newStatus === "open"
-        ? "open"
-        : newStatus;
-
     await patchSelectedConversation({
-      status: finalStatus,
+      status: newStatus,
     });
   };
 
@@ -412,7 +407,9 @@ export default function AgentInboxPage() {
 
                     <div className="border-t border-border">
                       <MessageComposer
-                        disabled={sending || selectedConversation.status === "closed"}
+                        disabled={
+                          sending || selectedConversation.status === "closed"
+                        }
                         onSend={handleSendMessage}
                         error={sendError}
                       />

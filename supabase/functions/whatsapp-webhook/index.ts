@@ -8,14 +8,12 @@ const VERIFY_TOKEN = Deno.env.get("META_VERIFY_TOKEN")!;
 
 // Resuelve el token real de Meta a partir del alias guardado en la tabla channels
 function resolveMetaToken(alias: string): string | null {
-  // Mapa explícito para los casos que ya tenés
   const map: Record<string, string> = {
     meta_token_dm: Deno.env.get("META_TOKEN_DM") ?? "",
     meta_token_fea: Deno.env.get("META_TOKEN_FEA") ?? "",
   };
   if (map[alias]) return map[alias];
 
-  // Convención opcional: meta_token_cliente_x -> META_TOKEN__CLIENTE_X
   const envKey =
     "META_TOKEN__" + alias.toUpperCase().replace(/[^A-Z0-9]/g, "_");
   const val = Deno.env.get(envKey);
@@ -86,6 +84,8 @@ serve(async (req) => {
     const text = m.text?.body ?? "";
     if (!from) continue;
 
+    const nowIso = new Date().toISOString();
+
     // --- Asegurar conversación (1 por contacto y canal) ---
     const { data: existingConv } = await supabase
       .from("conversations")
@@ -96,28 +96,46 @@ serve(async (req) => {
       .maybeSingle();
 
     let convId = existingConv?.id;
+
     if (!convId) {
+      // Nueva conversación: arranca como 'new'
       const { data: newConv } = await supabase
         .from("conversations")
         .insert({
           tenant_id: channel.tenant_id,
           channel_id: channel.id,
           contact_phone: from,
-          status: "open",
+          status: "new",
+          last_message_at: nowIso,
         })
         .select()
         .single();
-      convId = newConv?.id;
+      convId = newConv?.id ?? null;
+    } else {
+      // Hay conversación: actualizamos last_message_at
+      const nextStatus =
+        existingConv.status === "closed" ? "open" : existingConv.status;
+
+      await supabase
+        .from("conversations")
+        .update({
+          status: nextStatus,
+          last_message_at: nowIso,
+        })
+        .eq("id", existingConv.id);
     }
 
     // Guardar mensaje entrante
     if (convId) {
       await supabase.from("messages").insert({
         conversation_id: convId,
+        tenant_id: channel.tenant_id,
+        channel_id: channel.id,
         direction: "in",
         sender: from,
         body: text,
         meta: m,
+        created_at: nowIso,
       });
     }
 
@@ -172,10 +190,13 @@ serve(async (req) => {
       if (convId) {
         await supabase.from("messages").insert({
           conversation_id: convId,
+          tenant_id: channel.tenant_id,
+          channel_id: channel.id,
           direction: "out",
           sender: "bot",
           body: reply,
           meta: { via: "auto-reply" },
+          created_at: new Date().toISOString(),
         });
       }
     }

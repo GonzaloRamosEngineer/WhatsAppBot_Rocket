@@ -6,20 +6,18 @@ import clsx from "clsx";
 const STATUS_LABELS = {
   new: "Nueva",
   open: "Abierta",
-  pending_agent: "Pendiente agente",
+  pending: "Pendiente agente",
   closed: "Cerrada",
 };
 
-const STATUS_COLORS =
-  // tailwind classes para los pill de estado
-  {
-    new: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200",
-    open: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200",
-    pending_agent:
-      "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
-    closed:
-      "bg-slate-200 text-slate-800 dark:bg-slate-800/60 dark:text-slate-100",
-  };
+const STATUS_COLORS = {
+  new: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200",
+  open: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200",
+  pending:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
+  closed:
+    "bg-slate-200 text-slate-800 dark:bg-slate-800/60 dark:text-slate-100",
+};
 
 export default function ChatHeader({
   conversation,
@@ -36,12 +34,12 @@ export default function ChatHeader({
   const isAssignedToMe = conversation.assigned_agent === userId;
   const isUnassigned = !conversation.assigned_agent;
 
-  const canEdit =
-    !!userId && (isAssignedToMe || isUnassigned); // simplificado por ahora
+  const canEdit = !!userId && (isAssignedToMe || isUnassigned);
 
   const handleStatusClick = (status) => {
     if (!canEdit) return;
-    onChangeStatus && onChangeStatus(status);
+    if (!onChangeStatus) return;
+    onChangeStatus(status);
   };
 
   return (
@@ -121,7 +119,7 @@ export default function ChatHeader({
 
         {/* Estados rápidos */}
         <div className="flex items-center gap-1 ml-2">
-          {["new", "open", "pending_agent", "closed"].map((status) => {
+          {["new", "open", "pending", "closed"].map((status) => {
             const isActive = conversation.status === status;
             const label = STATUS_LABELS[status] || status;
 
