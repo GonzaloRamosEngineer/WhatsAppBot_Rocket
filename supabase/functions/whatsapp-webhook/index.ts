@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\supabase\functions\whatsapp-webhook\index.ts
+
 // supabase/functions/whatsapp-webhook/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -5,6 +7,25 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("PROJECT_URL")!;
 const SERVICE_ROLE = Deno.env.get("SERVICE_ROLE_KEY")!;
 const VERIFY_TOKEN = Deno.env.get("META_VERIFY_TOKEN")!;
+
+// ----------------------------------------------
+// Tipos para las reglas definidas en Flow Builder
+// ----------------------------------------------
+type UiFlowRule = {
+  id: string | number;
+  name: string;
+  description?: string;
+  triggerType: "keyword" | "welcome" | "fallback";
+  keywords?: string[];
+  responses: { message: string; delay: number }[];
+  isActive?: boolean;
+};
+
+type RulesDefinitionV1 = {
+  version: number;
+  engine: string;
+  rules: UiFlowRule[];
+};
 
 // Resuelve el token real de Meta a partir del alias guardado en la tabla channels
 function resolveMetaToken(alias: string): string | null {
@@ -18,6 +39,131 @@ function resolveMetaToken(alias: string): string | null {
     "META_TOKEN__" + alias.toUpperCase().replace(/[^A-Z0-9]/g, "_");
   const val = Deno.env.get(envKey);
   return val ?? null;
+}
+
+// ----------------------------------------------
+// Motor de reglas v1 (flows.key = 'rules_v1')
+// ----------------------------------------------
+async function runRulesEngine(options: {
+  supabase: any;
+  tenantId: string;
+  botId: string;
+  channel: any;
+  from: string;
+  text: string;
+  convId: string;
+  isNewConversation: boolean;
+}) {
+  const {
+    supabase,
+    tenantId,
+    botId,
+    channel,
+    from,
+    text,
+    convId,
+    isNewConversation,
+  } = options;
+
+  const normalized = text.trim().toLowerCase();
+
+  // 1) obtener flow rules_v1 del bot
+  const { data: flowRow, error: flowError } = await supabase
+    .from("flows")
+    .select("definition")
+    .eq("bot_id", botId)
+    .eq("key", "rules_v1")
+    .maybeSingle();
+
+  if (flowError || !flowRow?.definition) {
+    if (flowError) {
+      console.error("rules_v1 flow error:", flowError);
+    }
+    return null;
+  }
+
+  const def = flowRow.definition as RulesDefinitionV1;
+  let rules = def.rules || [];
+  // Solo reglas activas (por default todas salvo que isActive === false)
+  rules = rules.filter((r) => r.isActive !== false);
+
+  if (rules.length === 0) return null;
+
+  const welcomeRules = rules.filter((r) => r.triggerType === "welcome");
+  const keywordRules = rules.filter((r) => r.triggerType === "keyword");
+  const fallbackRules = rules.filter((r) => r.triggerType === "fallback");
+
+  let selected: UiFlowRule | null = null;
+
+  // 2) Si es conversación nueva y hay welcome
+  if (isNewConversation && welcomeRules.length > 0) {
+    selected = welcomeRules[0];
+  } else {
+    // 3) Intentar keyword
+    for (const rule of keywordRules) {
+      const kws = rule.keywords || [];
+      if (kws.some((kw) => normalized.includes(kw.toLowerCase()))) {
+        selected = rule;
+        break;
+      }
+    }
+
+    // 4) Fallback si no matchea nada
+    if (!selected && fallbackRules.length > 0) {
+      selected = fallbackRules[0];
+    }
+  }
+
+  if (!selected) return null;
+
+  const token = resolveMetaToken(channel.token_alias ?? "");
+  if (!token) {
+    console.error("No Meta token for channel token_alias:", channel.token_alias);
+    return null;
+  }
+
+  // 5) Enviar respuestas al usuario
+  //    (ignoramos delay en backend para no bloquear el webhook,
+  //     el delay queda solo como metadata de diseño)
+  for (const resp of selected.responses || []) {
+    const replyText = resp.message;
+    if (!replyText) continue;
+
+    try {
+      // WhatsApp API
+      await fetch(
+        `https://graph.facebook.com/v20.0/${channel.phone_id}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: from,
+            text: { body: replyText },
+          }),
+        },
+      );
+
+      // Guardar mensaje out en tabla messages
+      await supabase.from("messages").insert({
+        conversation_id: convId,
+        tenant_id: tenantId,
+        channel_id: channel.id,
+        direction: "out",
+        sender: "bot",
+        body: replyText,
+        meta: { via: "auto-flow-rules", rule_id: selected.id },
+        created_at: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.error("Error sending WhatsApp message (rules_v1):", e);
+    }
+  }
+
+  return selected;
 }
 
 serve(async (req) => {
@@ -96,6 +242,7 @@ serve(async (req) => {
       .maybeSingle();
 
     let convId = existingConv?.id;
+    let isNewConversation = false;
 
     if (!convId) {
       // Nueva conversación: arranca como 'new'
@@ -111,6 +258,7 @@ serve(async (req) => {
         .select()
         .single();
       convId = newConv?.id ?? null;
+      isNewConversation = true;
     } else {
       // Hay conversación: actualizamos last_message_at
       const nextStatus =
@@ -139,7 +287,7 @@ serve(async (req) => {
       });
     }
 
-    // --- Resolver bot/flow default del tenant ---
+    // --- Resolver bot del tenant ---
     const { data: bot } = await supabase
       .from("bots")
       .select("id, tenant_id, name")
@@ -148,56 +296,68 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    let reply = `👋 Hola! Recibimos tu mensaje: "${text}"`;
+    if (bot?.id && convId) {
+      // 1) Intentar motor de reglas configurables (rules_v1)
+      const usedRule = await runRulesEngine({
+        supabase,
+        tenantId: channel.tenant_id,
+        botId: bot.id,
+        channel,
+        from,
+        text,
+        convId,
+        isNewConversation,
+      });
 
-    if (bot?.id) {
-      const { data: flow } = await supabase
-        .from("flows")
-        .select("definition")
-        .eq("bot_id", bot.id)
-        .eq("key", "default")
-        .maybeSingle();
+      if (!usedRule) {
+        // 2) Fallback a flow "default" (lo que ya tenías)
+        let reply = `👋 Hola! Recibimos tu mensaje: "${text}"`;
 
-      const salute = (flow as any)?.definition?.nodes?.find?.(
-        (n: any) => n.id === "saludo",
-      );
-      if (salute?.text) reply = salute.text;
-    }
+        const { data: flow } = await supabase
+          .from("flows")
+          .select("definition")
+          .eq("bot_id", bot.id)
+          .eq("key", "default")
+          .maybeSingle();
 
-    // --- Enviar respuesta hacia WhatsApp usando token_alias ---
-    const token = resolveMetaToken(channel.token_alias ?? "");
-    if (token && reply) {
-      try {
-        await fetch(
-          `https://graph.facebook.com/v20.0/${channel.phone_id}/messages`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              messaging_product: "whatsapp",
-              to: from,
-              text: { body: reply },
-            }),
-          },
+        const salute = (flow as any)?.definition?.nodes?.find?.(
+          (n: any) => n.id === "saludo",
         );
-      } catch (e) {
-        console.error("Error sending WhatsApp message:", e);
-      }
+        if (salute?.text) reply = salute.text;
 
-      if (convId) {
-        await supabase.from("messages").insert({
-          conversation_id: convId,
-          tenant_id: channel.tenant_id,
-          channel_id: channel.id,
-          direction: "out",
-          sender: "bot",
-          body: reply,
-          meta: { via: "auto-reply" },
-          created_at: new Date().toISOString(),
-        });
+        const token = resolveMetaToken(channel.token_alias ?? "");
+        if (token && reply) {
+          try {
+            await fetch(
+              `https://graph.facebook.com/v20.0/${channel.phone_id}/messages`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  messaging_product: "whatsapp",
+                  to: from,
+                  text: { body: reply },
+                }),
+              },
+            );
+          } catch (e) {
+            console.error("Error sending WhatsApp message (default):", e);
+          }
+
+          await supabase.from("messages").insert({
+            conversation_id: convId,
+            tenant_id: channel.tenant_id,
+            channel_id: channel.id,
+            direction: "out",
+            sender: "bot",
+            body: reply,
+            meta: { via: "auto-reply-default" },
+            created_at: new Date().toISOString(),
+          });
+        }
       }
     }
   }

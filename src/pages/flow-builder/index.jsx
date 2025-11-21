@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\flow-builder\index.jsx
+
 import React, { useState, useEffect } from "react";
 import NavigationSidebar from "../../components/ui/NavigationSidebar";
 import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
@@ -9,13 +11,13 @@ import FlowEditor from "./components/FlowEditor";
 import FlowPreview from "./components/FlowPreview";
 import TemplateLibrary from "./components/TemplateLibrary";
 
-// ⬇️ NUEVO: hooks globales
+// ⬇️ Hook global con supabase + tenant + profile
 import { useAuth } from "@/lib/AuthProvider";
-import { useMockApi } from "@/lib/useMockApi";
+
+const RULES_KEY = "rules_v1";
 
 const FlowBuilder = () => {
-  const { profile } = useAuth();
-  const { tenant, flows, createFlow } = useMockApi();
+  const { supabase, tenant, profile } = useAuth();
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -24,18 +26,167 @@ const FlowBuilder = () => {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isTemplateLibraryOpen, setIsTemplateLibraryOpen] = useState(false);
+
+  // Flujos en memoria (reglas)
   const [localFlows, setLocalFlows] = useState([]);
 
-  // Inicializa flows desde el mock
-  useEffect(() => {
-    setLocalFlows(flows || []);
-  }, [flows]);
+  // Fila de flows (key = 'rules_v1') asociada al bot
+  const [rulesFlowRow, setRulesFlowRow] = useState(null);
+
+  // Estado de carga / guardado / errores
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [uiMessage, setUiMessage] = useState(null);
+  const [uiError, setUiError] = useState(null);
 
   const handleToggleSidebar = () => setIsSidebarCollapsed(!isSidebarCollapsed);
 
   const handleLogout = () => console.log("Logging out...");
   const handleProfileClick = () => console.log("Opening profile...");
 
+  // --------------------------------------------------
+  //  Load: obtener bot + flow rules_v1 desde Supabase
+  // --------------------------------------------------
+  useEffect(() => {
+    const loadRulesFlow = async () => {
+      if (!supabase || !tenant) return;
+      setIsLoading(true);
+      setUiError(null);
+      setUiMessage(null);
+
+      try {
+        // 1) Obtener bot principal del tenant (mismo criterio que webhook)
+        const { data: bot, error: botError } = await supabase
+          .from("bots")
+          .select("id, name")
+          .eq("tenant_id", tenant.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (botError) {
+          console.error("[FlowBuilder] Error loading bot:", botError);
+          setUiError("No se pudo cargar el bot del tenant.");
+          setIsLoading(false);
+          return;
+        }
+
+        if (!bot) {
+          setUiError(
+            "No hay ningún bot configurado para este tenant. Primero conectá un canal de WhatsApp."
+          );
+          setLocalFlows([]);
+          setIsLoading(false);
+          return;
+        }
+
+        // 2) Buscar flow con key = 'rules_v1'
+        const { data: flowRow, error: flowError } = await supabase
+          .from("flows")
+          .select("id, bot_id, key, definition")
+          .eq("bot_id", bot.id)
+          .eq("key", RULES_KEY)
+          .maybeSingle();
+
+        if (flowError) {
+          console.error("[FlowBuilder] Error loading rules_v1 flow:", flowError);
+          setUiError("No se pudieron cargar las reglas del bot.");
+          setIsLoading(false);
+          return;
+        }
+
+        if (!flowRow) {
+          // Aún no existe ningun flow de reglas → inicial vacío
+          const def = { version: 1, engine: "rules_v1", rules: [] };
+          setRulesFlowRow({
+            id: null,
+            bot_id: bot.id,
+            key: RULES_KEY,
+            definition: def,
+          });
+          setLocalFlows([]);
+          setUiMessage("Todavía no hay reglas configuradas. Creá tu primer flujo.");
+        } else {
+          setRulesFlowRow(flowRow);
+          const def = flowRow.definition || {};
+          setLocalFlows(def.rules || []);
+        }
+
+        setIsLoading(false);
+      } catch (e) {
+        console.error("[FlowBuilder] Unexpected error:", e);
+        setUiError("Ocurrió un error inesperado al cargar las reglas.");
+        setIsLoading(false);
+      }
+    };
+
+    loadRulesFlow();
+  }, [supabase, tenant]);
+
+  // --------------------------------------------------
+  //  Persistencia: guardar reglas en flows.definition
+  // --------------------------------------------------
+  const buildDefinitionFromLocalFlows = () => {
+    return {
+      version: 1,
+      engine: "rules_v1",
+      rules: localFlows,
+    };
+  };
+
+  const handlePersistRules = async () => {
+    if (!supabase || !rulesFlowRow) return;
+    setIsSaving(true);
+    setUiError(null);
+    setUiMessage(null);
+
+    try {
+      const definition = buildDefinitionFromLocalFlows();
+
+      if (rulesFlowRow.id) {
+        // UPDATE existente
+        const { error } = await supabase
+          .from("flows")
+          .update({ definition })
+          .eq("id", rulesFlowRow.id);
+
+        if (error) {
+          console.error("[FlowBuilder] Error updating rules flow:", error);
+          setUiError("No se pudieron guardar los cambios en las reglas.");
+        } else {
+          setUiMessage("Reglas guardadas correctamente.");
+        }
+      } else {
+        // INSERT nuevo
+        const { data, error } = await supabase
+          .from("flows")
+          .insert({
+            bot_id: rulesFlowRow.bot_id,
+            key: RULES_KEY,
+            definition,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error("[FlowBuilder] Error inserting rules flow:", error);
+          setUiError("No se pudieron crear las reglas.");
+        } else {
+          setRulesFlowRow(data);
+          setUiMessage("Reglas creadas y guardadas correctamente.");
+        }
+      }
+    } catch (e) {
+      console.error("[FlowBuilder] Unexpected error on save:", e);
+      setUiError("Ocurrió un error inesperado al guardar las reglas.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // --------------------------------------------------
+  //  Eventos UI de flujos (en memoria)
+  // --------------------------------------------------
   const handleCreateFlow = () => {
     setSelectedFlow(null);
     setIsEditorOpen(true);
@@ -47,8 +198,9 @@ const FlowBuilder = () => {
   };
 
   const handleDeleteFlow = (flowId) => {
-    if (window.confirm("Are you sure you want to delete this flow?")) {
+    if (window.confirm("¿Seguro que querés eliminar este flujo?")) {
       setLocalFlows((prev) => prev.filter((flow) => flow.id !== flowId));
+      setUiMessage("Flujo eliminado. No olvides guardar las reglas.");
     }
   };
 
@@ -58,6 +210,7 @@ const FlowBuilder = () => {
         flow.id === flowId ? { ...flow, isActive: !flow.isActive } : flow
       )
     );
+    setUiMessage("Estado del flujo actualizado. No olvides guardar las reglas.");
   };
 
   const handlePreviewFlow = (flow) => {
@@ -66,26 +219,36 @@ const FlowBuilder = () => {
   };
 
   const handleSaveFlow = (flowData) => {
-    if (selectedFlow) {
-      // Update existing flow
-      setLocalFlows((prev) =>
-        prev.map((flow) => (flow.id === selectedFlow.id ? flowData : flow))
-      );
-    } else {
-      // Add new flow (also to mock)
-      const newFlow = createFlow(flowData.name || "Untitled Flow", flowData.draft);
-      setLocalFlows((prev) => [...prev, newFlow]);
-    }
+    // FlowEditor ya arma id, triggerCount, lastUpdated
+    setLocalFlows((prev) => {
+      if (selectedFlow) {
+        // update
+        return prev.map((flow) =>
+          flow.id === selectedFlow.id ? flowData : flow
+        );
+      } else {
+        // create
+        return [flowData, ...prev];
+      }
+    });
+
+    setIsEditorOpen(false);
+    setSelectedFlow(null);
+    setUiMessage("Flujo actualizado en borrador. No olvides guardar las reglas.");
   };
 
   const handleSelectTemplate = (templateData) => {
-    setLocalFlows((prev) => [...prev, templateData]);
+    setLocalFlows((prev) => [templateData, ...prev]);
+    setUiMessage("Plantilla agregada. No olvides guardar las reglas.");
   };
 
+  // --------------------------------------------------
+  //  Filtros + stats
+  // --------------------------------------------------
   const filteredFlows = localFlows.filter((flow) => {
     const matchesSearch =
-      flow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      flow.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      flow.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      flow.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (flow.keywords &&
         flow.keywords.some((keyword) =>
           keyword.toLowerCase().includes(searchTerm.toLowerCase())
@@ -143,11 +306,21 @@ const FlowBuilder = () => {
                 Flow Builder
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Create and manage automated chatbot conversations
+                Diseñá y administrá las respuestas automáticas de tu bot
               </p>
             </div>
 
             <div className="flex items-center space-x-4">
+              <Button
+                variant="outline"
+                iconName="Save"
+                iconPosition="left"
+                onClick={handlePersistRules}
+                disabled={isSaving || isLoading || !tenant}
+              >
+                {isSaving ? "Guardando..." : "Guardar reglas"}
+              </Button>
+
               <UserProfileDropdown
                 user={currentUser}
                 onLogout={handleLogout}
@@ -156,6 +329,25 @@ const FlowBuilder = () => {
             </div>
           </div>
         </header>
+
+        {/* Mensajes de estado */}
+        <div className="px-6 pt-4">
+          {isLoading && (
+            <div className="mb-4 rounded-md bg-muted px-4 py-2 text-sm text-muted-foreground">
+              Cargando reglas del bot…
+            </div>
+          )}
+          {uiError && (
+            <div className="mb-4 rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
+              {uiError}
+            </div>
+          )}
+          {uiMessage && !uiError && (
+            <div className="mb-4 rounded-md bg-emerald-500/10 px-4 py-2 text-sm text-emerald-500">
+              {uiMessage}
+            </div>
+          )}
+        </div>
 
         {/* Stats Cards */}
         <div className="p-6">
@@ -209,7 +401,7 @@ const FlowBuilder = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <Input
-                placeholder="Search flows..."
+                placeholder="Buscar flows..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full sm:w-64"
@@ -240,6 +432,7 @@ const FlowBuilder = () => {
                 iconName="Plus"
                 iconPosition="left"
                 onClick={handleCreateFlow}
+                disabled={!tenant || isLoading}
               >
                 Create Flow
               </Button>
@@ -263,7 +456,11 @@ const FlowBuilder = () => {
           ) : (
             <div className="text-center py-12">
               <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                <Icon name="GitBranch" size={32} className="text-muted-foreground" />
+                <Icon
+                  name="GitBranch"
+                  size={32}
+                  className="text-muted-foreground"
+                />
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">
                 {searchTerm || filterStatus !== "all"
@@ -272,8 +469,8 @@ const FlowBuilder = () => {
               </h3>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                 {searchTerm || filterStatus !== "all"
-                  ? "Try adjusting your search or filter criteria."
-                  : "Create your first automated flow to start engaging with customers on WhatsApp."}
+                  ? "Probá cambiando el criterio de búsqueda o filtros."
+                  : "Creá tu primer flow automático para empezar a responder en WhatsApp."}
               </p>
               {!searchTerm && filterStatus === "all" && (
                 <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-3">
@@ -290,6 +487,7 @@ const FlowBuilder = () => {
                     iconName="Plus"
                     iconPosition="left"
                     onClick={handleCreateFlow}
+                    disabled={!tenant || isLoading}
                   >
                     Create Flow
                   </Button>
