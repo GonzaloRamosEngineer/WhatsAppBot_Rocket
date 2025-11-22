@@ -11,7 +11,7 @@ import FlowEditor from "./components/FlowEditor";
 import FlowPreview from "./components/FlowPreview";
 import TemplateLibrary from "./components/TemplateLibrary";
 
-// ⬇️ Hook global con supabase + tenant + profile
+// Hook global con supabase + tenant + profile
 import { useAuth } from "@/lib/AuthProvider";
 
 const RULES_KEY = "rules_v1";
@@ -105,7 +105,9 @@ const FlowBuilder = () => {
             definition: def,
           });
           setLocalFlows([]);
-          setUiMessage("Todavía no hay reglas configuradas. Creá tu primer flujo.");
+          setUiMessage(
+            "Todavía no hay reglas configuradas. Creá tu primer flujo automático."
+          );
         } else {
           setRulesFlowRow(flowRow);
           const def = flowRow.definition || {};
@@ -234,7 +236,9 @@ const FlowBuilder = () => {
 
     setIsEditorOpen(false);
     setSelectedFlow(null);
-    setUiMessage("Flujo actualizado en borrador. No olvides guardar las reglas.");
+    setUiMessage(
+      "Flujo actualizado en borrador. No olvides guardar las reglas."
+    );
   };
 
   const handleSelectTemplate = (templateData) => {
@@ -361,7 +365,7 @@ const FlowBuilder = () => {
                   <p className="text-2xl font-semibold text-foreground">
                     {stats.totalFlows}
                   </p>
-                  <p className="text-sm text-muted-foreground">Total Flows</p>
+                  <p className="text-sm text-muted-foreground">Flujos totales</p>
                 </div>
               </div>
             </div>
@@ -375,7 +379,7 @@ const FlowBuilder = () => {
                   <p className="text-2xl font-semibold text-foreground">
                     {stats.activeFlows}
                   </p>
-                  <p className="text-sm text-muted-foreground">Active Flows</p>
+                  <p className="text-sm text-muted-foreground">Flujos activos</p>
                 </div>
               </div>
             </div>
@@ -390,14 +394,14 @@ const FlowBuilder = () => {
                     {stats.totalTriggers.toLocaleString()}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Total Triggers
+                    Disparos totales
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Controls */}
+          {/* Controles */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <Input
@@ -412,9 +416,9 @@ const FlowBuilder = () => {
                 onChange={(e) => setFilterStatus(e.target.value)}
                 className="px-3 py-2 border border-border rounded-md bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="all">All Flows</option>
-                <option value="active">Active Only</option>
-                <option value="inactive">Inactive Only</option>
+                <option value="all">Todos los flujos</option>
+                <option value="active">Solo activos</option>
+                <option value="inactive">Solo inactivos</option>
               </select>
             </div>
 
@@ -425,7 +429,7 @@ const FlowBuilder = () => {
                 iconPosition="left"
                 onClick={() => setIsTemplateLibraryOpen(true)}
               >
-                Templates
+                Plantillas
               </Button>
               <Button
                 variant="default"
@@ -434,7 +438,7 @@ const FlowBuilder = () => {
                 onClick={handleCreateFlow}
                 disabled={!tenant || isLoading}
               >
-                Create Flow
+                Crear flujo
               </Button>
             </div>
           </div>
@@ -464,13 +468,13 @@ const FlowBuilder = () => {
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">
                 {searchTerm || filterStatus !== "all"
-                  ? "No flows found"
-                  : "No flows created yet"}
+                  ? "No se encontraron flujos"
+                  : "Todavía no creaste flujos"}
               </h3>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                 {searchTerm || filterStatus !== "all"
-                  ? "Probá cambiando el criterio de búsqueda o filtros."
-                  : "Creá tu primer flow automático para empezar a responder en WhatsApp."}
+                  ? "Probá cambiando el criterio de búsqueda o los filtros."
+                  : "Creá tu primer flujo automático para empezar a responder en WhatsApp."}
               </p>
               {!searchTerm && filterStatus === "all" && (
                 <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-3">
@@ -480,7 +484,7 @@ const FlowBuilder = () => {
                     iconPosition="left"
                     onClick={() => setIsTemplateLibraryOpen(true)}
                   >
-                    Browse Templates
+                    Ver plantillas
                   </Button>
                   <Button
                     variant="default"
@@ -489,7 +493,7 @@ const FlowBuilder = () => {
                     onClick={handleCreateFlow}
                     disabled={!tenant || isLoading}
                   >
-                    Create Flow
+                    Crear flujo
                   </Button>
                 </div>
               )}

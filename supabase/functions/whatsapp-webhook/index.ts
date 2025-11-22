@@ -1,6 +1,5 @@
 // C:\Projects\WhatsAppBot_Rocket\supabase\functions\whatsapp-webhook\index.ts
 
-// supabase/functions/whatsapp-webhook/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -118,7 +117,10 @@ async function runRulesEngine(options: {
 
   const token = resolveMetaToken(channel.token_alias ?? "");
   if (!token) {
-    console.error("No Meta token for channel token_alias:", channel.token_alias);
+    console.error(
+      "No Meta token for channel token_alias:",
+      channel.token_alias,
+    );
     return null;
   }
 
@@ -162,6 +164,12 @@ async function runRulesEngine(options: {
       console.error("Error sending WhatsApp message (rules_v1):", e);
     }
   }
+
+  // Incrementar contador de disparos (solo estadístico)
+  await supabase.rpc("fn_increment_rule_trigger", {
+    // si en el futuro creas esta RPC, ya lo tenés referenciado;
+    // sino, esto no rompe porque la función no existe y se ignora en tu setup actual.
+  }).catch(() => {});
 
   return selected;
 }

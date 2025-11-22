@@ -1,4 +1,5 @@
-// supabase/functions/whatsapp-connect/index.ts
+// C:\Projects\WhatsAppBot_Rocket\supabase\functions\whatsapp-connect\index.ts
+
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -172,7 +173,7 @@ serve(async (req) => {
       }
     }
 
-    // Flow default
+    // Flow default (legacy de saludo simple)
     if (bot?.id) {
       const { data: existingFlow } = await supabase
         .from("flows")
@@ -194,7 +195,7 @@ serve(async (req) => {
             {
               id: "fallback",
               type: "message",
-              text: "No entendí. Escribí MENU para opciones.",
+              text: "En estos momentos no estamos disponibles, llamá luego.",
             },
           ],
           edges: [
@@ -213,6 +214,66 @@ serve(async (req) => {
 
         if (flowError) {
           console.error("Error creating default flow:", flowError);
+        }
+      }
+
+      // Flow de reglas v1 (si no existe, lo inicializamos vacío con dos ejemplos)
+      const { data: existingRulesFlow } = await supabase
+        .from("flows")
+        .select("id")
+        .eq("bot_id", bot.id)
+        .eq("key", "rules_v1")
+        .maybeSingle();
+
+      if (!existingRulesFlow) {
+        const rulesDef = {
+          version: 1,
+          engine: "rules_v1",
+          rules: [
+            {
+              id: "welcome_default",
+              name: "Bienvenida básica",
+              description: "Mensaje de bienvenida cuando inicia la conversación.",
+              triggerType: "welcome",
+              keywords: [],
+              isActive: true,
+              responses: [
+                {
+                  message:
+                    "¡Hola! 👋 Gracias por escribirnos. En unos minutos alguien de nuestro equipo te va a responder.",
+                  delay: 0,
+                },
+              ],
+            },
+            {
+              id: "fallback_default",
+              name: "Respuesta por defecto",
+              description:
+                "Se usa cuando ninguna otra regla coincide con el mensaje.",
+              triggerType: "fallback",
+              keywords: [],
+              isActive: true,
+              responses: [
+                {
+                  message:
+                    "En estos momentos no estamos disponibles, pero ya registramos tu mensaje 🙌",
+                  delay: 0,
+                },
+              ],
+            },
+          ],
+        };
+
+        const { error: rulesFlowError } = await supabase
+          .from("flows")
+          .insert({
+            bot_id: bot.id,
+            key: "rules_v1",
+            definition: rulesDef,
+          });
+
+        if (rulesFlowError) {
+          console.error("Error creating rules_v1 flow:", rulesFlowError);
         }
       }
     }
