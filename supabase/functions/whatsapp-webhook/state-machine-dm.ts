@@ -43,6 +43,12 @@ const politeWords = [
   "perfecto",
 ];
 
+// Comando global de menú
+const menuWords = ["menu", "menú"];
+
+// Palabras que disparan flujo de presupuesto
+const budgetWords = ["presupuesto", "presupuestos", "cotizacion", "cotización", "quote"];
+
 // Mapas de contexto (similar a tu constants.js viejo)
 const areaMap: Record<string, string> = {
   "1": "1️⃣ Ventas",
@@ -119,35 +125,55 @@ export async function runStateMachineForTenant(
   let ctxData: any = conv.context_data ?? {};
   const replies: string[] = [];
 
+  // 0) Comando global: PRESUPUESTO → flujo propio
+  if (budgetWords.includes(normalized)) {
+    state = "esperando_presupuesto";
+    ctxData = {
+      ...ctxData,
+      budget_init_text: text.trim(),
+    };
+    replies.push(
+      "Perfecto 💸 Contame brevemente qué querés automatizar, en qué área y si hoy usás algún sistema. Con eso armamos un primer estimado para vos.",
+    );
+  }
   // 1) Preguntas “predefinidas” (precio, soporte, etc.), siempre disponibles
-  if (predefinedResponses[normalized]) {
+  else if (predefinedResponses[normalized]) {
     replies.push(predefinedResponses[normalized]);
   }
-
   // 2) Comando global: SALIR → reiniciar menú
-  if (normalized === "salir") {
+  else if (normalized === "salir") {
     state = "menu_principal";
     ctxData = {};
-    replies.push(
-      "🔄 Conversación reiniciada.\n\n" + buildMainMenuMessage(),
-    );
-  } else if (politeWords.includes(normalized)) {
-    // 3) Palabras “amables”: gracias, ok, etc.
+    replies.push("🔄 Conversación reiniciada.\n\n" + buildMainMenuMessage());
+  }
+  // 3) Comando global: MENU → ir directo al menú
+  else if (menuWords.includes(normalized)) {
+    state = "menu_principal";
+    ctxData = {
+      ...ctxData,
+      last_command: "menu",
+    };
+    replies.push(buildMainMenuMessage());
+  }
+  // 4) Palabras “amables”: gracias, ok, etc.
+  else if (politeWords.includes(normalized)) {
     replies.push(
       "¡Genial! 😊 Si necesitás más ayuda, decime cómo puedo asistirte.",
     );
-  } else if (!state && (isNewConversation || normalized === "hola")) {
-    // 4) Conversación nueva o user dice "hola" → menú principal
+  }
+  // 5) Conversación nueva o user dice "hola" → menú principal
+  else if (!state && (isNewConversation || normalized === "hola")) {
     state = "menu_principal";
     replies.push(buildMainMenuMessage());
-  } else if (!state && !isNewConversation) {
-    // 5) No hay estado, no es conversación nueva, y no dijo hola
+  }
+  // 6) No hay estado, no es conversación nueva, y no dijo hola
+  else if (!state && !isNewConversation) {
     replies.push(
       "No entendí tu mensaje en este contexto 🤔\n" +
         "Si querés volver al menú principal, escribí *Hola*.",
     );
   } else {
-    // 6) Tenemos algún estado vigente → procesar flujo
+    // 7) Tenemos algún estado vigente → procesar flujo
     switch (state) {
       case "menu_principal": {
         if (normalized === "1") {
@@ -306,7 +332,34 @@ export async function runStateMachineForTenant(
       }
 
       case "info_servicios": {
-        if (politeWords.includes(normalized)) {
+        // Si menciona alguna área, lo llevo directo al flujo de automatización
+        const txt = normalized;
+
+        const mentionsVentas = txt.includes("venta");
+        const mentionsMkt = txt.includes("marketing");
+        const mentionsFinanzas = txt.includes("finanza");
+        const mentionsOper = txt.includes("operacion") ||
+          txt.includes("operación");
+        const mentionsAtc =
+          txt.includes("atencion al cliente") ||
+          txt.includes("atención al cliente") ||
+          (txt.includes("cliente") && txt.includes("atencion"));
+
+        if (mentionsVentas || mentionsMkt || mentionsFinanzas || mentionsOper ||
+          mentionsAtc) {
+          state = "esperando_area";
+          ctxData.menu_opcion = "automatizar_procesos_desde_info";
+          replies.push(
+            "¡Genial! Justamente podemos ayudarte a automatizar en esa área 💪\n\n" +
+              "¿En qué área necesitás automatizar?\n" +
+              "1️⃣ Ventas\n" +
+              "2️⃣ Marketing\n" +
+              "3️⃣ Finanzas\n" +
+              "4️⃣ Operaciones\n" +
+              "5️⃣ Atención al cliente\n" +
+              "6️⃣ Otros",
+          );
+        } else if (politeWords.includes(normalized)) {
           replies.push(
             "¡De nada! 😊 Si querés más detalles, podés preguntarme por *precios*, *integraciones*, *duración* o *seguridad*.",
           );
@@ -318,6 +371,16 @@ export async function runStateMachineForTenant(
               buildMainMenuMessage(),
           );
         }
+        break;
+      }
+
+      case "esperando_presupuesto": {
+        // Tomamos el texto como detalle de requerimiento
+        ctxData.budget_details = text.trim();
+        state = null;
+        replies.push(
+          "¡Gracias! 🙌 Vamos a analizar tu requerimiento y un asesor se va a poner en contacto con vos con una propuesta de presupuesto.",
+        );
         break;
       }
 
