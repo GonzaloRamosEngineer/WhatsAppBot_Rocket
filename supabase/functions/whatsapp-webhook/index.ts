@@ -27,9 +27,7 @@ type RulesDefinitionV1 = {
   rules: UiFlowRule[];
 };
 
-// ----------------------------------------------
-// Helpers generales
-// ----------------------------------------------
+// Resuelve el token real de Meta a partir del alias guardado en la tabla channels
 function resolveMetaToken(alias: string): string | null {
   const map: Record<string, string> = {
     meta_token_dm: Deno.env.get("META_TOKEN_DM") ?? "",
@@ -41,32 +39,6 @@ function resolveMetaToken(alias: string): string | null {
     "META_TOKEN__" + alias.toUpperCase().replace(/[^A-Z0-9]/g, "_");
   const val = Deno.env.get(envKey);
   return val ?? null;
-}
-
-async function sendWhatsAppText(options: {
-  channel: any;
-  token: string;
-  to: string;
-  text: string;
-}) {
-  const { channel, token, to, text } = options;
-  if (!text) return;
-
-  await fetch(
-    `https://graph.facebook.com/v20.0/${channel.phone_id}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to,
-        text: { body: text },
-      }),
-    },
-  );
 }
 
 // ----------------------------------------------
@@ -95,6 +67,7 @@ async function runRulesEngine(options: {
 
   const normalized = text.trim().toLowerCase();
 
+  // 1) obtener flow rules_v1 del bot
   const { data: flowRow, error: flowError } = await supabase
     .from("flows")
     .select("definition")
@@ -111,6 +84,7 @@ async function runRulesEngine(options: {
 
   const def = flowRow.definition as RulesDefinitionV1;
   let rules = def.rules || [];
+  // Solo reglas activas (por default todas salvo que isActive === false)
   rules = rules.filter((r) => r.isActive !== false);
 
   if (rules.length === 0) return null;
@@ -121,9 +95,11 @@ async function runRulesEngine(options: {
 
   let selected: UiFlowRule | null = null;
 
+  // 2) Si es conversación nueva y hay welcome
   if (isNewConversation && welcomeRules.length > 0) {
     selected = welcomeRules[0];
   } else {
+    // 3) Intentar keyword
     for (const rule of keywordRules) {
       const kws = rule.keywords || [];
       if (kws.some((kw) => normalized.includes(kw.toLowerCase()))) {
@@ -132,6 +108,7 @@ async function runRulesEngine(options: {
       }
     }
 
+    // 4) Fallback si no matchea nada
     if (!selected && fallbackRules.length > 0) {
       selected = fallbackRules[0];
     }
@@ -145,18 +122,32 @@ async function runRulesEngine(options: {
     return null;
   }
 
+  // 5) Enviar respuestas al usuario
+  //    (ignoramos delay en backend para no bloquear el webhook,
+  //     el delay queda como metadata de diseño)
   for (const resp of selected.responses || []) {
     const replyText = resp.message;
     if (!replyText) continue;
 
     try {
-      await sendWhatsAppText({
-        channel,
-        token,
-        to: from,
-        text: replyText,
-      });
+      // WhatsApp API
+      await fetch(
+        `https://graph.facebook.com/v20.0/${channel.phone_id}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: from,
+            text: { body: replyText },
+          }),
+        },
+      );
 
+      // Guardar mensaje out en tabla messages
       await supabase.from("messages").insert({
         conversation_id: convId,
         tenant_id: tenantId,
@@ -175,9 +166,6 @@ async function runRulesEngine(options: {
   return selected;
 }
 
-// ----------------------------------------------
-// Handler HTTP principal
-// ----------------------------------------------
 serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
   const url = new URL(req.url);
@@ -230,10 +218,12 @@ serve(async (req) => {
     payload: body,
   });
 
+  // Si no reconocemos el canal, respondemos igual OK para que Meta no reintente
   if (!channel) {
     return new Response("ok", { status: 200 });
   }
 
+  // Procesar mensajes entrantes
   const msgs = value?.messages ?? [];
   for (const m of msgs) {
     const from = m.from;
@@ -253,9 +243,9 @@ serve(async (req) => {
 
     let convId = existingConv?.id;
     let isNewConversation = false;
-    let conversation: any = existingConv ?? null;
 
     if (!convId) {
+      // Nueva conversación: arranca como 'new'
       const { data: newConv } = await supabase
         .from("conversations")
         .insert({
@@ -268,9 +258,9 @@ serve(async (req) => {
         .select()
         .single();
       convId = newConv?.id ?? null;
-      conversation = newConv ?? null;
       isNewConversation = true;
     } else {
+      // Hay conversación: actualizamos last_message_at
       const nextStatus =
         existingConv.status === "closed" ? "open" : existingConv.status;
 
@@ -281,27 +271,35 @@ serve(async (req) => {
           last_message_at: nowIso,
         })
         .eq("id", existingConv.id);
+    }
 
-      conversation = {
-        ...existingConv,
-        status: nextStatus,
-        last_message_at: nowIso,
-      };
+    if (!convId) {
+      // Algo raro pasó, pero no frenamos el webhook
+      continue;
+    }
+
+    // Recargar la conversación para tener context_state/context_data actualizados
+    const { data: conversation } = await supabase
+      .from("conversations")
+      .select("*")
+      .eq("id", convId)
+      .maybeSingle();
+
+    if (!conversation) {
+      continue;
     }
 
     // Guardar mensaje entrante
-    if (convId) {
-      await supabase.from("messages").insert({
-        conversation_id: convId,
-        tenant_id: channel.tenant_id,
-        channel_id: channel.id,
-        direction: "in",
-        sender: from,
-        body: text,
-        meta: m,
-        created_at: nowIso,
-      });
-    }
+    await supabase.from("messages").insert({
+      conversation_id: convId,
+      tenant_id: channel.tenant_id,
+      channel_id: channel.id,
+      direction: "in",
+      sender: from,
+      body: text,
+      meta: m,
+      created_at: nowIso,
+    });
 
     // --- Resolver bot del tenant ---
     const { data: bot } = await supabase
@@ -312,8 +310,8 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    if (bot?.id && convId && conversation) {
-      // 1) Intentar primero la state machine (tenant-aware)
+    if (bot?.id && convId) {
+      // 1) Intentar primero la state machine (tenant-aware / DM)
       const handledByStateMachine = await runStateMachineForTenant({
         supabase,
         tenantId: channel.tenant_id,
@@ -321,61 +319,74 @@ serve(async (req) => {
         conv: conversation,
         from,
         text,
+        isNewConversation,
       });
 
-      if (!handledByStateMachine) {
-        // 2) Intentar motor de reglas configurables (rules_v1)
-        const usedRule = await runRulesEngine({
-          supabase,
-          tenantId: channel.tenant_id,
-          botId: bot.id,
-          channel,
-          from,
-          text,
-          convId,
-          isNewConversation,
-        });
+      if (handledByStateMachine) {
+        // Ya respondió la state machine → no seguimos
+        continue;
+      }
 
-        if (!usedRule) {
-          // 3) Fallback a flow "default"
-          let reply = `👋 Hola! Recibimos tu mensaje: "${text}"`;
+      // 2) Intentar motor de reglas configurables (rules_v1)
+      const usedRule = await runRulesEngine({
+        supabase,
+        tenantId: channel.tenant_id,
+        botId: bot.id,
+        channel,
+        from,
+        text,
+        convId,
+        isNewConversation,
+      });
 
-          const { data: flow } = await supabase
-            .from("flows")
-            .select("definition")
-            .eq("bot_id", bot.id)
-            .eq("key", "default")
-            .maybeSingle();
+      if (!usedRule) {
+        // 3) Fallback a flow "default" (lo que ya tenías)
+        let reply = `👋 Hola! Recibimos tu mensaje: "${text}"`;
 
-          const salute = (flow as any)?.definition?.nodes?.find?.(
-            (n: any) => n.id === "saludo",
-          );
-          if (salute?.text) reply = salute.text;
+        const { data: flow } = await supabase
+          .from("flows")
+          .select("definition")
+          .eq("bot_id", bot.id)
+          .eq("key", "default")
+          .maybeSingle();
 
-          const token = resolveMetaToken(channel.token_alias ?? "");
-          if (token && reply) {
-            try {
-              await sendWhatsAppText({
-                channel,
-                token,
-                to: from,
-                text: reply,
-              });
-            } catch (e) {
-              console.error("Error sending WhatsApp message (default):", e);
-            }
+        const salute = (flow as any)?.definition?.nodes?.find?.(
+          (n: any) => n.id === "saludo",
+        );
+        if (salute?.text) reply = salute.text;
 
-            await supabase.from("messages").insert({
-              conversation_id: convId,
-              tenant_id: channel.tenant_id,
-              channel_id: channel.id,
-              direction: "out",
-              sender: "bot",
-              body: reply,
-              meta: { via: "auto-reply-default" },
-              created_at: new Date().toISOString(),
-            });
+        const token = resolveMetaToken(channel.token_alias ?? "");
+        if (token && reply) {
+          try {
+            await fetch(
+              `https://graph.facebook.com/v20.0/${channel.phone_id}/messages`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  messaging_product: "whatsapp",
+                  to: from,
+                  text: { body: reply },
+                }),
+              },
+            );
+          } catch (e) {
+            console.error("Error sending WhatsApp message (default):", e);
           }
+
+          await supabase.from("messages").insert({
+            conversation_id: convId,
+            tenant_id: channel.tenant_id,
+            channel_id: channel.id,
+            direction: "out",
+            sender: "bot",
+            body: reply,
+            meta: { via: "auto-reply-default" },
+            created_at: new Date().toISOString(),
+          });
         }
       }
     }
