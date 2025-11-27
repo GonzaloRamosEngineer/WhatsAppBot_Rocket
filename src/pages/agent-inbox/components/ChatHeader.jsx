@@ -19,6 +19,42 @@ const STATUS_COLORS = {
     "bg-slate-200 text-slate-800 dark:bg-slate-800/60 dark:text-slate-100",
 };
 
+// Mapeo de context_state -> label más friendly
+const CONTEXT_STATE_LABELS = {
+  inicio: "Inicio",
+  menu_principal: "Menú principal",
+  esperando_area: "Esperando área",
+  esperando_area_otro: "Esperando área (otro)",
+  esperando_tipo_automatizacion: "Esperando tipo de automatización",
+  esperando_tipo_otro: "Esperando tipo (otro)",
+  esperando_contacto: "Esperando preferencia de contacto",
+  esperando_email: "Esperando email",
+  info_servicios: "Info de servicios",
+  esperando_presupuesto: "Esperando detalle de presupuesto",
+  esperando_seguimiento: "Seguimiento",
+};
+
+// Chips con info clave del contexto
+const buildContextChips = (conversation) => {
+  const ctx = conversation?.context_data || {};
+  const chips = [];
+
+  if (ctx.area) chips.push(ctx.area);
+  if (ctx.tipo_automatizacion) chips.push(ctx.tipo_automatizacion);
+  if (ctx.tipo_automatizacion_otro)
+    chips.push(ctx.tipo_automatizacion_otro);
+
+  if (ctx.modo_contacto === "whatsapp") chips.push("Contacto: WhatsApp");
+  if (ctx.modo_contacto === "videollamada")
+    chips.push("Contacto: videollamada");
+  if (ctx.modo_contacto === "email" && ctx.email)
+    chips.push(`Email: ${ctx.email}`);
+
+  if (ctx.budget_details) chips.push("Pidió presupuesto");
+
+  return chips;
+};
+
 export default function ChatHeader({
   conversation,
   session,
@@ -27,7 +63,7 @@ export default function ChatHeader({
   onAssignToMe,
   onUnassign,
   onChangeStatus,
-  onUpdateContactInfo,
+  onSaveContact,
 }) {
   if (!conversation) return null;
 
@@ -56,17 +92,19 @@ export default function ChatHeader({
   };
 
   const handleSaveContactInfo = () => {
-    if (!canEdit || !onUpdateContactInfo || !dirty) return;
+    if (!canEdit || !onSaveContact || !dirty) return;
 
-    onUpdateContactInfo({
-      contact_name: editName.trim() || null,
-      topic: editTopic.trim() || null,
-    });
+    onSaveContact(editName.trim() || null, editTopic.trim() || null);
     setDirty(false);
   };
 
   const displayName =
     editName.trim() || conversation.contact_name || conversation.contact_phone;
+
+  const contextState = conversation.context_state || null;
+  const contextStateLabel =
+    (contextState && CONTEXT_STATE_LABELS[contextState]) || contextState;
+  const contextChips = buildContextChips(conversation);
 
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/70 backdrop-blur-sm">
@@ -148,6 +186,33 @@ export default function ChatHeader({
             </span>
           )}
         </div>
+
+        {/* Contexto del flujo */}
+        {(contextStateLabel || contextChips.length > 0) && (
+          <div className="mt-1 flex flex-col gap-1">
+            {contextStateLabel && (
+              <p className="text-[11px] text-muted-foreground">
+                Contexto actual:{" "}
+                <span className="font-medium text-foreground">
+                  {contextStateLabel}
+                </span>
+              </p>
+            )}
+
+            {contextChips.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {contextChips.map((chip, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Acciones */}

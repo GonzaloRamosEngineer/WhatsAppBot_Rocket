@@ -28,6 +28,46 @@ function formatShortDate(iso) {
   });
 }
 
+// 🧠 Resumen del contexto para mostrar en la lista
+function summarizeContext(conversation) {
+  const state = conversation?.context_state || null;
+  const ctx = conversation?.context_data || {};
+
+  if (ctx.modo_contacto === "email" && ctx.email) {
+    return `Quiere contacto por email: ${ctx.email}`;
+  }
+
+  if (ctx.modo_contacto === "whatsapp") {
+    return "Quiere que lo contacten por WhatsApp";
+  }
+
+  if (ctx.modo_contacto === "videollamada") {
+    return "Quiere agendar una videollamada";
+  }
+
+  if (ctx.area || ctx.tipo_automatizacion || ctx.tipo_automatizacion_otro) {
+    const partes = [];
+    if (ctx.area) partes.push(ctx.area);
+    if (ctx.tipo_automatizacion) partes.push(ctx.tipo_automatizacion);
+    if (ctx.tipo_automatizacion_otro)
+      partes.push(ctx.tipo_automatizacion_otro);
+    return `Interesado en automatización: ${partes.join(" · ")}`;
+  }
+
+  if (ctx.budget_details) {
+    const short =
+      ctx.budget_details.length > 60
+        ? ctx.budget_details.slice(0, 60) + "…"
+        : ctx.budget_details;
+    return `Pidiendo presupuesto: ${short}`;
+  }
+
+  if (state === "menu_principal") return "En menú principal";
+  if (state === "info_servicios") return "Consultando info de servicios";
+
+  return null;
+}
+
 export default function ConversationListItem({
   conversation,
   selected,
@@ -41,6 +81,8 @@ export default function ConversationListItem({
   const statusLabel = STATUS_LABELS[conversation.status] || conversation.status;
   const statusColor =
     STATUS_COLORS[conversation.status] || "bg-slate-200 text-slate-800";
+
+  const contextSummary = summarizeContext(conversation);
 
   return (
     <li>
@@ -75,6 +117,11 @@ export default function ConversationListItem({
             {conversation.topic && (
               <div className="mt-0.5 text-[10px] text-muted-foreground truncate">
                 Nota: {conversation.topic}
+              </div>
+            )}
+            {contextSummary && (
+              <div className="mt-0.5 text-[10px] text-muted-foreground truncate">
+                {contextSummary}
               </div>
             )}
           </div>

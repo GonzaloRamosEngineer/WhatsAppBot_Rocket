@@ -55,7 +55,9 @@ export default function AgentInboxPage() {
         topic,
         status,
         assigned_agent,
-        last_message_at
+        last_message_at,
+        context_state,
+        context_data
       `
       )
       .eq("tenant_id", tenant.id)
@@ -264,7 +266,9 @@ export default function AgentInboxPage() {
           topic,
           status,
           assigned_agent,
-          last_message_at
+          last_message_at,
+          context_state,
+          context_data
         `
         )
         .single();
