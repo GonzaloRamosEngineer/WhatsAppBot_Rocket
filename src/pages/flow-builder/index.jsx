@@ -27,7 +27,7 @@ const FlowBuilder = () => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isTemplateLibraryOpen, setIsTemplateLibraryOpen] = useState(false);
 
-  // Flujos en memoria (reglas)
+  // Flujos en memoria (rules_v1.rules[])
   const [localFlows, setLocalFlows] = useState([]);
 
   // Fila de flows (key = 'rules_v1') asociada al bot
@@ -49,7 +49,7 @@ const FlowBuilder = () => {
   // --------------------------------------------------
   useEffect(() => {
     const loadRulesFlow = async () => {
-      if (!supabase || !tenant) return;
+      if (!supabase || !tenant?.id) return;
       setIsLoading(true);
       setUiError(null);
       setUiMessage(null);
@@ -96,7 +96,7 @@ const FlowBuilder = () => {
         }
 
         if (!flowRow) {
-          // Aún no existe ningun flow de reglas → inicial vacío
+          // Aún no existe ningún flow de reglas → inicial vacío
           const def = { version: 1, engine: "rules_v1", rules: [] };
           setRulesFlowRow({
             id: null,
@@ -109,9 +109,18 @@ const FlowBuilder = () => {
             "Todavía no hay reglas configuradas. Creá tu primer flujo automático."
           );
         } else {
-          setRulesFlowRow(flowRow);
+          // Normalizamos el formato por si el engine cambió
           const def = flowRow.definition || {};
-          setLocalFlows(def.rules || []);
+          const rules = Array.isArray(def.rules) ? def.rules : [];
+          setRulesFlowRow({
+            ...flowRow,
+            definition: {
+              version: def.version || 1,
+              engine: def.engine || "rules_v1",
+              rules,
+            },
+          });
+          setLocalFlows(rules);
         }
 
         setIsLoading(false);
@@ -123,7 +132,7 @@ const FlowBuilder = () => {
     };
 
     loadRulesFlow();
-  }, [supabase, tenant]);
+  }, [supabase, tenant?.id]);
 
   // --------------------------------------------------
   //  Persistencia: guardar reglas en flows.definition
@@ -207,11 +216,29 @@ const FlowBuilder = () => {
   };
 
   const handleToggleFlow = (flowId) => {
-    setLocalFlows((prev) =>
-      prev.map((flow) =>
+    setLocalFlows((prev) => {
+      const updated = prev.map((flow) =>
         flow.id === flowId ? { ...flow, isActive: !flow.isActive } : flow
-      )
-    );
+      );
+
+      // Regla de coherencia: solo un welcome activo y un fallback activo
+      const toggled = updated.find((f) => f.id === flowId);
+      if (
+        toggled &&
+        toggled.isActive &&
+        (toggled.triggerType === "welcome" ||
+          toggled.triggerType === "fallback")
+      ) {
+        return updated.map((f) =>
+          f.id !== toggled.id && f.triggerType === toggled.triggerType
+            ? { ...f, isActive: false }
+            : f
+        );
+      }
+
+      return updated;
+    });
+
     setUiMessage("Estado del flujo actualizado. No olvides guardar las reglas.");
   };
 
@@ -221,17 +248,32 @@ const FlowBuilder = () => {
   };
 
   const handleSaveFlow = (flowData) => {
-    // FlowEditor ya arma id, triggerCount, lastUpdated
     setLocalFlows((prev) => {
+      let next;
       if (selectedFlow) {
         // update
-        return prev.map((flow) =>
+        next = prev.map((flow) =>
           flow.id === selectedFlow.id ? flowData : flow
         );
       } else {
         // create
-        return [flowData, ...prev];
+        next = [flowData, ...prev];
       }
+
+      // Regla: solo un welcome activo y un fallback activo
+      if (
+        flowData.isActive &&
+        (flowData.triggerType === "welcome" ||
+          flowData.triggerType === "fallback")
+      ) {
+        next = next.map((f) =>
+          f.id !== flowData.id && f.triggerType === flowData.triggerType
+            ? { ...f, isActive: false }
+            : f
+        );
+      }
+
+      return next;
     });
 
     setIsEditorOpen(false);
@@ -242,7 +284,26 @@ const FlowBuilder = () => {
   };
 
   const handleSelectTemplate = (templateData) => {
-    setLocalFlows((prev) => [templateData, ...prev]);
+    setLocalFlows((prev) => {
+      let next = [templateData, ...prev];
+
+      // Si la plantilla es welcome o fallback y viene activa,
+      // respetamos la misma regla de unicidad
+      if (
+        templateData.isActive &&
+        (templateData.triggerType === "welcome" ||
+          templateData.triggerType === "fallback")
+      ) {
+        next = next.map((f) =>
+          f.id !== templateData.id &&
+          f.triggerType === templateData.triggerType
+            ? { ...f, isActive: false }
+            : f
+        );
+      }
+
+      return next;
+    });
     setUiMessage("Plantilla agregada. No olvides guardar las reglas.");
   };
 
@@ -311,6 +372,7 @@ const FlowBuilder = () => {
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
                 Diseñá y administrá las respuestas automáticas de tu bot
+                (motor <span className="font-mono">rules_v1</span>).
               </p>
             </div>
 
@@ -365,7 +427,9 @@ const FlowBuilder = () => {
                   <p className="text-2xl font-semibold text-foreground">
                     {stats.totalFlows}
                   </p>
-                  <p className="text-sm text-muted-foreground">Flujos totales</p>
+                  <p className="text-sm text-muted-foreground">
+                    Flujos totales
+                  </p>
                 </div>
               </div>
             </div>
@@ -373,13 +437,19 @@ const FlowBuilder = () => {
             <div className="bg-card border border-border rounded-lg p-6">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-success/10 rounded-lg flex items-center justify-center">
-                  <Icon name="CheckCircle" size={24} className="text-success" />
+                  <Icon
+                    name="CheckCircle"
+                    size={24}
+                    className="text-success"
+                  />
                 </div>
                 <div>
                   <p className="text-2xl font-semibold text-foreground">
                     {stats.activeFlows}
                   </p>
-                  <p className="text-sm text-muted-foreground">Flujos activos</p>
+                  <p className="text-sm text-muted-foreground">
+                    Flujos activos
+                  </p>
                 </div>
               </div>
             </div>
@@ -394,7 +464,7 @@ const FlowBuilder = () => {
                     {stats.totalTriggers.toLocaleString()}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Disparos totales
+                    Disparos totales (histórico)
                   </p>
                 </div>
               </div>

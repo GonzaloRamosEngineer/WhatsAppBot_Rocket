@@ -27,7 +27,8 @@ const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
     {
       value: "welcome",
       label: "Mensaje de bienvenida",
-      description: "Primer mensaje cuando inicia la conversación",
+      description:
+        "Primer mensaje cuando el usuario inicia la conversación con tu bot",
     },
     {
       value: "fallback",
@@ -136,7 +137,8 @@ const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
     }
 
     if (formData?.responses?.some((response) => !response?.message?.trim())) {
-      newErrors.responses = "Todos los mensajes de respuesta deben estar cargados.";
+      newErrors.responses =
+        "Todos los mensajes de respuesta deben estar cargados.";
     }
 
     setErrors(newErrors);
@@ -168,15 +170,11 @@ const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
               {flow ? "Editar flujo" : "Crear nuevo flujo"}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Configurá las respuestas automáticas de tu bot de WhatsApp.
+              Configurá las respuestas automáticas de tu bot de WhatsApp
+              (motor rules_v1).
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            iconName="X"
-            onClick={onClose}
-          />
+          <Button variant="ghost" size="icon" iconName="X" onClick={onClose} />
         </div>
 
         {/* Content */}
@@ -213,6 +211,14 @@ const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
                 value={formData?.triggerType}
                 onChange={(value) => handleInputChange("triggerType", value)}
               />
+
+              {formData.triggerType !== "keyword" && (
+                <p className="text-xs text-muted-foreground">
+                  Para flujos de tipo <b>Bienvenida</b> o <b>Fallback</b> se
+                  ignoran las palabras clave. El motor los usa según contexto y
+                  orden de evaluación.
+                </p>
+              )}
             </div>
 
             {/* Palabras clave */}
@@ -222,9 +228,15 @@ const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
                   Palabras clave
                 </h3>
 
+                <p className="text-xs text-muted-foreground">
+                  El motor intentará matchear estas palabras dentro del mensaje
+                  del usuario (búsqueda por <b>contiene</b>, sin distinción de
+                  mayúsculas/minúsculas).
+                </p>
+
                 <div className="flex space-x-2">
                   <Input
-                    placeholder="Ej: hola, consulta, turno"
+                    placeholder="Ej: precio, soporte, demo"
                     value={keywordInput}
                     onChange={(e) => setKeywordInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAddKeyword()}
@@ -327,7 +339,7 @@ const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
                           handleResponseChange(
                             index,
                             "delay",
-                            parseInt(e.target.value) || 0
+                            parseInt(e.target.value, 10) || 0
                           )
                         }
                         min={0}

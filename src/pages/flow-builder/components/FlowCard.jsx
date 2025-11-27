@@ -22,6 +22,19 @@ const FlowCard = ({ flow, onEdit, onToggle, onDelete, onPreview }) => {
     }
   };
 
+  const getTriggerTypeLabel = (type) => {
+    switch (type) {
+      case "keyword":
+        return "Palabras clave";
+      case "welcome":
+        return "Mensaje de bienvenida";
+      case "fallback":
+        return "Respuesta por defecto";
+      default:
+        return "Otro";
+    }
+  };
+
   const renderTriggerDescription = () => {
     if (flow?.triggerType === "keyword") {
       return (
@@ -45,7 +58,8 @@ const FlowCard = ({ flow, onEdit, onToggle, onDelete, onPreview }) => {
     if (flow?.triggerType === "welcome") {
       return (
         <span className="text-sm text-foreground">
-          Se dispara cuando el usuario inicia una conversación.
+          Se dispara cuando el usuario inicia una conversación (primer mensaje
+          que matchee este flujo).
         </span>
       );
     }
@@ -75,6 +89,9 @@ const FlowCard = ({ flow, onEdit, onToggle, onDelete, onPreview }) => {
             <h3 className="text-lg font-semibold text-foreground">
               {flow?.name}
             </h3>
+            <p className="text-xs text-muted-foreground mb-1">
+              Tipo: {getTriggerTypeLabel(flow?.triggerType)}
+            </p>
             <p className="text-sm text-muted-foreground">
               {flow?.description}
             </p>
@@ -112,7 +129,13 @@ const FlowCard = ({ flow, onEdit, onToggle, onDelete, onPreview }) => {
             Disparador
           </span>
         </div>
-        <div className="bg-muted rounded-md p-3">{renderTriggerDescription()}</div>
+        <div className="bg-muted rounded-md p-3">
+          {renderTriggerDescription() || (
+            <span className="text-sm text-muted-foreground">
+              Este flujo no tiene descripción de disparador.
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Response Preview */}
@@ -124,7 +147,7 @@ const FlowCard = ({ flow, onEdit, onToggle, onDelete, onPreview }) => {
           </span>
         </div>
         <div className="bg-muted rounded-md p-3">
-          <p className="text-sm text-foreground line-clamp-2">
+          <p className="text-sm text-foreground line-clamp-2 whitespace-pre-line">
             {flow?.responses?.[0]?.message || "No hay respuesta configurada"}
           </p>
           {flow?.responses?.length > 1 && (

@@ -21,10 +21,9 @@ const FlowPreview = ({ flow, isOpen, onClose }) => {
     };
 
     setConversation((prev) => [...prev, userMessage]);
+    const text = testInput.toLowerCase();
     setTestInput("");
     setIsTyping(true);
-
-    const text = testInput.toLowerCase();
 
     let isTriggered = false;
 
@@ -102,12 +101,7 @@ const FlowPreview = ({ flow, isOpen, onClose }) => {
               Probá cómo va a responder "{flow?.name}" ante diferentes mensajes.
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            iconName="X"
-            onClick={onClose}
-          />
+          <Button variant="ghost" size="icon" iconName="X" onClick={onClose} />
         </div>
 
         {/* Flow Information */}
@@ -166,7 +160,9 @@ const FlowPreview = ({ flow, isOpen, onClose }) => {
                         }
                       `}
                     >
-                      <p className="text-sm">{message?.message}</p>
+                      <p className="text-sm whitespace-pre-line">
+                        {message?.message}
+                      </p>
                       <p className="text-xs mt-1 opacity-70">
                         {formatTime(message?.timestamp)}
                       </p>
