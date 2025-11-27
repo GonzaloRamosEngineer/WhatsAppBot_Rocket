@@ -140,7 +140,7 @@ serve(async (req) => {
         `,
         )
         .eq("tenant_id", tenant.id)
-        .in("status", ["new", "open", "pending"])
+        .in("status", ["new", "open", "pending_agent"])
         .lt("last_message_at", thresholdDate);
 
       if (convError) {

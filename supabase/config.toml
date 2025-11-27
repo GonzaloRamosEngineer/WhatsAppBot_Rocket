@@ -363,3 +363,9 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 [functions."whatsapp-connect"]
   verify_jwt = true
+
+[functions."whatsapp-send-message"]
+  verify_jwt = true
+
+[functions."auto-close-conversations"]
+  verify_jwt = false
