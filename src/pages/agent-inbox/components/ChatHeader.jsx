@@ -32,6 +32,7 @@ const CONTEXT_STATE_LABELS = {
   info_servicios: "Info de servicios",
   esperando_presupuesto: "Esperando detalle de presupuesto",
   esperando_seguimiento: "Seguimiento",
+  auto_closed: "Cerrada automáticamente por inactividad",
 };
 
 // Chips con info clave del contexto

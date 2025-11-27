@@ -1,4 +1,3 @@
-// supabase/functions/whatsapp-send-message/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -38,27 +37,22 @@ serve(async (req) => {
   }
 
   const authHeader = req.headers.get("Authorization") ?? "";
+  const hasUserAuth = !!authHeader;
+
+  // 🧠 Cliente supabase con service role.
+  // Si viene desde el frontend → forwardeamos Authorization del user
+  // Si viene desde otra función (auto-close) → sin Authorization = modo system
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
-    global: { headers: { Authorization: authHeader } },
+    global: {
+      headers: hasUserAuth ? { Authorization: authHeader } : {},
+    },
   });
-
-  // 🔐 Validar usuario
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
 
   // 📦 Body
   let body: {
     conversationId?: string;
     text?: string;
+    meta?: Record<string, unknown>;
   };
 
   try {
@@ -70,7 +64,7 @@ serve(async (req) => {
     });
   }
 
-  const { conversationId, text } = body;
+  const { conversationId, text, meta: extraMeta } = body;
   const messageText = (text ?? "").trim();
 
   if (!conversationId || !messageText) {
@@ -83,6 +77,25 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );
+  }
+
+  // 🔐 Usuario (solo si viene con Authorization)
+  let user: { id: string } | null = null;
+
+  if (hasUserAuth) {
+    const {
+      data: { user: supaUser },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !supaUser) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    user = { id: supaUser.id };
   }
 
   try {
@@ -139,33 +152,35 @@ serve(async (req) => {
       );
     }
 
-    // 2) Verificar que el usuario tenga membership en el tenant
-    const { data: membership, error: memberError } = await supabase
-      .from("tenant_members")
-      .select("tenant_id, role")
-      .eq("tenant_id", conv.tenant_id)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    // 2) Verificar membership SOLO si viene de un usuario real
+    if (user) {
+      const { data: membership, error: memberError } = await supabase
+        .from("tenant_members")
+        .select("tenant_id, role")
+        .eq("tenant_id", conv.tenant_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    if (memberError) {
-      console.error("Error checking membership:", memberError);
-      return new Response(
-        JSON.stringify({ error: "Failed to check membership" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
+      if (memberError) {
+        console.error("Error checking membership:", memberError);
+        return new Response(
+          JSON.stringify({ error: "Failed to check membership" }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
 
-    if (!membership) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden for this tenant" }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      if (!membership) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden for this tenant" }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
     }
 
     // 3) Resolver token de Meta
@@ -218,6 +233,13 @@ serve(async (req) => {
     }
 
     // 5) Insertar mensaje en tabla messages
+    const metaPayload = {
+      via: user ? "agent" : "system",
+      sent_by: user ? user.id : "system",
+      ...(extraMeta || {}),
+      whatsapp_response: waJson,
+    };
+
     const { data: newMsg, error: msgError } = await supabase
       .from("messages")
       .insert({
@@ -225,13 +247,9 @@ serve(async (req) => {
         tenant_id: conv.tenant_id,
         channel_id: conv.channel_id,
         direction: "out", // 👈 consistente con whatsapp-webhook
-        sender: user.id,
+        sender: user ? user.id : "system",
         body: messageText,
-        meta: {
-          via: "agent",
-          sent_by: user.id,
-          whatsapp_response: waJson,
-        },
+        meta: metaPayload,
       })
       .select()
       .single();
@@ -248,12 +266,20 @@ serve(async (req) => {
     }
 
     // 6) Actualizar conversación (last_message_at, status, assigned_agent)
+    const nowIso = new Date().toISOString();
+
+    // Si viene de agente → aseguramos assigned_agent
+    // Si viene de sistema → NO tocamos assigned_agent
+    const nextAssignedAgent = user
+      ? conv.assigned_agent ?? user.id
+      : conv.assigned_agent ?? null;
+
     await supabase
       .from("conversations")
       .update({
-        last_message_at: new Date().toISOString(),
+        last_message_at: nowIso,
         status: conv.status === "pending_agent" ? "open" : conv.status,
-        assigned_agent: conv.assigned_agent ?? user.id,
+        assigned_agent: nextAssignedAgent,
       })
       .eq("id", conv.id);
 

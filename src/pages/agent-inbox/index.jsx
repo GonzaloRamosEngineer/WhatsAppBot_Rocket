@@ -14,7 +14,6 @@ import MessageComposer from "./components/MessageComposer";
 export default function AgentInboxPage() {
   const navigate = useNavigate();
 
-  // ProtectedRoute ya maneja loading; acá no bloqueamos render
   const { supabase, tenant, profile, session, loading: authLoading } =
     useAuth();
 
@@ -31,7 +30,6 @@ export default function AgentInboxPage() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
 
-  // Estado para updates de conversación (status / asignación / contacto)
   const [updatingConversation, setUpdatingConversation] = useState(false);
   const [updateConversationError, setUpdateConversationError] =
     useState(null);
@@ -114,14 +112,12 @@ export default function AgentInboxPage() {
     [supabase]
   );
 
-  // Cargar conversaciones al montar / cuando cambia tenant
   useEffect(() => {
     if (!authLoading && tenant?.id) {
       loadConversations();
     }
   }, [authLoading, tenant?.id, loadConversations]);
 
-  // Cuando cambia la conversación seleccionada, cargar sus mensajes
   useEffect(() => {
     if (selectedConversation) {
       loadMessages(selectedConversation);
@@ -130,13 +126,11 @@ export default function AgentInboxPage() {
     }
   }, [selectedConversation, loadMessages]);
 
-  // 📩 Handler para seleccionar conversación desde la lista
   const handleSelectConversation = (conversationId) => {
     const conv = conversations.find((c) => c.id === conversationId) || null;
     setSelectedConversation(conv);
   };
 
-  // ✉️ Handler para enviar mensaje como agente
   const handleSendMessage = async (text) => {
     if (!text.trim()) return;
     if (!selectedConversation) return;
@@ -177,7 +171,6 @@ export default function AgentInboxPage() {
         };
 
         setMessages((prev) => [...prev, newMessage]);
-        // Refrescamos lista para actualizar last_message_at
         loadConversations();
       }
     } catch (e) {
@@ -206,7 +199,6 @@ export default function AgentInboxPage() {
           const newMsg = payload.new;
           if (!newMsg) return;
 
-          // Si es de la conversación abierta, lo agregamos al chat
           setMessages((prev) => {
             if (!selectedConversation) return prev;
             if (newMsg.conversation_id !== selectedConversation.id) return prev;
@@ -214,7 +206,6 @@ export default function AgentInboxPage() {
             return [...prev, newMsg];
           });
 
-          // Actualizar lista de conversaciones (last_message_at y orden)
           setConversations((prev) => {
             const idx = prev.findIndex(
               (c) => c.id === newMsg.conversation_id
@@ -279,7 +270,6 @@ export default function AgentInboxPage() {
           error.message || "Error updating conversation"
         );
       } else if (data) {
-        // Actualizamos en lista
         setConversations((prev) => {
           const idx = prev.findIndex((c) => c.id === data.id);
           if (idx === -1) return prev;
@@ -287,7 +277,6 @@ export default function AgentInboxPage() {
           updated[idx] = data;
           return updated;
         });
-        // Actualizamos seleccionada
         setSelectedConversation(data);
       }
 
@@ -296,7 +285,6 @@ export default function AgentInboxPage() {
     [supabase, selectedConversation]
   );
 
-  // 👤 Tomar conversación
   const handleAssignToMe = async () => {
     if (!session?.user?.id || !selectedConversation) return;
 
@@ -311,7 +299,6 @@ export default function AgentInboxPage() {
     });
   };
 
-  // 👤 Liberar conversación
   const handleUnassign = async () => {
     if (!selectedConversation) return;
     await patchSelectedConversation({
@@ -319,7 +306,6 @@ export default function AgentInboxPage() {
     });
   };
 
-  // 🔄 Cambiar estado (new | open | pending | closed)
   const handleChangeStatus = async (newStatus) => {
     if (!selectedConversation) return;
     if (newStatus === selectedConversation.status) return;
@@ -329,7 +315,6 @@ export default function AgentInboxPage() {
     });
   };
 
-  // 💾 Guardar/editar contacto (nombre + nota)
   const handleSaveContact = async (contactName, topic) => {
     if (!selectedConversation) return;
 
@@ -337,6 +322,56 @@ export default function AgentInboxPage() {
       contact_name: contactName,
       topic: topic,
     });
+  };
+
+  // 🗑️ NUEVO: borrar conversación (y sus mensajes)
+  const handleDeleteConversation = async (conversationId) => {
+    const conv = conversations.find((c) => c.id === conversationId);
+    if (!conv) return;
+
+    const confirmar = window.confirm(
+      `Vas a borrar la conversación con ${conv.contact_name || conv.contact_phone}. ` +
+        "Se perderá el historial de mensajes. ¿Continuar?"
+    );
+    if (!confirmar) return;
+
+    try {
+      // primero borramos mensajes
+      const { error: msgError } = await supabase
+        .from("messages")
+        .delete()
+        .eq("conversation_id", conversationId);
+
+      if (msgError) {
+        console.error("[AgentInbox] delete messages error", msgError);
+        alert("Error borrando mensajes de la conversación.");
+        return;
+      }
+
+      const { error: convError } = await supabase
+        .from("conversations")
+        .delete()
+        .eq("id", conversationId);
+
+      if (convError) {
+        console.error("[AgentInbox] delete conversation error", convError);
+        alert("Error borrando la conversación.");
+        return;
+      }
+
+      // Actualizar estado en memoria
+      setConversations((prev) =>
+        prev.filter((c) => c.id !== conversationId)
+      );
+
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(null);
+        setMessages([]);
+      }
+    } catch (e) {
+      console.error("[AgentInbox] unexpected delete error", e);
+      alert("Error inesperado borrando la conversación.");
+    }
   };
 
   const handleBackToDashboard = () => {
@@ -347,12 +382,9 @@ export default function AgentInboxPage() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar global */}
       <NavigationSidebar />
 
-      {/* Contenido principal */}
       <main className="flex-1 ml-0 md:ml-60 flex flex-col">
-        {/* Header superior */}
         <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card/60 backdrop-blur">
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-foreground">
@@ -372,7 +404,6 @@ export default function AgentInboxPage() {
           </button>
         </header>
 
-        {/* Contenido del inbox */}
         <section className="flex-1 p-4 min-h-0">
           {noTenant ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground border border-dashed border-border rounded-xl">
@@ -381,7 +412,6 @@ export default function AgentInboxPage() {
             </div>
           ) : (
             <div className="flex h-full border border-border rounded-xl overflow-hidden bg-background">
-              {/* Lista de conversaciones */}
               <div className="w-full max-w-xs border-right border-border bg-muted/30 flex flex-col border-r">
                 <div className="px-4 py-3 border-b border-border">
                   <h2 className="text-sm font-semibold">
@@ -399,10 +429,10 @@ export default function AgentInboxPage() {
                   error={conversationsError}
                   selectedId={selectedConversation?.id || null}
                   onSelect={handleSelectConversation}
+                  onDeleteConversation={handleDeleteConversation} // 👈 NUEVO
                 />
               </div>
 
-              {/* Panel de chat */}
               <div className="flex flex-1 flex-col min-h-0">
                 {selectedConversation ? (
                   <>
@@ -418,7 +448,6 @@ export default function AgentInboxPage() {
                       onSaveContact={handleSaveContact}
                     />
 
-                    {/* 👉 Contenedor con scroll interno */}
                     <ChatMessages
                       messages={messages}
                       loading={messagesLoading}

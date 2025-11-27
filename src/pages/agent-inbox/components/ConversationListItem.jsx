@@ -28,7 +28,6 @@ function formatShortDate(iso) {
   });
 }
 
-// 🧠 Resumen del contexto para mostrar en la lista
 function summarizeContext(conversation) {
   const state = conversation?.context_state || null;
   const ctx = conversation?.context_data || {};
@@ -36,11 +35,9 @@ function summarizeContext(conversation) {
   if (ctx.modo_contacto === "email" && ctx.email) {
     return `Quiere contacto por email: ${ctx.email}`;
   }
-
   if (ctx.modo_contacto === "whatsapp") {
     return "Quiere que lo contacten por WhatsApp";
   }
-
   if (ctx.modo_contacto === "videollamada") {
     return "Quiere agendar una videollamada";
   }
@@ -64,6 +61,7 @@ function summarizeContext(conversation) {
 
   if (state === "menu_principal") return "En menú principal";
   if (state === "info_servicios") return "Consultando info de servicios";
+  if (state === "auto_closed") return "Cerrada automáticamente por inactividad";
 
   return null;
 }
@@ -72,6 +70,7 @@ export default function ConversationListItem({
   conversation,
   selected,
   onClick,
+  onDelete, // 👈 NUEVO
 }) {
   const displayName =
     conversation.contact_name?.trim() ||
@@ -86,55 +85,73 @@ export default function ConversationListItem({
 
   return (
     <li>
-      <button
-        type="button"
-        onClick={onClick}
+      <div
         className={clsx(
-          "w-full text-left px-3 py-2 text-xs hover:bg-accent/60 focus:outline-none",
-          selected && "bg-accent"
+          "flex items-stretch",
+          selected && "bg-accent/70",
+          !selected && "hover:bg-accent/40"
         )}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1">
-              <span className="font-semibold text-foreground truncate">
-                {displayName}
-              </span>
-            </div>
-            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-              <span className="truncate">
-                {conversation.contact_phone || "Sin teléfono"}
-              </span>
-              <span
-                className={clsx(
-                  "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-                  statusColor
-                )}
-              >
-                {statusLabel}
-              </span>
-            </div>
-            {conversation.topic && (
-              <div className="mt-0.5 text-[10px] text-muted-foreground truncate">
-                Nota: {conversation.topic}
+        {/* Botón principal para seleccionar */}
+        <button
+          type="button"
+          onClick={onClick}
+          className="flex-1 text-left px-3 py-2 text-xs focus:outline-none"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-foreground truncate">
+                  {displayName}
+                </span>
               </div>
-            )}
-            {contextSummary && (
-              <div className="mt-0.5 text-[10px] text-muted-foreground truncate">
-                {contextSummary}
+              <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span className="truncate">
+                  {conversation.contact_phone || "Sin teléfono"}
+                </span>
+                <span
+                  className={clsx(
+                    "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                    statusColor
+                  )}
+                >
+                  {statusLabel}
+                </span>
               </div>
-            )}
-          </div>
+              {conversation.topic && (
+                <div className="mt-0.5 text-[10px] text-muted-foreground truncate">
+                  Nota: {conversation.topic}
+                </div>
+              )}
+              {contextSummary && (
+                <div className="mt-0.5 text-[10px] text-muted-foreground truncate">
+                  {contextSummary}
+                </div>
+              )}
+            </div>
 
-          <div className="flex flex-col items-end gap-1">
-            {conversation.last_message_at && (
-              <span className="text-[10px] text-muted-foreground">
-                {formatShortDate(conversation.last_message_at)}
-              </span>
-            )}
+            <div className="flex flex-col items-end gap-1">
+              {conversation.last_message_at && (
+                <span className="text-[10px] text-muted-foreground">
+                  {formatShortDate(conversation.last_message_at)}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      </button>
+        </button>
+
+        {/* Botón de borrar */}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="px-2 text-[11px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 border-l border-border"
+            title="Borrar conversación"
+          >
+            🗑️
+          </button>
+        )}
+      </div>
     </li>
   );
 }
