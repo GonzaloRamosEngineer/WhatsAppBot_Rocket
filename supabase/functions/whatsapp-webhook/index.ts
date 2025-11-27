@@ -123,8 +123,6 @@ async function runRulesEngine(options: {
   }
 
   // 5) Enviar respuestas al usuario
-  //    (ignoramos delay en backend para no bloquear el webhook,
-  //     el delay queda como metadata de diseño)
   for (const resp of selected.responses || []) {
     const replyText = resp.message;
     if (!replyText) continue;
@@ -274,7 +272,6 @@ serve(async (req) => {
     }
 
     if (!convId) {
-      // Algo raro pasó, pero no frenamos el webhook
       continue;
     }
 

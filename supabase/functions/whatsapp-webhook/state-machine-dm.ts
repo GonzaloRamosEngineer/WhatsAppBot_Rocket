@@ -1,4 +1,4 @@
-// supabase/functions/whatsapp-webhook/state-machine-dm.ts
+// C:\Projects\WhatsAppBot_Rocket\supabase\functions\whatsapp-webhook\state-machine-dm.ts
 
 type ConversationRow = {
   id: string;
@@ -47,7 +47,13 @@ const politeWords = [
 const menuWords = ["menu", "menú"];
 
 // Palabras que disparan flujo de presupuesto
-const budgetWords = ["presupuesto", "presupuestos", "cotizacion", "cotización", "quote"];
+const budgetWords = [
+  "presupuesto",
+  "presupuestos",
+  "cotizacion",
+  "cotización",
+  "quote",
+];
 
 // Mapas de contexto (similar a tu constants.js viejo)
 const areaMap: Record<string, string> = {
@@ -100,6 +106,16 @@ function resolveMetaToken(alias: string | null | undefined): string | null {
   return val ?? null;
 }
 
+// 🔧 Leer lista de tenants (opcional) desde env DM_TENANT_IDS
+// Formato: DM_TENANT_IDS="uuid1,uuid2,uuid3"
+function getDmTenantIds(): string[] {
+  const raw = Deno.env.get("DM_TENANT_IDS") ?? "";
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
 // 🎛 MENSAJE DE MENÚ PRINCIPAL
 function buildMainMenuMessage() {
   return (
@@ -112,8 +128,8 @@ function buildMainMenuMessage() {
   );
 }
 
-// 🧠 STATE MACHINE PRINCIPAL
-export async function runStateMachineForTenant(
+// 🧠 IMPLEMENTACIÓN REAL DE LA STATE MACHINE (no mira tenants)
+async function runDmStateMachine(
   options: StateMachineOptions,
 ): Promise<boolean> {
   const { supabase, tenantId, channel, conv, from, text, isNewConversation } =
@@ -332,7 +348,6 @@ export async function runStateMachineForTenant(
       }
 
       case "info_servicios": {
-        // Si menciona alguna área, lo llevo directo al flujo de automatización
         const txt = normalized;
 
         const mentionsVentas = txt.includes("venta");
@@ -345,8 +360,13 @@ export async function runStateMachineForTenant(
           txt.includes("atención al cliente") ||
           (txt.includes("cliente") && txt.includes("atencion"));
 
-        if (mentionsVentas || mentionsMkt || mentionsFinanzas || mentionsOper ||
-          mentionsAtc) {
+        if (
+          mentionsVentas ||
+          mentionsMkt ||
+          mentionsFinanzas ||
+          mentionsOper ||
+          mentionsAtc
+        ) {
           state = "esperando_area";
           ctxData.menu_opcion = "automatizar_procesos_desde_info";
           replies.push(
@@ -375,7 +395,6 @@ export async function runStateMachineForTenant(
       }
 
       case "esperando_presupuesto": {
-        // Tomamos el texto como detalle de requerimiento
         ctxData.budget_details = text.trim();
         state = null;
         replies.push(
@@ -393,7 +412,6 @@ export async function runStateMachineForTenant(
     }
   }
 
-  // Si no hay respuestas, esta función no se hace cargo
   if (replies.length === 0) {
     return false;
   }
@@ -443,7 +461,6 @@ export async function runStateMachineForTenant(
         },
       );
 
-      // Guardar mensaje out en messages
       await supabase.from("messages").insert({
         conversation_id: conv.id,
         tenant_id: tenantId,
@@ -463,4 +480,27 @@ export async function runStateMachineForTenant(
   }
 
   return true;
+}
+
+// 🔌 FUNCIÓN PÚBLICA QUE USA EL WEBHOOK
+// - Si DM_TENANT_IDS está vacío → corre la state machine para TODOS los tenants
+// - Si DM_TENANT_IDS tiene valores → solo corre para esos tenants
+export async function runStateMachineForTenant(
+  options: StateMachineOptions,
+): Promise<boolean> {
+  const { tenantId } = options;
+
+  const dmTenants = getDmTenantIds();
+
+  // Caso 1: no hay lista → aplica a todos
+  if (dmTenants.length === 0) {
+    return await runDmStateMachine(options);
+  }
+
+  // Caso 2: hay lista → solo estos tenants usan state machine
+  if (!dmTenants.includes(tenantId)) {
+    return false;
+  }
+
+  return await runDmStateMachine(options);
 }
