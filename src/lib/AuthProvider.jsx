@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\src\lib\AuthProvider.jsx
+
 import React, {
   createContext,
   useContext,
@@ -14,12 +16,46 @@ export default function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null); // { role, tenant_id, tenant }
   const [tenants, setTenants] = useState([]);   // lista de memberships
-  const [loading, setLoading] = useState(true); // 👈 SOLO “ya sé si hay sesión o no”
+  const [loading, setLoading] = useState(true); // SOLO “ya sé si hay sesión o no”
 
   const loadTenantsAndProfile = async (userId) => {
+    if (!userId) {
+      console.warn("[AuthProvider] loadTenantsAndProfile sin userId");
+      setProfile(null);
+      setTenants([]);
+      return;
+    }
+
     try {
       console.log("[AuthProvider] loadTenantsAndProfile userId", userId);
 
+      // 1) Aseguramos que exista al menos un tenant asociado al usuario.
+      //    Esto lo hace la función SQL init_tenant_if_empty(p_user_id uuid).
+      try {
+        const { data: initResult, error: initError } = await supabase.rpc(
+          "init_tenant_if_empty",
+          { p_user_id: userId }
+        );
+
+        if (initError) {
+          console.warn(
+            "[AuthProvider] init_tenant_if_empty error",
+            initError
+          );
+        } else {
+          console.log(
+            "[AuthProvider] init_tenant_if_empty resultado",
+            initResult
+          );
+        }
+      } catch (rpcErr) {
+        console.error(
+          "[AuthProvider] RPC init_tenant_if_empty falló (revisar que exista la función en la BD)",
+          rpcErr
+        );
+      }
+
+      // 2) Leemos memberships actualizados
       const { data, error } = await supabase
         .from("tenant_members")
         .select("role, tenant_id, tenants ( name, slug )")
@@ -38,7 +74,7 @@ export default function AuthProvider({ children }) {
       setTenants(rows);
 
       if (rows.length === 0) {
-        // Usuario sin tenant asociado todavía
+        // Caso muy raro: no hay tenant ni siquiera después de init_tenant_if_empty
         setProfile({
           role: "tenant",
           tenant_id: null,
@@ -69,7 +105,8 @@ export default function AuthProvider({ children }) {
   // Cargar sesión inicial + suscripción a cambios de auth
   useEffect(() => {
     const init = async () => {
-      setLoading(true); // 👈 Estamos averiguando si hay sesión
+      setLoading(true); // Estamos averiguando si hay sesión
+
       try {
         const { data, error } = await supabase.auth.getSession();
 
@@ -81,11 +118,11 @@ export default function AuthProvider({ children }) {
           setProfile(null);
           setTenants([]);
         } else {
-          setSession(data.session ?? null);
+          const currentSession = data.session ?? null;
+          setSession(currentSession);
 
-          // Cargamos contexto de usuario en segundo plano
-          if (data.session?.user) {
-            loadTenantsAndProfile(data.session.user.id);
+          if (currentSession?.user) {
+            await loadTenantsAndProfile(currentSession.user.id);
           } else {
             setProfile(null);
             setTenants([]);
@@ -97,7 +134,7 @@ export default function AuthProvider({ children }) {
         setProfile(null);
         setTenants([]);
       } finally {
-        // 👈 Ya sabemos si hay sesión o no → salimos de “loading”
+        // Ya sabemos si hay sesión o no
         setLoading(false);
       }
     };
@@ -106,20 +143,20 @@ export default function AuthProvider({ children }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("[AuthProvider] onAuthStateChange", { event, session });
 
       // Auth cambió → actualizamos sesión
       setSession(session ?? null);
-      setLoading(false); // 👈 Ya tenemos respuesta de auth
 
       if (session?.user) {
-        // Cargar tenant/profile en segundo plano
-        loadTenantsAndProfile(session.user.id);
+        await loadTenantsAndProfile(session.user.id);
       } else {
         setProfile(null);
         setTenants([]);
       }
+
+      setLoading(false); // Ya tenemos respuesta de auth
     });
 
     return () => {
@@ -144,17 +181,19 @@ export default function AuthProvider({ children }) {
       return { ok: false, error };
     }
 
-    setSession(data.session ?? null);
-    setLoading(false); // 👈 ya sabemos si el login fue correcto
+    const currentSession = data.session ?? null;
+    setSession(currentSession);
 
-    if (data.session?.user) {
-      loadTenantsAndProfile(data.session.user.id);
+    if (currentSession?.user) {
+      await loadTenantsAndProfile(currentSession.user.id);
     } else {
       setProfile(null);
       setTenants([]);
     }
 
-    return { ok: true, session: data.session };
+    setLoading(false); // ya sabemos si el login fue correcto
+
+    return { ok: true, session: currentSession };
   };
 
   const logout = async () => {

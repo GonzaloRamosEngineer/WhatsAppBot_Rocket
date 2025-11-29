@@ -37,7 +37,8 @@ const TenantRegistrationForm = () => {
     const newErrors = {};
 
     if (!formData.organizationName?.trim()) {
-      newErrors.organizationName = "El nombre de la organización es obligatorio";
+      newErrors.organizationName =
+        "El nombre de la organización / workspace es obligatorio";
     }
 
     if (!formData.fullName?.trim()) {
@@ -92,26 +93,27 @@ const TenantRegistrationForm = () => {
 
       if (error) {
         console.error("Sign up error", error);
-        // Mensajes un poco más amigables
+
         if (error.code === "user_already_exists") {
           setGeneralError(
             "Ya existe una cuenta con este email. Probá iniciar sesión."
           );
         } else {
           setGeneralError(
-            error.message || "No pudimos crear la cuenta. Intentá de nuevo."
+            error.message ||
+              "No pudimos crear la cuenta. Intentá nuevamente en unos minutos."
           );
         }
+
         setIsSubmitting(false);
         return;
       }
 
-      const user = data?.user;
       const session = data?.session;
 
       // 2) NO creamos tenant ni tenant_members desde el frontend.
-      //    Eso lo hace el backend (función/trigger init_tenant_if_empty / handle_new_user)
-      //    una vez que el usuario confirma el mail.
+      //    Eso lo resuelve la función SQL init_tenant_if_empty + policies
+      //    cuando el usuario confirma el correo e inicia sesión.
 
       if (!session) {
         // Flujo típico con confirmación de email
@@ -120,13 +122,13 @@ const TenantRegistrationForm = () => {
             "Revisá tu bandeja de entrada (y spam), confirmá tu correo y luego iniciá sesión."
         );
       } else {
-        // Por si en algún momento desactivás el correo de confirmación
+        // Por si desactivás la confirmación de correo en el futuro
         setSuccessMessage(
           "Cuenta creada correctamente. Te vamos a redirigir a tu panel."
         );
       }
 
-      // Pequeño redirect suave al login después de unos segundos
+      // Redirigimos suave al login
       setTimeout(() => {
         navigate("/login");
       }, 2500);
@@ -233,7 +235,10 @@ const TenantRegistrationForm = () => {
       <p className="text-xs text-muted-foreground text-center">
         Al crear una cuenta aceptás nuestros{" "}
         <span className="underline cursor-pointer">Términos</span> y{" "}
-        <span className="underline cursor-pointer">Política de privacidad</span>.
+        <span className="underline cursor-pointer">
+          Política de privacidad
+        </span>
+        .
       </p>
     </form>
   );
