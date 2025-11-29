@@ -24,6 +24,7 @@ const TenantDashboard = () => {
   const [flows, setFlows] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [channels, setChannels] = useState([]);
 
   // 🔹 Cargar datos reales del tenant desde Supabase
   useEffect(() => {
@@ -41,7 +42,7 @@ const TenantDashboard = () => {
       setIsLoading(true);
 
       try {
-        // 1) Tenant info
+        // 1) Info del tenant
         const { data: tenant, error: tenantError } = await supabase
           .from("tenants")
           .select("id, name, slug")
@@ -49,7 +50,7 @@ const TenantDashboard = () => {
           .single();
 
         if (tenantError) {
-          console.error("Error loading tenant", tenantError);
+          console.error("Error cargando tenant", tenantError);
         } else {
           setTenantInfo(tenant);
         }
@@ -65,7 +66,7 @@ const TenantDashboard = () => {
           .limit(100);
 
         if (msgsError) {
-          console.error("Error loading messages", msgsError);
+          console.error("Error cargando mensajes", msgsError);
           setMessages([]);
         } else {
           setMessages(msgs || []);
@@ -79,7 +80,7 @@ const TenantDashboard = () => {
           .eq("bots.tenant_id", profile.tenant_id);
 
         if (flowsError) {
-          console.error("Error loading flows", flowsError);
+          console.error("Error cargando flows", flowsError);
           setFlows([]);
         } else {
           setFlows(flowsData || []);
@@ -94,7 +95,7 @@ const TenantDashboard = () => {
           .limit(10);
 
         if (convsError) {
-          console.error("Error loading conversations", convsError);
+          console.error("Error cargando conversaciones", convsError);
           setConversations([]);
         } else {
           // Para cada conversación buscamos su último mensaje
@@ -109,7 +110,7 @@ const TenantDashboard = () => {
               phone: c.contact_phone || "",
               avatar:
                 "https://images.unsplash.com/photo-1564581335312-88ba5f1ae29f?auto=format&fit=crop&w=150&h=150",
-              avatarAlt: "Contact avatar",
+              avatarAlt: "Avatar del contacto",
               lastMessage: lastMsg?.body || "Sin mensajes todavía",
               lastSeen: c.last_message_at || lastMsg?.created_at,
               status:
@@ -125,7 +126,21 @@ const TenantDashboard = () => {
           setConversations(convItems);
         }
 
-        // 5) Actividad reciente basada en lo que tenemos
+        // 5) Canales de WhatsApp del tenant
+        const { data: channelsData, error: channelsError } = await supabase
+          .from("channels")
+          .select("id, status")
+          .eq("tenant_id", profile.tenant_id)
+          .eq("type", "whatsapp");
+
+        if (channelsError) {
+          console.error("Error cargando canales", channelsError);
+          setChannels([]);
+        } else {
+          setChannels(channelsData || []);
+        }
+
+        // 6) Actividad reciente basada en lo que tenemos
         const latestMsg = (msgs || [])[0];
         const now = new Date();
 
@@ -159,9 +174,26 @@ const TenantDashboard = () => {
           });
         }
 
+        if ((channelsData || []).length > 0) {
+          const activos = (channelsData || []).filter(
+            (c) => c.status === "active"
+          ).length;
+          activityItems.push({
+            id: "channels_status",
+            type: "channel_connected",
+            title: "Estado de canales",
+            description:
+              activos > 0
+                ? `Tenés ${activos} canal(es) de WhatsApp activo(s)`
+                : "Aún no conectaste ningún canal de WhatsApp",
+            timestamp: now.toISOString(),
+            status: activos > 0 ? "success" : "pending",
+          });
+        }
+
         setActivities(activityItems);
       } catch (err) {
-        console.error("Unexpected error loading dashboard data", err);
+        console.error("Error inesperado cargando datos del panel", err);
       } finally {
         setIsLoading(false);
       }
@@ -178,38 +210,43 @@ const TenantDashboard = () => {
 
   const metrics = [
     {
-      title: "Messages Sent",
+      title: "Mensajes enviados",
       value: String(outCount),
-      change: totalMessages ? "+100%" : "—",
-      changeType: totalMessages ? "positive" : "neutral",
+      change: null,
+      changeType: "neutral",
       icon: "Send",
       color: "primary",
     },
     {
-      title: "Messages Received",
+      title: "Mensajes recibidos",
       value: String(inCount),
-      change: totalMessages ? "+100%" : "—",
-      changeType: totalMessages ? "positive" : "neutral",
+      change: null,
+      changeType: "neutral",
       icon: "MessageCircle",
       color: "success",
     },
     {
-      title: "Active Flows",
+      title: "Flujos activos",
       value: String(activeFlows),
-      change: activeFlows ? "+100%" : "—",
-      changeType: activeFlows ? "positive" : "neutral",
+      change: null,
+      changeType: "neutral",
       icon: "GitBranch",
       color: "secondary",
     },
     {
-      title: "Total Messages",
+      title: "Mensajes totales (últimos 100)",
       value: String(totalMessages),
-      change: "—",
+      change: null,
       changeType: "neutral",
       icon: "BarChart3",
       color: "warning",
     },
   ];
+
+  // 🔹 Flags para el onboarding
+  const hasChannel = channels.some((c) => c.status === "active");
+  const hasFlow = activeFlows > 0;
+  const hasTestMessage = outCount > 0;
 
   // 🔹 Usuario actual mostrado en el header
   const currentUser = {
@@ -218,8 +255,8 @@ const TenantDashboard = () => {
       profile?.tenant?.name ||
       session?.user?.user_metadata?.full_name ||
       session?.user?.email ||
-      "User",
-    email: session?.user?.email || "user@example.com",
+      "Usuario",
+    email: session?.user?.email || "usuario@example.com",
     avatar:
       "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
     role: profile?.role || "tenant",
@@ -227,14 +264,14 @@ const TenantDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation Sidebar */}
+      {/* Barra lateral de navegación */}
       <NavigationSidebar
         isCollapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         userRole={profile?.role || "tenant"}
       />
 
-      {/* Main Content */}
+      {/* Contenido principal */}
       <div
         className={`transition-all duration-200 ${
           sidebarCollapsed ? "md:ml-16" : "md:ml-60"
@@ -246,11 +283,11 @@ const TenantDashboard = () => {
             <div className="flex items-center space-x-4">
               <div>
                 <h1 className="text-2xl font-bold text-foreground">
-                  Dashboard
+                  Panel de control
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Welcome back, {currentUser?.name}! Here&apos;s what&apos;s
-                  happening with your WhatsApp bot.
+                  ¡Bienvenido de nuevo, {currentUser?.name}! Acá ves cómo viene
+                  funcionando tu bot de WhatsApp.
                 </p>
                 {profile && !profile.tenant_id && (
                   <p className="mt-1 text-xs text-amber-600">
@@ -263,7 +300,7 @@ const TenantDashboard = () => {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Notifications */}
+              {/* Notificaciones (placeholder) */}
               <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md micro-animation relative">
                 <Icon name="Bell" size={20} />
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full"></span>
@@ -279,9 +316,9 @@ const TenantDashboard = () => {
           </div>
         </header>
 
-        {/* Dashboard Content */}
+        {/* Contenido del dashboard */}
         <main className="p-6 space-y-6">
-          {/* Metrics Cards */}
+          {/* Tarjetas de métricas */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {metrics.map((metric, index) => (
               <MetricsCard
@@ -297,18 +334,20 @@ const TenantDashboard = () => {
             ))}
           </div>
 
-          {/* Main Dashboard Grid */}
+          {/* Grid principal */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Activity Feed & Quick Actions */}
+            {/* Columna izquierda - Actividad y acciones rápidas */}
             <div className="lg:col-span-2 space-y-6">
               <ActivityFeed activities={activities} isLoading={isLoading} />
               <QuickActions />
             </div>
 
-            {/* Right Column - Conversations & Onboarding */}
+            {/* Columna derecha - Onboarding & conversaciones */}
             <div className="space-y-6">
               <OnboardingChecklist
-                onComplete={() => console.log("Onboarding completed")}
+                hasChannel={hasChannel}
+                hasFlow={hasFlow}
+                hasTestMessage={hasTestMessage}
               />
               <ActiveConversations
                 conversations={conversations}
@@ -317,12 +356,12 @@ const TenantDashboard = () => {
             </div>
           </div>
 
-          {/* Additional Stats Section */}
+          {/* Sección de stats adicionales (placeholder futuro) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="bg-card border border-border rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-foreground">
-                  Response Time
+                  Tiempo de respuesta
                 </h3>
                 <Icon
                   name="Clock"
@@ -334,7 +373,7 @@ const TenantDashboard = () => {
                 <p className="text-2xl font-bold text-foreground">—</p>
                 <p className="text-sm text-muted-foreground">
                   Más adelante podemos calcular esto con tiempos de respuesta
-                  reales
+                  reales.
                 </p>
               </div>
             </div>
@@ -342,7 +381,7 @@ const TenantDashboard = () => {
             <div className="bg-card border border-border rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-foreground">
-                  Customer Satisfaction
+                  Satisfacción del cliente
                 </h3>
                 <Icon
                   name="Heart"
@@ -353,7 +392,7 @@ const TenantDashboard = () => {
               <div className="space-y-2">
                 <p className="text-2xl font-bold text-foreground">—</p>
                 <p className="text-sm text-muted-foreground">
-                  Podés agregar encuestas / NPS más adelante
+                  Podés agregar encuestas / NPS más adelante.
                 </p>
               </div>
             </div>
@@ -361,7 +400,7 @@ const TenantDashboard = () => {
             <div className="bg-card border border-border rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-foreground">
-                  Active Flows
+                  Flujos activos
                 </h3>
                 <Icon
                   name="GitBranch"
@@ -374,7 +413,7 @@ const TenantDashboard = () => {
                   {activeFlows}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Flujos actuales en tu workspace
+                  Flujos actuales en tu workspace.
                 </p>
               </div>
             </div>

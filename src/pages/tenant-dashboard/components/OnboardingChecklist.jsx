@@ -1,58 +1,58 @@
-import React, { useState } from 'react';
-import Icon from '../../../components/AppIcon';
-import Button from '../../../components/ui/Button';
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import Icon from "../../../components/AppIcon";
+import Button from "../../../components/ui/Button";
 
-const OnboardingChecklist = ({ onComplete }) => {
-  const [completedSteps, setCompletedSteps] = useState([]);
+const OnboardingChecklist = ({ hasChannel, hasFlow, hasTestMessage }) => {
+  const navigate = useNavigate();
 
   const steps = [
     {
-      id: 'profile',
-      title: 'Complete Profile Setup',
-      description: 'Add your business information and contact details',
-      icon: 'User',
-      completed: true
+      id: "profile",
+      title: "Completar perfil del negocio",
+      description: "Agregá la información básica de tu organización.",
+      icon: "User",
+      completed: true, // más adelante se puede atar a datos reales
     },
     {
-      id: 'channel',
-      title: 'Connect WhatsApp Channel',
-      description: 'Link your WhatsApp Business number to start messaging',
-      icon: 'MessageSquare',
-      completed: false,
-      action: 'Setup Now'
+      id: "channel",
+      title: "Conectar canal de WhatsApp",
+      description: "Vinculá al menos un número de WhatsApp Business.",
+      icon: "MessageSquare",
+      completed: hasChannel,
+      action: "Configurar canal",
     },
     {
-      id: 'flow',
-      title: 'Create First Chatbot Flow',
-      description: 'Build an automated welcome message for new customers',
-      icon: 'GitBranch',
-      completed: false,
-      action: 'Create Flow'
+      id: "flow",
+      title: "Crear tu primer flujo de chatbot",
+      description: "Definí el mensaje de bienvenida automatizado.",
+      icon: "GitBranch",
+      completed: hasFlow,
+      action: "Crear flujo",
     },
     {
-      id: 'test',
-      title: 'Send Test Message',
-      description: 'Verify your setup by sending a test WhatsApp message',
-      icon: 'Send',
-      completed: false,
-      action: 'Test Now'
-    }
+      id: "test",
+      title: "Enviar mensaje de prueba",
+      description: "Probá que el bot responde correctamente.",
+      icon: "Send",
+      completed: hasTestMessage,
+      action: "Enviar prueba",
+    },
   ];
 
-  const completedCount = steps?.filter(step => step?.completed)?.length;
+  const completedCount = steps?.filter((step) => step?.completed)?.length;
   const progressPercentage = (completedCount / steps?.length) * 100;
 
   const handleStepAction = (stepId) => {
-    // Handle step-specific actions
     switch (stepId) {
-      case 'channel':
-        // Navigate to channel setup
+      case "channel":
+        navigate("/channel-setup");
         break;
-      case 'flow':
-        // Navigate to flow builder
+      case "flow":
+        navigate("/flow-builder");
         break;
-      case 'test':
-        // Open test message dialog
+      case "test":
+        navigate("/messages-log");
         break;
       default:
         break;
@@ -60,59 +60,80 @@ const OnboardingChecklist = ({ onComplete }) => {
   };
 
   if (completedCount === steps?.length) {
-    return null; // Hide checklist when all steps are completed
+    return null; // Ocultar checklist cuando todo está completo
   }
 
   return (
     <div className="bg-card border border-border rounded-lg p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-foreground">Getting Started</h3>
-        <span className="text-sm text-muted-foreground">{completedCount}/{steps?.length} completed</span>
+        <h3 className="text-lg font-semibold text-foreground">
+          Primeros pasos
+        </h3>
+        <span className="text-sm text-muted-foreground">
+          {completedCount}/{steps?.length} completados
+        </span>
       </div>
-      {/* Progress Bar */}
+      {/* Barra de progreso */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-foreground">Setup Progress</span>
-          <span className="text-sm text-muted-foreground">{Math.round(progressPercentage)}%</span>
+          <span className="text-sm font-medium text-foreground">
+            Progreso de configuración
+          </span>
+          <span className="text-sm text-muted-foreground">
+            {Math.round(progressPercentage)}%
+          </span>
         </div>
         <div className="w-full bg-muted rounded-full h-2">
-          <div 
+          <div
             className="bg-primary h-2 rounded-full transition-all duration-300"
             style={{ width: `${progressPercentage}%` }}
           ></div>
         </div>
       </div>
-      {/* Steps List */}
+      {/* Lista de pasos */}
       <div className="space-y-4">
         {steps?.map((step) => (
-          <div key={step?.id} className={`flex items-start space-x-3 p-3 rounded-md ${
-            step?.completed ? 'bg-success/5 border border-success/20' : 'bg-muted/30'
-          }`}>
-            <div className={`p-2 rounded-full ${
-              step?.completed 
-                ? 'bg-success text-success-foreground' 
-                : 'bg-muted text-muted-foreground'
-            }`}>
-              <Icon 
-                name={step?.completed ? 'Check' : step?.icon} 
-                size={16} 
+          <div
+            key={step?.id}
+            className={`flex items-start space-x-3 p-3 rounded-md ${
+              step?.completed ? "bg-success/5 border border-success/20" : "bg-muted/30"
+            }`}
+          >
+            <div
+              className={`p-2 rounded-full ${
+                step?.completed
+                  ? "bg-success text-success-foreground"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              <Icon
+                name={step?.completed ? "Check" : step?.icon}
+                size={16}
               />
             </div>
-            
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <h4 className={`text-sm font-medium ${
-                  step?.completed ? 'text-success' : 'text-foreground'
-                }`}>
+                <h4
+                  className={`text-sm font-medium ${
+                    step?.completed ? "text-success" : "text-foreground"
+                  }`}
+                >
                   {step?.title}
                 </h4>
                 {step?.completed && (
-                  <Icon name="CheckCircle" size={16} className="text-success" />
+                  <Icon
+                    name="CheckCircle"
+                    size={16}
+                    className="text-success"
+                  />
                 )}
               </div>
-              
-              <p className="text-sm text-muted-foreground mt-1">{step?.description}</p>
-              
+
+              <p className="text-sm text-muted-foreground mt-1">
+                {step?.description}
+              </p>
+
               {!step?.completed && step?.action && (
                 <Button
                   variant="outline"
@@ -130,7 +151,8 @@ const OnboardingChecklist = ({ onComplete }) => {
       {completedCount > 0 && completedCount < steps?.length && (
         <div className="mt-6 pt-4 border-t border-border">
           <p className="text-sm text-muted-foreground text-center">
-            Great progress! Complete the remaining steps to unlock all features.
+            ¡Buen inicio! Completá los pasos restantes para aprovechar todas las
+            funciones de DigitalMatch.
           </p>
         </div>
       )}

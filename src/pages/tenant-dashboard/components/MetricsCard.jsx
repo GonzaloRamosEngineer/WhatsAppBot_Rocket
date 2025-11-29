@@ -1,26 +1,26 @@
-import React from 'react';
-import Icon from '../../../components/AppIcon';
+import React from "react";
+import Icon from "../../../components/AppIcon";
 
-const MetricsCard = ({ 
-  title, 
-  value, 
-  change, 
-  changeType, 
-  icon, 
-  color = 'primary',
-  isLoading = false 
+const MetricsCard = ({
+  title,
+  value,
+  change,
+  changeType,
+  icon,
+  color = "primary",
+  isLoading = false,
 }) => {
   const colorClasses = {
-    primary: 'bg-primary/10 text-primary border-primary/20',
-    success: 'bg-success/10 text-success border-success/20',
-    warning: 'bg-warning/10 text-warning border-warning/20',
-    secondary: 'bg-secondary/10 text-secondary border-secondary/20'
+    primary: "bg-primary/10 text-primary border-primary/20",
+    success: "bg-success/10 text-success border-success/20",
+    warning: "bg-warning/10 text-warning border-warning/20",
+    secondary: "bg-secondary/10 text-secondary border-secondary/20",
   };
 
   const changeColorClasses = {
-    positive: 'text-success',
-    negative: 'text-destructive',
-    neutral: 'text-muted-foreground'
+    positive: "text-success",
+    negative: "text-destructive",
+    neutral: "text-muted-foreground",
   };
 
   if (isLoading) {
@@ -48,15 +48,25 @@ const MetricsCard = ({
         <p className="text-2xl font-bold text-foreground">{value}</p>
         {change && (
           <div className="flex items-center space-x-1">
-            <Icon 
-              name={changeType === 'positive' ? 'TrendingUp' : changeType === 'negative' ? 'TrendingDown' : 'Minus'} 
-              size={14} 
+            <Icon
+              name={
+                changeType === "positive"
+                  ? "TrendingUp"
+                  : changeType === "negative"
+                  ? "TrendingDown"
+                  : "Minus"
+              }
+              size={14}
               className={changeColorClasses?.[changeType]}
             />
-            <span className={`text-sm font-medium ${changeColorClasses?.[changeType]}`}>
+            <span
+              className={`text-sm font-medium ${changeColorClasses?.[changeType]}`}
+            >
               {change}
             </span>
-            <span className="text-sm text-muted-foreground">vs last month</span>
+            <span className="text-sm text-muted-foreground">
+              vs período anterior
+            </span>
           </div>
         )}
       </div>
