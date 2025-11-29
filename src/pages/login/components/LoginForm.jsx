@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\login\components\LoginForm.jsx
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/ui/Button";
@@ -24,7 +26,7 @@ const LoginForm = () => {
   const [forgotError, setForgotError] = useState("");
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e?.target;
+    const { name, value, type, checked } = e?.target || {};
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
@@ -39,15 +41,15 @@ const LoginForm = () => {
     const newErrors = {};
 
     if (!formData?.email) {
-      newErrors.email = "Email is required";
+      newErrors.email = "El email es obligatorio.";
     } else if (!/\S+@\S+\.\S+/.test(formData?.email)) {
-      newErrors.email = "Please enter a valid email address";
+      newErrors.email = "Ingresá un email válido.";
     }
 
     if (!formData?.password) {
-      newErrors.password = "Password is required";
+      newErrors.password = "La contraseña es obligatoria.";
     } else if (formData?.password?.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+      newErrors.password = "La contraseña debe tener al menos 6 caracteres.";
     }
 
     setErrors(newErrors);
@@ -70,12 +72,13 @@ const LoginForm = () => {
     if (!result.ok) {
       setErrors((prev) => ({
         ...prev,
-        general: result.error?.message || "Invalid credentials",
+        general:
+          result.error?.message || "Credenciales inválidas. Probá de nuevo.",
       }));
       return;
     }
 
-    // Login OK → vamos al dashboard del tenant
+    // Login OK → dashboard del tenant
     navigate("/tenant-dashboard");
   };
 
@@ -84,7 +87,7 @@ const LoginForm = () => {
     setForgotMessage("");
 
     if (!formData?.email) {
-      setForgotError("Please enter your email to receive the reset link.");
+      setForgotError("Ingresá tu email para enviarte el enlace de reinicio.");
       return;
     }
 
@@ -100,10 +103,13 @@ const LoginForm = () => {
 
       if (error) {
         console.error(error);
-        setForgotError(error.message || "Could not send reset email.");
+        setForgotError(
+          error.message ||
+            "No pudimos enviar el email de reinicio. Intentá nuevamente."
+        );
       } else {
         setForgotMessage(
-          "If this email exists, we sent you a password reset link."
+          "Si el email existe, te enviamos un enlace para restablecer la contraseña."
         );
       }
     } finally {
@@ -118,7 +124,7 @@ const LoginForm = () => {
   return (
     <div className="w-full max-w-md mx-auto">
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* General Error Message */}
+        {/* Error general */}
         {errors?.general && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-md">
             <div className="flex items-center space-x-2">
@@ -140,12 +146,12 @@ const LoginForm = () => {
           </div>
         )}
 
-        {/* Email Input */}
+        {/* Email */}
         <Input
-          label="Email Address"
+          label="Email"
           type="email"
           name="email"
-          placeholder="Enter your email address"
+          placeholder="Ingresá tu email"
           value={formData?.email}
           onChange={handleInputChange}
           error={errors?.email}
@@ -153,12 +159,12 @@ const LoginForm = () => {
           disabled={isLoading || forgotLoading}
         />
 
-        {/* Password Input */}
+        {/* Password */}
         <Input
-          label="Password"
+          label="Contraseña"
           type="password"
           name="password"
-          placeholder="Enter your password"
+          placeholder="Ingresá tu contraseña"
           value={formData?.password}
           onChange={handleInputChange}
           error={errors?.password}
@@ -166,16 +172,16 @@ const LoginForm = () => {
           disabled={isLoading || forgotLoading}
         />
 
-        {/* Remember Me Checkbox */}
+        {/* Remember me */}
         <Checkbox
-          label="Remember me for 30 days"
+          label="Recordarme por 30 días"
           name="rememberMe"
           checked={formData?.rememberMe}
           onChange={handleInputChange}
           disabled={isLoading || forgotLoading}
         />
 
-        {/* Sign In Button */}
+        {/* Botón login */}
         <Button
           type="submit"
           variant="default"
@@ -185,10 +191,10 @@ const LoginForm = () => {
           iconName="LogIn"
           iconPosition="right"
         >
-          Sign In
+          Iniciar sesión
         </Button>
 
-        {/* Additional Links */}
+        {/* Links extra */}
         <div className="space-y-3">
           <button
             type="button"
@@ -196,12 +202,14 @@ const LoginForm = () => {
             className="w-full text-center text-sm text-primary hover:text-primary/80 micro-animation"
             disabled={isLoading || forgotLoading}
           >
-            {forgotLoading ? "Sending reset link…" : "Forgot your password?"}
+            {forgotLoading
+              ? "Enviando enlace de reinicio…"
+              : "¿Olvidaste tu contraseña?"}
           </button>
 
           <div className="text-center">
             <span className="text-sm text-muted-foreground">
-              Don't have an account?{" "}
+              ¿No tenés cuenta aún?{" "}
             </span>
             <button
               type="button"
@@ -209,7 +217,7 @@ const LoginForm = () => {
               className="text-sm text-primary hover:text-primary/80 font-medium micro-animation"
               disabled={isLoading || forgotLoading}
             >
-              Create Account
+              Crear cuenta
             </button>
           </div>
         </div>

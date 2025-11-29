@@ -1,5 +1,7 @@
-import React from 'react';
-import Icon from '../../../components/AppIcon';
+// C:\Projects\WhatsAppBot_Rocket\src\pages\login\components\LoginHeader.jsx
+
+import React from "react";
+import Icon from "../../../components/AppIcon";
 
 const LoginHeader = () => {
   return (
@@ -10,18 +12,22 @@ const LoginHeader = () => {
           <Icon name="MessageSquare" size={24} color="white" />
         </div>
         <div className="ml-3">
-          <h1 className="text-2xl font-bold text-foreground">WhatsApp Bot</h1>
-          <p className="text-sm text-muted-foreground">Manager</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            DigitalMatch – MatchBot
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Panel para administrar tu bot de WhatsApp
+          </p>
         </div>
       </div>
 
-      {/* Welcome Message */}
+      {/* Mensaje bienvenida */}
       <div className="space-y-2">
         <h2 className="text-2xl font-semibold text-foreground">
-          Welcome Back
+          Bienvenido de nuevo
         </h2>
         <p className="text-muted-foreground">
-          Sign in to your account to manage your WhatsApp chatbots
+          Iniciá sesión para gestionar tus conversaciones y automatizaciones.
         </p>
       </div>
     </div>

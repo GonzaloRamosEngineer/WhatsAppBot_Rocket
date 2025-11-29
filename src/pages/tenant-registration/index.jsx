@@ -9,10 +9,10 @@ const TenantRegistrationPage = () => {
   return (
     <>
       <Helmet>
-        <title>Create Account - WhatsApp Bot Manager</title>
+        <title>Crear cuenta - DigitalMatch MatchBot</title>
         <meta
           name="description"
-          content="Create your WhatsApp Bot Manager account to connect your WhatsApp number and start managing customer conversations."
+          content="Creá tu cuenta en MatchBot para conectar tu número de WhatsApp Business y gestionar las conversaciones de tu organización."
         />
       </Helmet>
 
@@ -23,11 +23,11 @@ const TenantRegistrationPage = () => {
             <div className="bg-card border border-border rounded-xl shadow-lg p-8">
               <div className="mb-6">
                 <h1 className="text-2xl font-semibold text-foreground">
-                  Create your account
+                  Crear tu cuenta y workspace
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Set up your workspace to start managing WhatsApp conversations
-                  for your business or organization.
+                  Configurá tu workspace para empezar a gestionar
+                  conversaciones de WhatsApp para tu negocio u organización.
                 </p>
               </div>
 
@@ -35,12 +35,12 @@ const TenantRegistrationPage = () => {
 
               <div className="mt-6 text-center">
                 <p className="text-xs text-muted-foreground">
-                  Already have an account?{" "}
+                  ¿Ya tenés una cuenta?{" "}
                   <a
                     href="/login"
                     className="text-xs text-primary hover:text-primary/80 font-medium micro-animation"
                   >
-                    Sign in
+                    Iniciar sesión
                   </a>
                 </p>
               </div>

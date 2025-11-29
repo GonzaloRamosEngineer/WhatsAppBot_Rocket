@@ -1,48 +1,57 @@
-import React from 'react';
-import Icon from '../../../components/AppIcon';
+// C:\Projects\WhatsAppBot_Rocket\src\pages\tenant-registration\components\FeatureHighlights.jsx
+
+import React from "react";
+import Icon from "../../../components/AppIcon";
 
 const FeatureHighlights = () => {
   const features = [
     {
-      icon: 'MessageCircle',
-      title: 'Automated Responses',
-      description: 'Set up intelligent chatbot flows to handle customer inquiries 24/7'
+      icon: "MessageCircle",
+      title: "Respuestas automatizadas",
+      description:
+        "Configurá flujos de chatbot inteligentes para atender consultas 24/7.",
     },
     {
-      icon: 'BarChart3',
-      title: 'Analytics & Insights',
-      description: 'Track message volume, response times, and customer satisfaction'
+      icon: "BarChart3",
+      title: "Métricas e insights",
+      description:
+        "Seguimiento de volumen de mensajes, tiempos de respuesta y satisfacción.",
     },
     {
-      icon: 'Users',
-      title: 'Multi-Agent Support',
-      description: 'Manage team access and assign conversations to specific agents'
+      icon: "Users",
+      title: "Soporte multi-agente",
+      description:
+        "Gestioná el acceso de tu equipo y asigná conversaciones a cada agente.",
     },
     {
-      icon: 'Zap',
-      title: 'Quick Integration',
-      description: 'Connect your WhatsApp Business account in just a few clicks'
+      icon: "Zap",
+      title: "Integración rápida",
+      description:
+        "Conectá tu número de WhatsApp Business en pocos pasos y sin fricción.",
     },
     {
-      icon: 'Shield',
-      title: 'Secure & Compliant',
-      description: 'Enterprise-grade security with full data privacy protection'
+      icon: "Shield",
+      title: "Seguro y compliant",
+      description:
+        "Buenas prácticas de seguridad y privacidad para tus datos y los de tus clientes.",
     },
     {
-      icon: 'Clock',
-      title: 'Real-time Sync',
-      description: 'Instant message delivery and real-time conversation updates'
-    }
+      icon: "Clock",
+      title: "Sincronización en tiempo real",
+      description:
+        "Mensajes instantáneos y actualización en vivo del estado de las conversaciones.",
+    },
   ];
 
   return (
     <div className="bg-muted/30 rounded-xl p-8">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-foreground mb-2">
-          Why Choose Our Platform?
+          ¿Por qué usar MatchBot?
         </h2>
         <p className="text-muted-foreground">
-          Everything you need to automate and scale your WhatsApp customer service
+          Todo lo que necesitás para automatizar y escalar tu atención por
+          WhatsApp.
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -62,20 +71,20 @@ const FeatureHighlights = () => {
           </div>
         ))}
       </div>
-      {/* Trust Indicators */}
+      {/* Indicadores de confianza */}
       <div className="mt-8 pt-6 border-t border-border">
         <div className="flex items-center justify-center space-x-8 text-sm text-muted-foreground">
           <div className="flex items-center space-x-2">
             <Icon name="Shield" size={16} />
-            <span>SSL Secured</span>
+            <span>Conexión segura SSL</span>
           </div>
           <div className="flex items-center space-x-2">
             <Icon name="Lock" size={16} />
-            <span>GDPR Compliant</span>
+            <span>Buenas prácticas de privacidad</span>
           </div>
           <div className="flex items-center space-x-2">
             <Icon name="CheckCircle" size={16} />
-            <span>99.9% Uptime</span>
+            <span>Alta disponibilidad</span>
           </div>
         </div>
       </div>

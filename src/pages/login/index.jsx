@@ -17,9 +17,8 @@ const LoginPage = () => {
   });
   const [error, setError] = useState("");
 
-  // Si ya hay sesión, mandamos al dashboard
+  // Si ya hay sesión → mandamos directo al dashboard
   useEffect(() => {
-    console.log("[LoginPage] useEffect session", session);
     if (session) {
       navigate("/tenant-dashboard", { replace: true });
     }
@@ -36,7 +35,7 @@ const LoginPage = () => {
     setError("");
 
     if (!form.email || !form.password) {
-      setError("Please enter your email and password.");
+      setError("Ingresá tu email y contraseña.");
       return;
     }
 
@@ -44,11 +43,13 @@ const LoginPage = () => {
 
     if (!ok) {
       console.error("[LoginPage] login error", error);
-      setError(error?.message || "Could not sign in. Please try again.");
+      setError(
+        error?.message ||
+          "No pudimos iniciar sesión. Verificá los datos e intentá nuevamente."
+      );
       return;
     }
-
-    // No hace falta navigate acá, el efecto de session se encarga
+    // El redirect lo maneja el useEffect cuando cambia session
   };
 
   return (
@@ -64,7 +65,7 @@ const LoginPage = () => {
               DigitalMatch – MatchBot
             </h1>
             <p className="text-xs text-muted-foreground">
-              Sign in to manage your WhatsApp workspace
+              Iniciá sesión para administrar tu workspace de WhatsApp.
             </p>
           </div>
         </div>
@@ -77,20 +78,20 @@ const LoginPage = () => {
           </div>
         )}
 
-        {/* Form */}
+        {/* Formulario */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Email"
             type="email"
             name="email"
-            placeholder="you@company.com"
+            placeholder="tu@empresa.com"
             value={form.email}
             onChange={handleChange}
             required
           />
 
           <Input
-            label="Password"
+            label="Contraseña"
             type="password"
             name="password"
             placeholder="••••••••••"
@@ -105,7 +106,7 @@ const LoginPage = () => {
               to="/auth/reset-password"
               className="text-primary hover:text-primary/80 font-medium"
             >
-              Forgot password?
+              ¿Olvidaste tu contraseña?
             </Link>
           </div>
 
@@ -118,18 +119,18 @@ const LoginPage = () => {
             iconName="LogIn"
             iconPosition="left"
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Ingresando..." : "Iniciar sesión"}
           </Button>
         </form>
 
         {/* Footer */}
         <div className="mt-6 text-center text-xs text-muted-foreground">
-          <span>Don&apos;t have an account? </span>
+          <span>¿Todavía no tenés cuenta? </span>
           <Link
             to="/tenant-registration"
             className="text-primary hover:text-primary/80 font-medium"
           >
-            Create workspace
+            Crear workspace
           </Link>
         </div>
       </div>

@@ -10,14 +10,16 @@ import { supabase } from "../../../lib/supabaseClient";
 // Helper simple para slug
 const slugify = (value) => {
   if (!value) return "tenant";
-  return value
-    .toString()
-    .toLowerCase()
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // quita acentos
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "tenant";
+  return (
+    value
+      .toString()
+      .toLowerCase()
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // quita acentos
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "tenant"
+  );
 };
 
 const TenantRegistrationForm = () => {
@@ -50,29 +52,30 @@ const TenantRegistrationForm = () => {
     const newErrors = {};
 
     if (!formData.organizationName?.trim()) {
-      newErrors.organizationName = "Organization name is required";
+      newErrors.organizationName = "El nombre de la organización es obligatorio.";
     }
 
     if (!formData.fullName?.trim()) {
-      newErrors.fullName = "Full name is required";
+      newErrors.fullName = "Tu nombre completo es obligatorio.";
     }
 
     if (!formData.email?.trim()) {
-      newErrors.email = "Email is required";
+      newErrors.email = "El email es obligatorio.";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email address";
+      newErrors.email = "Ingresá un email válido.";
     }
 
     if (!formData.password) {
-      newErrors.password = "Password is required";
+      newErrors.password = "La contraseña es obligatoria.";
     } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
+      newErrors.password =
+        "La contraseña debe tener al menos 8 caracteres.";
     }
 
     if (!formData.passwordConfirm) {
-      newErrors.passwordConfirm = "Please confirm your password";
+      newErrors.passwordConfirm = "Tenés que confirmar la contraseña.";
     } else if (formData.passwordConfirm !== formData.password) {
-      newErrors.passwordConfirm = "Passwords do not match";
+      newErrors.passwordConfirm = "Las contraseñas no coinciden.";
     }
 
     setErrors(newErrors);
@@ -92,22 +95,22 @@ const TenantRegistrationForm = () => {
 
     try {
       // 1) Alta de usuario en Supabase Auth
-      const {
-        data: signUpData,
-        error: signUpError,
-      } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
+      const { data: signUpData, error: signUpError } =
+        await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            },
           },
-        },
-      });
+        });
 
       if (signUpError) {
         console.error("Sign up error", signUpError);
-        setGeneralError(signUpError.message || "Could not create account.");
+        setGeneralError(
+          signUpError.message || "No pudimos crear la cuenta."
+        );
         setIsSubmitting(false);
         return;
       }
@@ -116,9 +119,9 @@ const TenantRegistrationForm = () => {
       const session = signUpData?.session;
 
       if (!user) {
-        // Caso típico cuando tenés confirmación de email activada
+        // Caso típico con confirmación de email
         setSuccessMessage(
-          "We’ve sent you a confirmation email. Please confirm your account and then sign in."
+          "Te enviamos un email de confirmación. Verificá tu cuenta y luego iniciá sesión."
         );
         setIsSubmitting(false);
         return;
@@ -127,10 +130,7 @@ const TenantRegistrationForm = () => {
       // 2) Crear tenant
       const slug = slugify(organizationName);
 
-      const {
-        data: tenantInsert,
-        error: tenantError,
-      } = await supabase
+      const { data: tenantInsert, error: tenantError } = await supabase
         .from("tenants")
         .insert({
           name: organizationName.trim(),
@@ -140,9 +140,10 @@ const TenantRegistrationForm = () => {
         .single();
 
       if (tenantError) {
-        console.error("Error creating tenant", tenantError);
+        console.error("Error creando tenant", tenantError);
         setGeneralError(
-          tenantError.message || "Could not create organization."
+          tenantError.message ||
+            "No pudimos crear la organización / workspace."
         );
         setIsSubmitting(false);
         return;
@@ -158,29 +159,29 @@ const TenantRegistrationForm = () => {
         });
 
       if (memberError) {
-        console.error("Error creating tenant member", memberError);
+        console.error("Error creando tenant member", memberError);
         setGeneralError(
           memberError.message ||
-            "Could not link your user with the organization."
+            "No pudimos vincular tu usuario con la organización."
         );
         setIsSubmitting(false);
         return;
       }
 
       // 4) Todo OK → mensaje + redirección
-      setSuccessMessage("Account created successfully. Redirecting...");
+      setSuccessMessage(
+        "Cuenta y workspace creados correctamente. Redirigiendo…"
+      );
       setTimeout(() => {
-        // Si ya hay sesión, vamos directo al dashboard
         if (session) {
           navigate("/tenant-dashboard");
         } else {
-          // fallback por si tenés confirmación de email
           navigate("/login");
         }
       }, 1500);
     } catch (err) {
       console.error("Unexpected error on registration", err);
-      setGeneralError("Unexpected error. Please try again.");
+      setGeneralError("Ocurrió un error inesperado. Intentá nuevamente.");
     } finally {
       setIsSubmitting(false);
     }
@@ -202,11 +203,11 @@ const TenantRegistrationForm = () => {
         </div>
       )}
 
-      {/* Organization */}
+      {/* Organización */}
       <Input
-        label="Organization / Workspace name"
+        label="Nombre de la organización / workspace"
         name="organizationName"
-        placeholder="e.g. DigitalMatch, Fundación Evolución Antoniana"
+        placeholder="Ej. DigitalMatch, Fundación Evolución Antoniana"
         value={formData.organizationName}
         onChange={handleChange}
         error={errors.organizationName}
@@ -214,11 +215,11 @@ const TenantRegistrationForm = () => {
         required
       />
 
-      {/* Full name */}
+      {/* Nombre completo */}
       <Input
-        label="Full name"
+        label="Nombre completo"
         name="fullName"
-        placeholder="Enter your full name"
+        placeholder="Ingresá tu nombre y apellido"
         value={formData.fullName}
         onChange={handleChange}
         error={errors.fullName}
@@ -228,10 +229,10 @@ const TenantRegistrationForm = () => {
 
       {/* Email */}
       <Input
-        label="Work email"
+        label="Email de trabajo"
         type="email"
         name="email"
-        placeholder="you@company.com"
+        placeholder="tu@empresa.com"
         value={formData.email}
         onChange={handleChange}
         error={errors.email}
@@ -241,10 +242,10 @@ const TenantRegistrationForm = () => {
 
       {/* Password */}
       <Input
-        label="Password"
+        label="Contraseña"
         type="password"
         name="password"
-        placeholder="Create a secure password"
+        placeholder="Creá una contraseña segura"
         value={formData.password}
         onChange={handleChange}
         error={errors.password}
@@ -254,10 +255,10 @@ const TenantRegistrationForm = () => {
 
       {/* Confirm password */}
       <Input
-        label="Confirm password"
+        label="Confirmar contraseña"
         type="password"
         name="passwordConfirm"
-        placeholder="Re-enter your password"
+        placeholder="Repetí la contraseña"
         value={formData.passwordConfirm}
         onChange={handleChange}
         error={errors.passwordConfirm}
@@ -274,13 +275,14 @@ const TenantRegistrationForm = () => {
         iconName="UserPlus"
         iconPosition="right"
       >
-        {isSubmitting ? "Creating account..." : "Create account"}
+        {isSubmitting ? "Creando cuenta..." : "Crear cuenta y workspace"}
       </Button>
 
       <p className="text-xs text-muted-foreground text-center">
-        By creating an account you agree to our{" "}
-        <span className="underline cursor-pointer">Terms</span> and{" "}
-        <span className="underline cursor-pointer">Privacy Policy</span>.
+        Al crear una cuenta aceptás nuestros{" "}
+        <span className="underline cursor-pointer">Términos</span> y{" "}
+        <span className="underline cursor-pointer">Política de privacidad</span>
+        .
       </p>
     </form>
   );
