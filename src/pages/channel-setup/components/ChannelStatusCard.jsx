@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import Button from '../../../components/ui/Button';
-import Icon from '../../../components/AppIcon';
+import React, { useState } from "react";
+import Button from "../../../components/ui/Button";
+import Icon from "../../../components/AppIcon";
 
 const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -8,8 +8,7 @@ const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
   const handleToggleChannel = async () => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 800));
       if (onToggleChannel) {
         onToggleChannel(!channelData?.isActive);
       }
@@ -19,18 +18,18 @@ const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
   };
 
   const getStatusColor = () => {
-    if (!isConnected) return 'text-muted-foreground';
-    return channelData?.isActive ? 'text-success' : 'text-warning';
+    if (!isConnected) return "text-muted-foreground";
+    return channelData?.isActive ? "text-success" : "text-warning";
   };
 
   const getStatusText = () => {
-    if (!isConnected) return 'Not Connected';
-    return channelData?.isActive ? 'Active' : 'Inactive';
+    if (!isConnected) return "Sin conectar";
+    return channelData?.isActive ? "Activo" : "Inactivo";
   };
 
   const getStatusIcon = () => {
-    if (!isConnected) return 'AlertCircle';
-    return channelData?.isActive ? 'CheckCircle' : 'Clock';
+    if (!isConnected) return "AlertCircle";
+    return channelData?.isActive ? "CheckCircle" : "Clock";
   };
 
   return (
@@ -41,11 +40,15 @@ const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
             <Icon name="MessageSquare" size={20} className="text-accent" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-foreground">Channel Status</h3>
-            <p className="text-sm text-muted-foreground">Manage your WhatsApp channel</p>
+            <h3 className="text-lg font-semibold text-foreground">
+              Estado del canal
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Gestioná el estado del canal de WhatsApp seleccionado
+            </p>
           </div>
         </div>
-        
+
         <div className={`flex items-center space-x-2 ${getStatusColor()}`}>
           <Icon name={getStatusIcon()} size={20} />
           <span className="font-medium">{getStatusText()}</span>
@@ -53,91 +56,129 @@ const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
       </div>
       {isConnected && channelData ? (
         <div className="space-y-4">
-          {/* Channel Information */}
+          {/* Información del canal */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted rounded-md">
             <div>
-              <label className="text-sm font-medium text-foreground">Business Name</label>
-              <p className="text-sm text-muted-foreground">{channelData?.businessName}</p>
+              <label className="text-sm font-medium text-foreground">
+                Nombre del negocio
+              </label>
+              <p className="text-sm text-muted-foreground">
+                {channelData?.businessName}
+              </p>
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground">Phone Number</label>
-              <p className="text-sm text-muted-foreground">{channelData?.phoneNumber}</p>
+              <label className="text-sm font-medium text-foreground">
+                Número de WhatsApp
+              </label>
+              <p className="text-sm text-muted-foreground">
+                {channelData?.phoneNumber || "No detectado (se completará al enviar mensajes)"}
+              </p>
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground">Verification Status</label>
+              <label className="text-sm font-medium text-foreground">
+                Verificación
+              </label>
               <div className="flex items-center space-x-2">
                 <Icon name="CheckCircle" size={16} className="text-success" />
-                <span className="text-sm text-success">Verified</span>
+                <span className="text-sm text-success">Verificado</span>
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground">Last Sync</label>
+              <label className="text-sm font-medium text-foreground">
+                Última sincronización
+              </label>
               <p className="text-sm text-muted-foreground">
-                {new Date(channelData.lastSync)?.toLocaleString()}
+                {channelData.lastSync
+                  ? new Date(channelData.lastSync).toLocaleString()
+                  : "Sincronización pendiente"}
               </p>
             </div>
           </div>
 
-          {/* Channel Controls */}
+          {/* Controles */}
           <div className="flex items-center justify-between p-4 border border-border rounded-md">
             <div>
-              <h4 className="font-medium text-foreground">Message Processing</h4>
+              <h4 className="font-medium text-foreground">
+                Procesamiento de mensajes
+              </h4>
               <p className="text-sm text-muted-foreground">
-                {channelData?.isActive 
-                  ? 'Your channel is actively processing incoming messages' :'Message processing is currently disabled'
-                }
+                {channelData?.isActive
+                  ? "Este canal está procesando mensajes entrantes."
+                  : "El procesamiento de mensajes está desactivado para este canal."}
               </p>
             </div>
             <Button
               onClick={handleToggleChannel}
               loading={isLoading}
-              variant={channelData?.isActive ? 'destructive' : 'default'}
-              iconName={channelData?.isActive ? 'Pause' : 'Play'}
+              variant={channelData?.isActive ? "destructive" : "default"}
+              iconName={channelData?.isActive ? "Pause" : "Play"}
               iconPosition="left"
             >
-              {isLoading 
-                ? (channelData?.isActive ? 'Deactivating...' : 'Activating...') 
-                : (channelData?.isActive ? 'Deactivate Channel' : 'Activate Channel')
-              }
+              {isLoading
+                ? channelData?.isActive
+                  ? "Desactivando..."
+                  : "Activando..."
+                : channelData?.isActive
+                ? "Desactivar canal"
+                : "Activar canal"}
             </Button>
           </div>
 
-          {/* Usage Statistics */}
+          {/* Estadísticas */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 bg-primary/5 border border-primary/20 rounded-md">
               <div className="flex items-center space-x-2 mb-2">
                 <Icon name="MessageCircle" size={16} className="text-primary" />
-                <span className="text-sm font-medium text-primary">Messages Today</span>
+                <span className="text-sm font-medium text-primary">
+                  Mensajes hoy
+                </span>
               </div>
-              <p className="text-2xl font-bold text-foreground">{channelData?.stats?.messagesToday || 0}</p>
+              <p className="text-2xl font-bold text-foreground">
+                {channelData?.stats?.messagesToday || 0}
+              </p>
             </div>
-            
+
             <div className="p-4 bg-secondary/5 border border-secondary/20 rounded-md">
               <div className="flex items-center space-x-2 mb-2">
                 <Icon name="Calendar" size={16} className="text-secondary" />
-                <span className="text-sm font-medium text-secondary">This Month</span>
+                <span className="text-sm font-medium text-secondary">
+                  Este mes
+                </span>
               </div>
-              <p className="text-2xl font-bold text-foreground">{channelData?.stats?.messagesThisMonth || 0}</p>
+              <p className="text-2xl font-bold text-foreground">
+                {channelData?.stats?.messagesThisMonth || 0}
+              </p>
             </div>
-            
+
             <div className="p-4 bg-accent/5 border border-accent/20 rounded-md">
               <div className="flex items-center space-x-2 mb-2">
                 <Icon name="Users" size={16} className="text-accent" />
-                <span className="text-sm font-medium text-accent">Active Chats</span>
+                <span className="text-sm font-medium text-accent">
+                  Chats activos
+                </span>
               </div>
-              <p className="text-2xl font-bold text-foreground">{channelData?.stats?.activeChats || 0}</p>
+              <p className="text-2xl font-bold text-foreground">
+                {channelData?.stats?.activeChats || 0}
+              </p>
             </div>
           </div>
         </div>
       ) : (
         <div className="text-center py-8">
-          <Icon name="AlertCircle" size={48} className="text-muted-foreground mx-auto mb-4" />
-          <h4 className="text-lg font-medium text-foreground mb-2">No Channel Connected</h4>
+          <Icon
+            name="AlertCircle"
+            size={48}
+            className="text-muted-foreground mx-auto mb-4"
+          />
+          <h4 className="text-lg font-medium text-foreground mb-2">
+            Ningún canal conectado
+          </h4>
           <p className="text-muted-foreground mb-4">
-            Connect your WhatsApp Business account to start managing your channel.
+            Conectá tu cuenta de WhatsApp Business para ver el estado del canal.
           </p>
           <p className="text-sm text-muted-foreground">
-            Fill in your credentials above and test the connection to get started.
+            Completá las credenciales y realizá la prueba de conexión para
+            comenzar.
           </p>
         </div>
       )}
