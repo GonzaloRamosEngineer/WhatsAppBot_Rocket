@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\tenant-dashboard\components\QuickActions.jsx
+
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../../components/ui/Button";
@@ -35,41 +37,42 @@ const QuickActions = () => {
         Acciones rápidas
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {actions?.map((action, index) => (
-          <div
+        {actions.map((action, index) => (
+          <button
             key={index}
-            className="p-4 border border-border rounded-lg hover:shadow-md micro-animation"
+            onClick={action.onClick}
+            className="p-4 border border-border rounded-lg hover:shadow-md micro-animation text-left bg-background/40"
           >
             <div className="flex flex-col items-center text-center space-y-3">
               <div className="p-3 bg-primary/10 text-primary rounded-lg">
                 <Button
                   variant="ghost"
-                  iconName={action?.icon}
+                  iconName={action.icon}
                   iconSize={24}
-                  onClick={action?.onClick}
+                  onClick={action.onClick}
                   className="p-0 h-auto hover:bg-transparent"
                 />
               </div>
 
               <div className="space-y-1">
                 <h4 className="font-medium text-foreground">
-                  {action?.title}
+                  {action.title}
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  {action?.description}
+                  {action.description}
                 </p>
               </div>
 
               <Button
-                variant={action?.variant}
+                variant={action.variant}
                 size="sm"
-                onClick={action?.onClick}
+                onClick={action.onClick}
                 fullWidth
               >
                 Ir
               </Button>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>

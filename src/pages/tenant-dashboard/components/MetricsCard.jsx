@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\tenant-dashboard\components\MetricsCard.jsx
+
 import React from "react";
 import Icon from "../../../components/AppIcon";
 
@@ -27,11 +29,11 @@ const MetricsCard = ({
     return (
       <div className="bg-card border border-border rounded-lg p-6 animate-pulse">
         <div className="flex items-center justify-between mb-4">
-          <div className="h-4 bg-muted rounded w-24"></div>
-          <div className="h-8 w-8 bg-muted rounded"></div>
+          <div className="h-4 bg-muted rounded w-24" />
+          <div className="h-8 w-8 bg-muted rounded" />
         </div>
-        <div className="h-8 bg-muted rounded w-16 mb-2"></div>
-        <div className="h-3 bg-muted rounded w-20"></div>
+        <div className="h-8 bg-muted rounded w-16 mb-2" />
+        <div className="h-3 bg-muted rounded w-20" />
       </div>
     );
   }
@@ -39,7 +41,9 @@ const MetricsCard = ({
   return (
     <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md micro-animation">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+        <h3 className="text-sm font-medium text-muted-foreground">
+          {title}
+        </h3>
         <div className={`p-2 rounded-lg ${colorClasses?.[color]}`}>
           <Icon name={icon} size={20} />
         </div>
@@ -60,12 +64,14 @@ const MetricsCard = ({
               className={changeColorClasses?.[changeType]}
             />
             <span
-              className={`text-sm font-medium ${changeColorClasses?.[changeType]}`}
+              className={`text-sm font-medium ${
+                changeColorClasses?.[changeType]
+              }`}
             >
               {change}
             </span>
             <span className="text-sm text-muted-foreground">
-              vs período anterior
+              (referencia actual)
             </span>
           </div>
         )}

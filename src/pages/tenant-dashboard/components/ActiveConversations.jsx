@@ -1,20 +1,22 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\tenant-dashboard\components\ActiveConversations.jsx
+
 import React from "react";
 import Icon from "../../../components/AppIcon";
 import Image from "../../../components/AppImage";
 
 const ActiveConversations = ({ conversations = [], isLoading = false }) => {
   const formatLastSeen = (timestamp) => {
-    if (!timestamp) return "-";
+    if (!timestamp) return "Sin actividad";
 
     const now = new Date();
     const time = new Date(timestamp);
     const diffInMinutes = Math.floor((now - time) / (1000 * 60));
 
     if (diffInMinutes < 1) return "Activo ahora";
-    if (diffInMinutes < 60) return `hace ${diffInMinutes} min`;
+    if (diffInMinutes < 60) return `Hace ${diffInMinutes} min`;
     if (diffInMinutes < 1440)
-      return `hace ${Math.floor(diffInMinutes / 60)} h`;
-    return time?.toLocaleDateString("es-UY");
+      return `Hace ${Math.floor(diffInMinutes / 60)} h`;
+    return time?.toLocaleDateString("es-ES");
   };
 
   const getStatusColor = (status) => {
@@ -42,10 +44,10 @@ const ActiveConversations = ({ conversations = [], isLoading = false }) => {
               key={i}
               className="flex items-center space-x-3 p-3 animate-pulse"
             >
-              <div className="w-10 h-10 bg-muted rounded-full"></div>
+              <div className="w-10 h-10 bg-muted rounded-full" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 bg-muted rounded w-3/4"></div>
-                <div className="h-3 bg-muted rounded w-1/2"></div>
+                <div className="h-4 bg-muted rounded w-3/4" />
+                <div className="h-3 bg-muted rounded w-1/2" />
               </div>
             </div>
           ))}
@@ -72,7 +74,9 @@ const ActiveConversations = ({ conversations = [], isLoading = false }) => {
               size={48}
               className="text-muted-foreground mx-auto mb-3"
             />
-            <p className="text-muted-foreground">Sin conversaciones activas</p>
+            <p className="text-muted-foreground">
+              No hay conversaciones activas
+            </p>
             <p className="text-sm text-muted-foreground">
               Las nuevas conversaciones van a aparecer acá.
             </p>
@@ -93,7 +97,7 @@ const ActiveConversations = ({ conversations = [], isLoading = false }) => {
                   className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-card ${getStatusColor(
                     conversation?.status
                   )}`}
-                ></div>
+                />
               </div>
 
               <div className="flex-1 min-w-0">

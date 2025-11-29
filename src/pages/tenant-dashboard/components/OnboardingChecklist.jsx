@@ -1,47 +1,58 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\tenant-dashboard\components\OnboardingChecklist.jsx
+
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../../../components/AppIcon";
 import Button from "../../../components/ui/Button";
 
-const OnboardingChecklist = ({ hasChannel, hasFlow, hasTestMessage }) => {
+const OnboardingChecklist = ({
+  onComplete,
+  isChannelConnected = false,
+  hasFlows = false,
+  hasMessages = false,
+}) => {
   const navigate = useNavigate();
 
   const steps = [
     {
       id: "profile",
-      title: "Completar perfil del negocio",
-      description: "Agregá la información básica de tu organización.",
+      title: "Completar perfil del workspace",
+      description:
+        "Agregá la información básica de tu negocio y datos de contacto.",
       icon: "User",
-      completed: true, // más adelante se puede atar a datos reales
+      completed: true, // asumimos creado
     },
     {
       id: "channel",
       title: "Conectar canal de WhatsApp",
-      description: "Vinculá al menos un número de WhatsApp Business.",
+      description:
+        "Vinculá tu número de WhatsApp Business para empezar a enviar y recibir mensajes.",
       icon: "MessageSquare",
-      completed: hasChannel,
+      completed: isChannelConnected,
       action: "Configurar canal",
     },
     {
       id: "flow",
-      title: "Crear tu primer flujo de chatbot",
-      description: "Definí el mensaje de bienvenida automatizado.",
+      title: "Crear el primer flujo de chatbot",
+      description:
+        "Diseñá un mensaje de bienvenida automatizado para tus clientes.",
       icon: "GitBranch",
-      completed: hasFlow,
+      completed: hasFlows,
       action: "Crear flujo",
     },
     {
       id: "test",
       title: "Enviar mensaje de prueba",
-      description: "Probá que el bot responde correctamente.",
+      description:
+        "Probá toda la configuración enviando un mensaje real a tu bot.",
       icon: "Send",
-      completed: hasTestMessage,
+      completed: hasMessages,
       action: "Enviar prueba",
     },
   ];
 
-  const completedCount = steps?.filter((step) => step?.completed)?.length;
-  const progressPercentage = (completedCount / steps?.length) * 100;
+  const completedCount = steps.filter((s) => s.completed).length;
+  const progressPercentage = (completedCount / steps.length) * 100;
 
   const handleStepAction = (stepId) => {
     switch (stepId) {
@@ -57,10 +68,14 @@ const OnboardingChecklist = ({ hasChannel, hasFlow, hasTestMessage }) => {
       default:
         break;
     }
+
+    if (onComplete) {
+      onComplete(stepId);
+    }
   };
 
-  if (completedCount === steps?.length) {
-    return null; // Ocultar checklist cuando todo está completo
+  if (completedCount === steps.length) {
+    return null;
   }
 
   return (
@@ -70,9 +85,10 @@ const OnboardingChecklist = ({ hasChannel, hasFlow, hasTestMessage }) => {
           Primeros pasos
         </h3>
         <span className="text-sm text-muted-foreground">
-          {completedCount}/{steps?.length} completados
+          {completedCount}/{steps.length} completados
         </span>
       </div>
+
       {/* Barra de progreso */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
@@ -87,27 +103,30 @@ const OnboardingChecklist = ({ hasChannel, hasFlow, hasTestMessage }) => {
           <div
             className="bg-primary h-2 rounded-full transition-all duration-300"
             style={{ width: `${progressPercentage}%` }}
-          ></div>
+          />
         </div>
       </div>
-      {/* Lista de pasos */}
+
+      {/* Pasos */}
       <div className="space-y-4">
-        {steps?.map((step) => (
+        {steps.map((step) => (
           <div
-            key={step?.id}
+            key={step.id}
             className={`flex items-start space-x-3 p-3 rounded-md ${
-              step?.completed ? "bg-success/5 border border-success/20" : "bg-muted/30"
+              step.completed
+                ? "bg-success/5 border border-success/20"
+                : "bg-muted/30"
             }`}
           >
             <div
               className={`p-2 rounded-full ${
-                step?.completed
+                step.completed
                   ? "bg-success text-success-foreground"
                   : "bg-muted text-muted-foreground"
               }`}
             >
               <Icon
-                name={step?.completed ? "Check" : step?.icon}
+                name={step.completed ? "Check" : step.icon}
                 size={16}
               />
             </div>
@@ -116,12 +135,12 @@ const OnboardingChecklist = ({ hasChannel, hasFlow, hasTestMessage }) => {
               <div className="flex items-center justify-between">
                 <h4
                   className={`text-sm font-medium ${
-                    step?.completed ? "text-success" : "text-foreground"
+                    step.completed ? "text-success" : "text-foreground"
                   }`}
                 >
-                  {step?.title}
+                  {step.title}
                 </h4>
-                {step?.completed && (
+                {step.completed && (
                   <Icon
                     name="CheckCircle"
                     size={16}
@@ -131,28 +150,29 @@ const OnboardingChecklist = ({ hasChannel, hasFlow, hasTestMessage }) => {
               </div>
 
               <p className="text-sm text-muted-foreground mt-1">
-                {step?.description}
+                {step.description}
               </p>
 
-              {!step?.completed && step?.action && (
+              {!step.completed && step.action && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleStepAction(step?.id)}
+                  onClick={() => handleStepAction(step.id)}
                   className="mt-2"
                 >
-                  {step?.action}
+                  {step.action}
                 </Button>
               )}
             </div>
           </div>
         ))}
       </div>
-      {completedCount > 0 && completedCount < steps?.length && (
+
+      {completedCount > 0 && completedCount < steps.length && (
         <div className="mt-6 pt-4 border-t border-border">
           <p className="text-sm text-muted-foreground text-center">
-            ¡Buen inicio! Completá los pasos restantes para aprovechar todas las
-            funciones de DigitalMatch.
+            ¡Buen progreso! Completá los pasos restantes para desbloquear
+            todas las funcionalidades.
           </p>
         </div>
       )}

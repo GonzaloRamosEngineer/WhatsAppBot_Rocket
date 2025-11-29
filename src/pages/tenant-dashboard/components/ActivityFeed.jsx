@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\tenant-dashboard\components\ActivityFeed.jsx
+
 import React from "react";
 import Icon from "../../../components/AppIcon";
 
@@ -37,17 +39,15 @@ const ActivityFeed = ({ activities = [], isLoading = false }) => {
   };
 
   const formatTime = (timestamp) => {
-    if (!timestamp) return "-";
-
     const now = new Date();
     const time = new Date(timestamp);
     const diffInMinutes = Math.floor((now - time) / (1000 * 60));
 
     if (diffInMinutes < 1) return "Hace un momento";
-    if (diffInMinutes < 60) return `hace ${diffInMinutes} min`;
+    if (diffInMinutes < 60) return `Hace ${diffInMinutes} min`;
     if (diffInMinutes < 1440)
-      return `hace ${Math.floor(diffInMinutes / 60)} h`;
-    return time?.toLocaleDateString("es-UY");
+      return `Hace ${Math.floor(diffInMinutes / 60)} h`;
+    return time?.toLocaleDateString("es-ES");
   };
 
   if (isLoading) {
@@ -62,10 +62,10 @@ const ActivityFeed = ({ activities = [], isLoading = false }) => {
               key={i}
               className="flex items-start space-x-3 animate-pulse"
             >
-              <div className="w-8 h-8 bg-muted rounded-full"></div>
+              <div className="w-8 h-8 bg-muted rounded-full" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 bg-muted rounded w-3/4"></div>
-                <div className="h-3 bg-muted rounded w-1/2"></div>
+                <div className="h-4 bg-muted rounded w-3/4" />
+                <div className="h-3 bg-muted rounded w-1/2" />
               </div>
             </div>
           ))}
@@ -92,9 +92,11 @@ const ActivityFeed = ({ activities = [], isLoading = false }) => {
               size={48}
               className="text-muted-foreground mx-auto mb-3"
             />
-            <p className="text-muted-foreground">Sin actividad reciente</p>
+            <p className="text-muted-foreground">
+              Sin actividad por el momento
+            </p>
             <p className="text-sm text-muted-foreground">
-              Acá vas a ver lo que va pasando cuando empieces a usar la
+              La actividad va a aparecer acá cuando empieces a usar la
               plataforma.
             </p>
           </div>

@@ -24,16 +24,19 @@ const TenantDashboard = () => {
   const [flows, setFlows] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [activities, setActivities] = useState([]);
-  const [channels, setChannels] = useState([]);
+  const [channelSummary, setChannelSummary] = useState({
+    hasChannel: false,
+    isActive: false,
+    phone: null,
+    displayName: null,
+  });
 
   // 🔹 Cargar datos reales del tenant desde Supabase
   useEffect(() => {
     const loadData = async () => {
-      // Si todavía no tenemos profile cargado, esperamos
       if (!profile) return;
 
-      // Si el usuario no está asociado a ningún tenant todavía,
-      // mostramos dashboard vacío pero sin romper nada.
+      // Usuario sin tenant asociado todavía
       if (!profile.tenant_id) {
         setIsLoading(false);
         return;
@@ -55,7 +58,7 @@ const TenantDashboard = () => {
           setTenantInfo(tenant);
         }
 
-        // 2) Mensajes del tenant (últimos 100)
+        // 2) Mensajes del tenant (últimos 200)
         const { data: msgs, error: msgsError } = await supabase
           .from("messages")
           .select(
@@ -63,7 +66,7 @@ const TenantDashboard = () => {
           )
           .eq("tenant_id", profile.tenant_id)
           .order("created_at", { ascending: false })
-          .limit(100);
+          .limit(200);
 
         if (msgsError) {
           console.error("Error cargando mensajes", msgsError);
@@ -73,7 +76,6 @@ const TenantDashboard = () => {
         }
 
         // 3) Flows asociados a bots del tenant
-        //   flows -> bot_id -> bots.tenant_id
         const { data: flowsData, error: flowsError } = await supabase
           .from("flows")
           .select("id, key, bots!inner(tenant_id)")
@@ -98,7 +100,6 @@ const TenantDashboard = () => {
           console.error("Error cargando conversaciones", convsError);
           setConversations([]);
         } else {
-          // Para cada conversación buscamos su último mensaje
           const convItems = (convs || []).map((c) => {
             const lastMsg = (msgs || []).find(
               (m) => m.conversation_id === c.id
@@ -110,7 +111,7 @@ const TenantDashboard = () => {
               phone: c.contact_phone || "",
               avatar:
                 "https://images.unsplash.com/photo-1564581335312-88ba5f1ae29f?auto=format&fit=crop&w=150&h=150",
-              avatarAlt: "Avatar del contacto",
+              avatarAlt: "Avatar contacto",
               lastMessage: lastMsg?.body || "Sin mensajes todavía",
               lastSeen: c.last_message_at || lastMsg?.created_at,
               status:
@@ -119,31 +120,50 @@ const TenantDashboard = () => {
                   : c.status === "pending"
                   ? "pending"
                   : "resolved",
-              unreadCount: 0, // más adelante podemos calcular esto
+              unreadCount: 0,
             };
           });
 
           setConversations(convItems);
         }
 
-        // 5) Canales de WhatsApp del tenant
-        const { data: channelsData, error: channelsError } = await supabase
+        // 5) Estado de canales de WhatsApp del tenant
+        const { data: channels, error: channelsError } = await supabase
           .from("channels")
-          .select("id, status")
+          .select("id, type, status, phone, display_name")
           .eq("tenant_id", profile.tenant_id)
           .eq("type", "whatsapp");
 
         if (channelsError) {
           console.error("Error cargando canales", channelsError);
-          setChannels([]);
+          setChannelSummary({
+            hasChannel: false,
+            isActive: false,
+            phone: null,
+            displayName: null,
+          });
+        } else if (channels && channels.length > 0) {
+          const activeChannel =
+            channels.find((c) => c.status === "active") || channels[0];
+
+          setChannelSummary({
+            hasChannel: true,
+            isActive: activeChannel.status === "active",
+            phone: activeChannel.phone,
+            displayName: activeChannel.display_name,
+          });
         } else {
-          setChannels(channelsData || []);
+          setChannelSummary({
+            hasChannel: false,
+            isActive: false,
+            phone: null,
+            displayName: null,
+          });
         }
 
         // 6) Actividad reciente basada en lo que tenemos
         const latestMsg = (msgs || [])[0];
         const now = new Date();
-
         const activityItems = [];
 
         if (latestMsg) {
@@ -174,79 +194,121 @@ const TenantDashboard = () => {
           });
         }
 
-        if ((channelsData || []).length > 0) {
-          const activos = (channelsData || []).filter(
-            (c) => c.status === "active"
-          ).length;
+        if (channelSummary?.hasChannel) {
           activityItems.push({
-            id: "channels_status",
+            id: "channel_state",
             type: "channel_connected",
             title: "Estado de canales",
-            description:
-              activos > 0
-                ? `Tenés ${activos} canal(es) de WhatsApp activo(s)`
-                : "Aún no conectaste ningún canal de WhatsApp",
+            description: channelSummary.isActive
+              ? "Tenés al menos un canal de WhatsApp activo"
+              : "Tenés un canal configurado pero inactivo",
             timestamp: now.toISOString(),
-            status: activos > 0 ? "success" : "pending",
+            status: channelSummary.isActive ? "success" : "pending",
           });
         }
 
         setActivities(activityItems);
       } catch (err) {
-        console.error("Error inesperado cargando datos del panel", err);
+        console.error("Error inesperado cargando el dashboard", err);
       } finally {
         setIsLoading(false);
       }
     };
 
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
-  // 🔹 Métricas calculadas en base a messages/flows
+  // 🔹 Métricas calculadas en base a messages / flows / conversations
   const totalMessages = messages.length;
   const inCount = messages.filter((m) => m.direction === "in").length;
   const outCount = messages.filter((m) => m.direction === "out").length;
   const activeFlows = flows.length;
 
+  const now = new Date();
+  const sevenDaysAgo = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() - 6
+  );
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
+
+  const messagesLast7Days = messages.filter(
+    (m) => new Date(m.created_at) >= sevenDaysAgo
+  );
+  const messagesToday = messages.filter(
+    (m) => new Date(m.created_at) >= startOfToday
+  );
+
+  const automationMessages = messages.filter(
+    (m) =>
+      m.sender === "bot" ||
+      (typeof m.sender === "string" &&
+        m.sender.startsWith("system_"))
+  );
+
+  const automationRate = totalMessages
+    ? Math.round((automationMessages.length / totalMessages) * 100)
+    : 0;
+
+  const activeConvCount = conversations.filter(
+    (c) => c.status === "active"
+  ).length;
+  const pendingConvCount = conversations.filter(
+    (c) => c.status === "pending"
+  ).length;
+  const resolvedConvCount = conversations.filter(
+    (c) => c.status === "resolved"
+  ).length;
+
   const metrics = [
     {
-      title: "Mensajes enviados",
-      value: String(outCount),
-      change: null,
-      changeType: "neutral",
+      title: "Mensajes enviados (últimos 7 días)",
+      value: String(
+        messagesLast7Days.filter((m) => m.direction === "out").length
+      ),
+      change: messagesToday.length
+        ? `${messagesToday.filter((m) => m.direction === "out").length} hoy`
+        : "Sin datos hoy",
+      changeType: messagesToday.length ? "positive" : "neutral",
       icon: "Send",
       color: "primary",
     },
     {
-      title: "Mensajes recibidos",
-      value: String(inCount),
-      change: null,
-      changeType: "neutral",
+      title: "Mensajes recibidos (últimos 7 días)",
+      value: String(
+        messagesLast7Days.filter((m) => m.direction === "in").length
+      ),
+      change: messagesToday.length
+        ? `${messagesToday.filter((m) => m.direction === "in").length} hoy`
+        : "Sin datos hoy",
+      changeType: messagesToday.length ? "positive" : "neutral",
       icon: "MessageCircle",
       color: "success",
     },
     {
-      title: "Flujos activos",
-      value: String(activeFlows),
-      change: null,
-      changeType: "neutral",
-      icon: "GitBranch",
+      title: "Nivel de automatización del bot",
+      value: totalMessages ? `${automationRate}%` : "—",
+      change: totalMessages
+        ? `${automationMessages.length} mensajes automáticos`
+        : "Aún sin actividad",
+      changeType: automationRate >= 60 ? "positive" : "neutral",
+      icon: "Cpu",
       color: "secondary",
     },
     {
-      title: "Mensajes totales (últimos 100)",
-      value: String(totalMessages),
-      change: null,
-      changeType: "neutral",
-      icon: "BarChart3",
+      title: "Flujos activos",
+      value: String(activeFlows),
+      change: activeFlows ? "Flujos en tu workspace" : "Creá tu primer flujo",
+      changeType: activeFlows ? "positive" : "neutral",
+      icon: "GitBranch",
       color: "warning",
     },
   ];
-
-  // 🔹 Flags para el onboarding
-  const hasChannel = channels.some((c) => c.status === "active");
-  const hasFlow = activeFlows > 0;
-  const hasTestMessage = outCount > 0;
 
   // 🔹 Usuario actual mostrado en el header
   const currentUser = {
@@ -264,7 +326,7 @@ const TenantDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Barra lateral de navegación */}
+      {/* Sidebar de navegación */}
       <NavigationSidebar
         isCollapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -286,8 +348,8 @@ const TenantDashboard = () => {
                   Panel de control
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  ¡Bienvenido de nuevo, {currentUser?.name}! Acá ves cómo viene
-                  funcionando tu bot de WhatsApp.
+                  ¡Bienvenido de nuevo, {currentUser?.name}! Acá ves cómo
+                  viene funcionando tu bot de WhatsApp.
                 </p>
                 {profile && !profile.tenant_id && (
                   <p className="mt-1 text-xs text-amber-600">
@@ -300,13 +362,13 @@ const TenantDashboard = () => {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Notificaciones (placeholder) */}
+              {/* Notificaciones */}
               <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md micro-animation relative">
                 <Icon name="Bell" size={20} />
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full"></span>
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full" />
               </button>
 
-              {/* User Profile Dropdown */}
+              {/* Usuario */}
               <UserProfileDropdown
                 user={currentUser}
                 onLogout={logout}
@@ -316,9 +378,44 @@ const TenantDashboard = () => {
           </div>
         </header>
 
+        {/* Barra de estado del canal */}
+        <div className="px-6 pt-4">
+          <div className="bg-card border border-border rounded-lg p-4 flex flex-wrap items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  channelSummary.isActive ? "bg-success" : "bg-muted-foreground"
+                }`}
+              />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {channelSummary.hasChannel
+                    ? channelSummary.isActive
+                      ? "Canal de WhatsApp conectado"
+                      : "Canal configurado pero inactivo"
+                    : "Todavía no conectaste ningún canal de WhatsApp"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {channelSummary.hasChannel
+                    ? `${channelSummary.displayName || "Canal"} · ${
+                        channelSummary.phone || "Sin número registrado"
+                      }`
+                    : "Configuralo desde la sección Canales para empezar a recibir mensajes."}
+                </p>
+              </div>
+            </div>
+            {channelSummary.hasChannel && (
+              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                <Icon name="Activity" size={16} />
+                <span>Webhook en tiempo real habilitado</span>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Contenido del dashboard */}
         <main className="p-6 space-y-6">
-          {/* Tarjetas de métricas */}
+          {/* Métricas principales */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {metrics.map((metric, index) => (
               <MetricsCard
@@ -336,18 +433,19 @@ const TenantDashboard = () => {
 
           {/* Grid principal */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Columna izquierda - Actividad y acciones rápidas */}
+            {/* Izquierda - Actividad + Acciones rápidas */}
             <div className="lg:col-span-2 space-y-6">
               <ActivityFeed activities={activities} isLoading={isLoading} />
               <QuickActions />
             </div>
 
-            {/* Columna derecha - Onboarding & conversaciones */}
+            {/* Derecha - Checklist + Conversaciones activas */}
             <div className="space-y-6">
               <OnboardingChecklist
-                hasChannel={hasChannel}
-                hasFlow={hasFlow}
-                hasTestMessage={hasTestMessage}
+                isChannelConnected={channelSummary.isActive}
+                hasFlows={activeFlows > 0}
+                hasMessages={totalMessages > 0}
+                onComplete={() => console.log("Onboarding completado")}
               />
               <ActiveConversations
                 conversations={conversations}
@@ -356,65 +454,188 @@ const TenantDashboard = () => {
             </div>
           </div>
 
-          {/* Sección de stats adicionales (placeholder futuro) */}
+          {/* Sección de insights adicionales */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Inteligencia del bot */}
             <div className="bg-card border border-border rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-foreground">
-                  Tiempo de respuesta
+                  Inteligencia del bot
                 </h3>
                 <Icon
-                  name="Clock"
+                  name="Cpu"
                   size={20}
                   className="text-muted-foreground"
                 />
               </div>
-              <div className="space-y-2">
-                <p className="text-2xl font-bold text-foreground">—</p>
-                <p className="text-sm text-muted-foreground">
-                  Más adelante podemos calcular esto con tiempos de respuesta
-                  reales.
-                </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Vista rápida de cuánto está trabajando tu asistente automático.
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Nivel de automatización
+                  </p>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-2xl font-bold text-foreground">
+                      {totalMessages ? `${automationRate}%` : "—"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {automationMessages.length} mensajes automáticos
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${automationRate || 0}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-md">
+                    <p className="text-muted-foreground">
+                      Mensajes totales (muestra)
+                    </p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {totalMessages}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-secondary/5 border border-secondary/20 rounded-md">
+                    <p className="text-muted-foreground">
+                      Mensajes de hoy (muestra)
+                    </p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {messagesToday.length}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
+            {/* Embudo de conversaciones */}
             <div className="bg-card border border-border rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-foreground">
-                  Satisfacción del cliente
+                  Embudo de conversaciones
                 </h3>
                 <Icon
-                  name="Heart"
+                  name="Filter"
                   size={20}
                   className="text-muted-foreground"
                 />
               </div>
-              <div className="space-y-2">
-                <p className="text-2xl font-bold text-foreground">—</p>
-                <p className="text-sm text-muted-foreground">
-                  Podés agregar encuestas / NPS más adelante.
-                </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Estado de las últimas conversaciones en tu workspace.
+              </p>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Totales</span>
+                  <span className="font-semibold text-foreground">
+                    {conversations.length}
+                  </span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden flex">
+                  <div
+                    className="bg-success h-2"
+                    style={{
+                      width: `${
+                        conversations.length
+                          ? (activeConvCount / conversations.length) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                  <div
+                    className="bg-warning h-2"
+                    style={{
+                      width: `${
+                        conversations.length
+                          ? (pendingConvCount / conversations.length) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                  <div
+                    className="bg-muted-foreground/60 h-2"
+                    style={{
+                      width: `${
+                        conversations.length
+                          ? (resolvedConvCount / conversations.length) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 text-xs mt-2">
+                  <div className="p-2 rounded-md bg-success/5 border border-success/20">
+                    <p className="text-muted-foreground">Abiertas</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {activeConvCount}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-md bg-warning/5 border border-warning/20">
+                    <p className="text-muted-foreground">En seguimiento</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {pendingConvCount}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-md bg-muted/40 border border-border">
+                    <p className="text-muted-foreground">Resueltas</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {resolvedConvCount}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
+            {/* Flujos activos / futuro NPS */}
             <div className="bg-card border border-border rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-foreground">
-                  Flujos activos
+                  Salud del workspace
                 </h3>
                 <Icon
-                  name="GitBranch"
+                  name="HeartPulse"
                   size={20}
                   className="text-muted-foreground"
                 />
               </div>
-              <div className="space-y-2">
-                <p className="text-2xl font-bold text-foreground">
-                  {activeFlows}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Flujos actuales en tu workspace.
-                </p>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Flujos activos
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {activeFlows}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Flujos actuales en tu workspace
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Tiempo de respuesta
+                  </p>
+                  <p className="text-lg font-semibold text-foreground">—</p>
+                  <p className="text-xs text-muted-foreground">
+                    Más adelante podemos calcular esto con tiempos de
+                    respuesta reales.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Satisfacción del cliente
+                  </p>
+                  <p className="text-lg font-semibold text-foreground">—</p>
+                  <p className="text-xs text-muted-foreground">
+                    Podés agregar encuestas / NPS más adelante.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
