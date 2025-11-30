@@ -359,8 +359,23 @@ const ChannelSetup = () => {
   // 🔌 NUEVO: botón "Conectar con Meta (Facebook)" → crea oauth_state y redirige al login
   const handleConnectWithMeta = async () => {
     try {
-      if (!supabase || !tenant?.id || !profile?.id) {
-        console.error("[ChannelSetup] falta tenant o profile para OAuth");
+      if (!supabase || !tenant?.id || !profile) {
+        console.error("[ChannelSetup] falta tenant o profile para OAuth", {
+          tenant,
+          profile,
+        });
+        return;
+      }
+
+      // Tomamos el id real del usuario según tu modelo de profiles
+      const profileId =
+        profile.id || profile.user_id || profile.auth_user_id || profile.uid;
+
+      if (!profileId) {
+        console.error(
+          "[ChannelSetup] profile sin id usable para OAuth",
+          profile
+        );
         return;
       }
 
@@ -369,7 +384,7 @@ const ChannelSetup = () => {
         .from("oauth_states")
         .insert({
           tenant_id: tenant.id,
-          user_id: profile.id, // ajustá si tu profile usa otro campo como user_id
+          user_id: profileId,
           provider: "facebook",
           redirect_to: "/channel-setup",
         })
@@ -481,7 +496,7 @@ const ChannelSetup = () => {
             </div>
           )}
 
-          {/* 🔥 NUEVO: Card Modo Wasapi / OAuth */}
+          {/* 🔥 Card Modo Wasapi / OAuth */}
           <div className="mb-6">
             <div className="bg-card border border-border rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex items-start space-x-3">
