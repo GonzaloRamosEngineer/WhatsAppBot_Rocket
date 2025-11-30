@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\channel-setup\index.jsx
+
 import React, { useState, useEffect } from "react";
 import NavigationSidebar from "../../components/ui/NavigationSidebar";
 import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
@@ -135,6 +137,27 @@ const ChannelSetup = () => {
 
     loadChannels();
   }, [supabase, tenant?.id]);
+
+  // 📨 Listener del popup OAuth (éxito / error)
+  useEffect(() => {
+    const handler = (event) => {
+      // Solo aceptamos mensajes del mismo origen
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data?.type === "facebook_oauth_success") {
+        console.log("[ChannelSetup] OAuth Meta completado, recargando canales...");
+        // Lo más simple: recargar la página completa
+        window.location.reload();
+      }
+
+      if (event.data?.type === "facebook_oauth_error") {
+        console.error("[ChannelSetup] error en OAuth Meta", event.data.error);
+      }
+    };
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   // Cambio de canal seleccionado desde el selector
   const handleSelectChannel = (channelId) => {
@@ -356,8 +379,7 @@ const ChannelSetup = () => {
     await logout();
   };
 
-  // 🔌 NUEVO: botón "Conectar con Meta (Facebook)" → crea oauth_state y redirige al login
-  // 🔌 Botón "Conectar con Meta (Facebook)" → crea oauth_state y redirige al login
+  // 🔌 Botón "Conectar con Meta (Facebook)" → crea oauth_state y abre popup
   const handleConnectWithMeta = async () => {
     try {
       if (!supabase || !tenant?.id) {
@@ -430,13 +452,30 @@ const ChannelSetup = () => {
         stateId
       )}&scope=${encodeURIComponent(scopes)}`;
 
-      // 4) Redirigir a Meta
-      window.location.href = authUrl;
+      // 4) Abrir popup
+      const w = 600;
+      const h = 700;
+      const dualScreenLeft = window.screenLeft ?? window.screenX ?? 0;
+      const dualScreenTop = window.screenTop ?? window.screenY ?? 0;
+      const width =
+        window.innerWidth ?? document.documentElement.clientWidth ?? screen.width;
+      const height =
+        window.innerHeight ??
+        document.documentElement.clientHeight ??
+        screen.height;
+
+      const left = width / 2 - w / 2 + dualScreenLeft;
+      const top = height / 2 - h / 2 + dualScreenTop;
+
+      window.open(
+        authUrl,
+        "facebook_oauth_popup",
+        `scrollbars=yes,width=${w},height=${h},top=${top},left=${left}`
+      );
     } catch (e) {
       console.error("[ChannelSetup] handleConnectWithMeta error:", e);
     }
   };
-
 
   const currentUser = {
     name: tenant?.name || "Tenant",

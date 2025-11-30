@@ -14,9 +14,12 @@ import ChannelSetup from "./pages/channel-setup";
 import MessagesLog from "./pages/messages-log";
 import TenantDashboard from "./pages/tenant-dashboard";
 import AgentInboxPage from "./pages/agent-inbox";
+import PasswordResetPage from "./pages/password-reset";
+
+// 👇 nuevo callback OAuth
+import FacebookCallback from "./pages/oauth/FacebookCallback";
 
 import ProtectedRoute from "./lib/ProtectedRoute";
-import PasswordResetPage from "./pages/password-reset";
 
 const Routes = () => {
   return (
@@ -29,7 +32,16 @@ const Routes = () => {
           <Route path="/login" element={<LoginPage />} />
 
           {/* Password reset (Supabase redirectTo) */}
-          <Route path="/auth/reset-password" element={<PasswordResetPage />} />
+          <Route
+            path="/auth/reset-password"
+            element={<PasswordResetPage />}
+          />
+
+          {/* 🔓 Ruta pública para el callback de Meta OAuth */}
+          <Route
+            path="/oauth/facebook/callback"
+            element={<FacebookCallback />}
+          />
 
           {/* Public routes */}
           <Route
