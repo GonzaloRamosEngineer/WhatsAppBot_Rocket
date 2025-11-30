@@ -357,34 +357,39 @@ const ChannelSetup = () => {
   };
 
   // 🔌 NUEVO: botón "Conectar con Meta (Facebook)" → crea oauth_state y redirige al login
+  // 🔌 Botón "Conectar con Meta (Facebook)" → crea oauth_state y redirige al login
   const handleConnectWithMeta = async () => {
     try {
-      if (!supabase || !tenant?.id || !profile) {
-        console.error("[ChannelSetup] falta tenant o profile para OAuth", {
+      if (!supabase || !tenant?.id) {
+        console.error("[ChannelSetup] falta supabase o tenant para OAuth", {
           tenant,
-          profile,
+          supabaseReady: !!supabase,
         });
         return;
       }
 
-      // Tomamos el id real del usuario según tu modelo de profiles
-      const profileId =
-        profile.id || profile.user_id || profile.auth_user_id || profile.uid;
+      // 1) Obtener el usuario actual desde Supabase Auth
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-      if (!profileId) {
+      if (userError || !user) {
         console.error(
-          "[ChannelSetup] profile sin id usable para OAuth",
-          profile
+          "[ChannelSetup] no se pudo obtener el usuario de Supabase Auth",
+          userError
         );
         return;
       }
 
-      // 1) Crear registro en oauth_states
+      const userId = user.id;
+
+      // 2) Crear registro en oauth_states
       const { data, error } = await supabase
         .from("oauth_states")
         .insert({
           tenant_id: tenant.id,
-          user_id: profileId,
+          user_id: userId,
           provider: "facebook",
           redirect_to: "/channel-setup",
         })
@@ -398,7 +403,7 @@ const ChannelSetup = () => {
 
       const stateId = data.id;
 
-      // 2) Construir URL de OAuth
+      // 3) Construir URL de OAuth
       const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
       const redirectUri =
         import.meta.env.VITE_FACEBOOK_REDIRECT_URI ||
@@ -425,12 +430,13 @@ const ChannelSetup = () => {
         stateId
       )}&scope=${encodeURIComponent(scopes)}`;
 
-      // 3) Redirigir a Meta
+      // 4) Redirigir a Meta
       window.location.href = authUrl;
     } catch (e) {
       console.error("[ChannelSetup] handleConnectWithMeta error:", e);
     }
   };
+
 
   const currentUser = {
     name: tenant?.name || "Tenant",
