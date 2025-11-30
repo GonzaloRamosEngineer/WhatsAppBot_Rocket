@@ -22,7 +22,7 @@ const ChannelSetup = () => {
   const [channels, setChannels] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState(null); // null = nuevo canal
 
-  // Credenciales del formulario
+  // Credenciales del formulario (modo manual / avanzado)
   const [credentials, setCredentials] = useState({
     phoneNumberId: "",
     wabaId: "",
@@ -110,9 +110,7 @@ const ChannelSetup = () => {
             },
           });
 
-          setIsConnected(
-            !!active.status && active.status !== "disconnected"
-          );
+          setIsConnected(!!active.status && active.status !== "disconnected");
         } else {
           // Sin canales todavía → modo "nuevo canal"
           setSelectedChannelId(null);
@@ -150,8 +148,7 @@ const ChannelSetup = () => {
         phoneNumberId: "",
         wabaId: "",
         accessToken: savedCreds.accessToken || "",
-        businessName:
-          savedCreds.businessName || tenant?.name || "Tu negocio",
+        businessName: savedCreds.businessName || tenant?.name || "Tu negocio",
       });
       setChannelData(null);
       setIsConnected(false);
@@ -190,16 +187,14 @@ const ChannelSetup = () => {
       },
     });
 
-    setIsConnected(
-      !!channel.status && channel.status !== "disconnected"
-    );
+    setIsConnected(!!channel.status && channel.status !== "disconnected");
   };
 
   const handleCredentialsChange = (newCredentials) => {
     setCredentials(newCredentials);
   };
 
-  // 💾 Guardar credenciales + persistir canal
+  // 💾 Guardar credenciales + persistir canal (modo manual)
   const handleSaveCredentials = async (credentialsData) => {
     if (!supabase || !tenant?.id) return;
 
@@ -307,9 +302,7 @@ const ChannelSetup = () => {
       setChannelData((prev) => ({
         ...(prev || {}),
         businessName:
-          credentials.businessName ||
-          tenant?.name ||
-          "Tu negocio",
+          credentials.businessName || tenant?.name || "Tu negocio",
         phoneNumber,
         phoneNumberId:
           credentials.phoneNumberId || prev?.phoneNumberId || null,
@@ -352,9 +345,7 @@ const ChannelSetup = () => {
       }
 
       // Actualizar lista en memoria
-      setChannels((prev) =>
-        prev.map((c) => (c.id === data.id ? data : c))
-      );
+      setChannels((prev) => prev.map((c) => (c.id === data.id ? data : c)));
     } catch (e) {
       console.error("[ChannelSetup] error inesperado actualizando estado", e);
     }
@@ -363,6 +354,67 @@ const ChannelSetup = () => {
   const handleLogout = async () => {
     localStorage.removeItem("whatsapp_credentials");
     await logout();
+  };
+
+  // 🔌 NUEVO: botón "Conectar con Meta (Facebook)" → crea oauth_state y redirige al login
+  const handleConnectWithMeta = async () => {
+    try {
+      if (!supabase || !tenant?.id || !profile?.id) {
+        console.error("[ChannelSetup] falta tenant o profile para OAuth");
+        return;
+      }
+
+      // 1) Crear registro en oauth_states
+      const { data, error } = await supabase
+        .from("oauth_states")
+        .insert({
+          tenant_id: tenant.id,
+          user_id: profile.id, // ajustá si tu profile usa otro campo como user_id
+          provider: "facebook",
+          redirect_to: "/channel-setup",
+        })
+        .select("id")
+        .single();
+
+      if (error || !data) {
+        console.error("[ChannelSetup] error creando oauth_state", error);
+        return;
+      }
+
+      const stateId = data.id;
+
+      // 2) Construir URL de OAuth
+      const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
+      const redirectUri =
+        import.meta.env.VITE_FACEBOOK_REDIRECT_URI ||
+        `${window.location.origin}/oauth/facebook/callback`;
+
+      if (!appId || !redirectUri) {
+        console.error(
+          "[ChannelSetup] faltan VITE_FACEBOOK_APP_ID o VITE_FACEBOOK_REDIRECT_URI"
+        );
+        return;
+      }
+
+      const scopes = [
+        "whatsapp_business_messaging",
+        "whatsapp_business_management",
+        "business_management",
+      ].join(",");
+
+      const authUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${encodeURIComponent(
+        appId
+      )}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&state=${encodeURIComponent(
+        stateId
+      )}&scope=${encodeURIComponent(scopes)}`;
+
+      // 3) Redirigir a Meta
+      window.location.href = authUrl;
+    } catch (e) {
+      console.error("[ChannelSetup] handleConnectWithMeta error:", e);
+    }
   };
 
   const currentUser = {
@@ -416,10 +468,7 @@ const ChannelSetup = () => {
                 </span>
               </div>
 
-              <UserProfileDropdown
-                user={currentUser}
-                onLogout={handleLogout}
-              />
+              <UserProfileDropdown user={currentUser} onLogout={handleLogout} />
             </div>
           </div>
         </header>
@@ -431,6 +480,34 @@ const ChannelSetup = () => {
               Error al cargar los canales: {loadError}
             </div>
           )}
+
+          {/* 🔥 NUEVO: Card Modo Wasapi / OAuth */}
+          <div className="mb-6">
+            <div className="bg-card border border-border rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-start space-x-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Icon name="Globe2" size={18} className="text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">
+                    Conectá automáticamente con Meta (recomendado)
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Usá el flujo oficial de Meta para seleccionar tu número de
+                    WhatsApp Business sin copiar tokens ni IDs a mano.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleConnectWithMeta}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 micro-animation"
+              >
+                <Icon name="Zap" size={16} className="mr-2" />
+                Conectar con Meta (Facebook)
+              </button>
+            </div>
+          </div>
 
           {/* Selector de canal */}
           <div className="mb-6">
