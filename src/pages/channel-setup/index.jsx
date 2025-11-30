@@ -379,7 +379,7 @@ const ChannelSetup = () => {
     await logout();
   };
 
-  // 🔌 Botón "Conectar con Meta (Facebook)" → crea oauth_state y abre popup (con config_id)
+  // 🔌 Botón "Conectar con Meta (Facebook)" → crea oauth_state y abre popup (login estándar con scopes)
   const handleConnectWithMeta = async () => {
     try {
       if (!supabase || !tenant?.id) {
@@ -425,29 +425,32 @@ const ChannelSetup = () => {
 
       const stateId = data.id;
 
-      // 3) Construir URL de OAuth usando Facebook Login for Business (config_id)
+      // 3) Construir URL de OAuth usando login estándar (SIN config_id, CON scopes)
       const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
       const redirectUri =
         import.meta.env.VITE_FACEBOOK_REDIRECT_URI ||
         `${window.location.origin}/oauth/facebook/callback`;
 
-      // ⚠️ Nuevo: config_id de la configuración "OnbWppDigitalMatch"
-      const configId =
-        import.meta.env.VITE_FACEBOOK_LOGIN_CONFIG_ID || "1354158045710421";
-
-      if (!appId || !redirectUri || !configId) {
+      if (!appId || !redirectUri) {
         console.error(
-          "[ChannelSetup] faltan VITE_FACEBOOK_APP_ID, VITE_FACEBOOK_REDIRECT_URI o VITE_FACEBOOK_LOGIN_CONFIG_ID"
+          "[ChannelSetup] faltan VITE_FACEBOOK_APP_ID o VITE_FACEBOOK_REDIRECT_URI"
         );
         return;
       }
 
-      // Meta recomienda usar config_id + response_type=code (sin scope)
+      const scopes = [
+        "public_profile",
+        "email",
+        "whatsapp_business_messaging",
+        "whatsapp_business_management",
+        "business_management",
+      ].join(",");
+
       const params = new URLSearchParams({
         client_id: appId,
         redirect_uri: redirectUri,
         state: stateId,
-        config_id: configId,
+        scope: scopes,
         response_type: "code",
       });
 
