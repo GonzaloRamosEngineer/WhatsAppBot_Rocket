@@ -379,7 +379,7 @@ const ChannelSetup = () => {
     await logout();
   };
 
-  // 🔌 Botón "Conectar con Meta (Facebook)" → crea oauth_state y abre popup
+  // 🔌 Botón "Conectar con Meta (Facebook)" → crea oauth_state y abre popup (con config_id)
   const handleConnectWithMeta = async () => {
     try {
       if (!supabase || !tenant?.id) {
@@ -425,32 +425,33 @@ const ChannelSetup = () => {
 
       const stateId = data.id;
 
-      // 3) Construir URL de OAuth
+      // 3) Construir URL de OAuth usando Facebook Login for Business (config_id)
       const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
       const redirectUri =
         import.meta.env.VITE_FACEBOOK_REDIRECT_URI ||
         `${window.location.origin}/oauth/facebook/callback`;
 
-      if (!appId || !redirectUri) {
+      // ⚠️ Nuevo: config_id de la configuración "OnbWppDigitalMatch"
+      const configId =
+        import.meta.env.VITE_FACEBOOK_LOGIN_CONFIG_ID || "1354158045710421";
+
+      if (!appId || !redirectUri || !configId) {
         console.error(
-          "[ChannelSetup] faltan VITE_FACEBOOK_APP_ID o VITE_FACEBOOK_REDIRECT_URI"
+          "[ChannelSetup] faltan VITE_FACEBOOK_APP_ID, VITE_FACEBOOK_REDIRECT_URI o VITE_FACEBOOK_LOGIN_CONFIG_ID"
         );
         return;
       }
 
-      const scopes = [
-        "whatsapp_business_messaging",
-        "whatsapp_business_management",
-        "business_management",
-      ].join(",");
+      // Meta recomienda usar config_id + response_type=code (sin scope)
+      const params = new URLSearchParams({
+        client_id: appId,
+        redirect_uri: redirectUri,
+        state: stateId,
+        config_id: configId,
+        response_type: "code",
+      });
 
-      const authUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${encodeURIComponent(
-        appId
-      )}&redirect_uri=${encodeURIComponent(
-        redirectUri
-      )}&state=${encodeURIComponent(
-        stateId
-      )}&scope=${encodeURIComponent(scopes)}`;
+      const authUrl = `https://www.facebook.com/v20.0/dialog/oauth?${params.toString()}`;
 
       // 4) Abrir popup
       const w = 600;
@@ -458,7 +459,9 @@ const ChannelSetup = () => {
       const dualScreenLeft = window.screenLeft ?? window.screenX ?? 0;
       const dualScreenTop = window.screenTop ?? window.screenY ?? 0;
       const width =
-        window.innerWidth ?? document.documentElement.clientWidth ?? screen.width;
+        window.innerWidth ??
+        document.documentElement.clientWidth ??
+        screen.width;
       const height =
         window.innerHeight ??
         document.documentElement.clientHeight ??
