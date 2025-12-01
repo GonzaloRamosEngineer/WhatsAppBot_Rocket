@@ -20,6 +20,9 @@ const ChannelSetup = () => {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // 🔌 estado para el botón "Conectar con Meta"
+  const [connecting, setConnecting] = useState(false);
+
   // Lista de canales WhatsApp del tenant
   const [channels, setChannels] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState(null); // null = nuevo canal
@@ -380,68 +383,83 @@ const ChannelSetup = () => {
   };
 
   // 🔌 Botón "Conectar con Meta (Facebook)" → crea oauth_state y abre popup (login estándar con scopes)
-const handleConnectWithMeta = async () => {
-  try {
-    setConnecting(true);
+  const handleConnectWithMeta = async () => {
+    try {
+      if (!supabase || !tenant?.id || !profile?.id) {
+        console.error("[ChannelSetup] falta supabase, tenant o profile para OAuth", {
+          hasSupabase: !!supabase,
+          tenantId: tenant?.id,
+          profileId: profile?.id,
+        });
+        alert("No se pudo preparar la conexión con Meta. Falta información de sesión.");
+        return;
+      }
 
-    // 1. Crear oauth_state
-    const { data, error } = await supabase
-      .from("oauth_states")
-      .insert({
-        tenant_id: tenant.id,
-        user_id: profile.id,
-        provider: "facebook",
-        redirect_to: window.location.href
-      })
-      .select()
-      .single();
+      setConnecting(true);
 
-    if (error) throw error;
+      // 1. Crear oauth_state
+      const { data, error } = await supabase
+        .from("oauth_states")
+        .insert({
+          tenant_id: tenant.id,
+          user_id: profile.id,
+          provider: "facebook",
+          redirect_to: window.location.href,
+        })
+        .select()
+        .single();
 
-    const stateId = data.id;
-    const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
-    const redirectUri = import.meta.env.VITE_FACEBOOK_REDIRECT_URI;
+      if (error) throw error;
 
-    // 2. SCOPES CLÁSICOS
-    const scopes = [
-      "public_profile",
-      "email",
-      "business_management",
-      "whatsapp_business_management",
-      "whatsapp_business_messaging"
-    ].join(",");
+      const stateId = data.id;
+      const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
+      const redirectUri = import.meta.env.VITE_FACEBOOK_REDIRECT_URI;
 
-    // 3. Construcción URL sin config_id
-    const params = new URLSearchParams({
-      client_id: appId,
-      redirect_uri: redirectUri,
-      state: stateId,
-      scope: scopes,
-      response_type: "code",
-      auth_type: "rerequest"
-    });
+      if (!appId || !redirectUri) {
+        console.error("[ChannelSetup] faltan VITE_FACEBOOK_APP_ID o VITE_FACEBOOK_REDIRECT_URI");
+        alert("Faltan variables de entorno para conectar con Meta.");
+        return;
+      }
 
-    const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?${params.toString()}`;
+      // 2. SCOPES CLÁSICOS
+      const scopes = [
+        "public_profile",
+        "email",
+        "business_management",
+        "whatsapp_business_management",
+        "whatsapp_business_messaging",
+      ].join(",");
 
-    // 4. Abrir popup
-    const width = 600;
-    const height = 800;
-    const left = window.screenX + (window.innerWidth - width) / 2;
-    const top = window.screenY + (window.innerHeight - height) / 2;
+      // 3. Construcción URL sin config_id
+      const params = new URLSearchParams({
+        client_id: appId,
+        redirect_uri: redirectUri,
+        state: stateId,
+        scope: scopes,
+        response_type: "code",
+        auth_type: "rerequest",
+      });
 
-    window.open(
-      oauthUrl,
-      "facebook_oauth_popup",
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-  } catch (err) {
-    console.error(err);
-    alert("Error preparando la conexión con Meta.");
-  } finally {
-    setConnecting(false);
-  }
-};
+      const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?${params.toString()}`;
 
+      // 4. Abrir popup
+      const width = 600;
+      const height = 800;
+      const left = window.screenX + (window.innerWidth - width) / 2;
+      const top = window.screenY + (window.innerHeight - height) / 2;
+
+      window.open(
+        oauthUrl,
+        "facebook_oauth_popup",
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+    } catch (err) {
+      console.error("[ChannelSetup] handleConnectWithMeta error:", err);
+      alert("Error preparando la conexión con Meta.");
+    } finally {
+      setConnecting(false);
+    }
+  };
 
   const currentUser = {
     name: tenant?.name || "Tenant",
@@ -527,10 +545,11 @@ const handleConnectWithMeta = async () => {
               <button
                 type="button"
                 onClick={handleConnectWithMeta}
-                className="inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 micro-animation"
+                disabled={connecting}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 micro-animation disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Icon name="Zap" size={16} className="mr-2" />
-                Conectar con Meta (Facebook)
+                {connecting ? "Preparando conexión..." : "Conectar con Meta (Facebook)"}
               </button>
             </div>
           </div>
