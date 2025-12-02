@@ -484,16 +484,16 @@ const handleConnectWithMeta = async () => {
 };
 
 
-  const currentUser = {
-    name: tenant?.name || "Tenant",
-    email:
-      profile?.role === "tenant"
-        ? "tenant@business.com"
-        : "admin@whatsappbot.com",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
-    role: profile?.role || "tenant",
-  };
+const currentUser = {
+  name: tenant?.name || "Tenant",
+  email:
+    profile?.role === "tenant"
+      ? "tenant@business.com"
+      : "admin@whatsappbot.com",
+  avatar: null,                     // 👈 antes era una URL
+  role: profile?.role || "tenant",
+};
+
 
   return (
     <div className="min-h-screen bg-background">

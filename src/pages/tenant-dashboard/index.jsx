@@ -311,18 +311,18 @@ const TenantDashboard = () => {
   ];
 
   // 🔹 Usuario actual mostrado en el header
-  const currentUser = {
-    name:
-      tenantInfo?.name ||
-      profile?.tenant?.name ||
-      session?.user?.user_metadata?.full_name ||
-      session?.user?.email ||
-      "Usuario",
-    email: session?.user?.email || "usuario@example.com",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
-    role: profile?.role || "tenant",
-  };
+const currentUser = {
+  name:
+    tenantInfo?.name ||
+    profile?.tenant?.name ||
+    session?.user?.user_metadata?.full_name ||
+    session?.user?.email ||
+    "Usuario",
+  email: session?.user?.email || "usuario@example.com",
+  avatar: null,                     // 👈 dejarlo en null
+  role: profile?.role || "tenant",
+};
+
 
   return (
     <div className="min-h-screen bg-background">
