@@ -14,23 +14,30 @@ export const useAuth = () => useContext(AuthContext);
 
 export default function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
-  const [profile, setProfile] = useState(null); // { role, tenant_id, tenant }
-  const [tenants, setTenants] = useState([]);   // lista de memberships
-  const [loading, setLoading] = useState(true); // SOLO “ya sé si hay sesión o no”
+  const [profile, setProfile] = useState(null);   // { role, tenant_id, tenant }
+  const [tenants, setTenants] = useState([]);     // lista de memberships
+  const [loading, setLoading] = useState(true);   // ⬅️ “estoy resolviendo auth/tenant”
 
+  /**
+   * Carga memberships + perfil del usuario.
+   * Este método es el ÚNICO que controla loading para estos casos.
+   */
   const loadTenantsAndProfile = async (userId) => {
+    console.log("[AuthProvider] loadTenantsAndProfile userId", userId);
+
+    // Si por algún motivo llega sin userId, limpiamos todo y apagamos loading
     if (!userId) {
       console.warn("[AuthProvider] loadTenantsAndProfile sin userId");
       setProfile(null);
       setTenants([]);
+      setLoading(false);
       return;
     }
 
-    try {
-      console.log("[AuthProvider] loadTenantsAndProfile userId", userId);
+    setLoading(true);
 
+    try {
       // 1) Aseguramos que exista al menos un tenant asociado al usuario.
-      //    Esto lo hace la función SQL init_tenant_if_empty(p_user_id uuid).
       try {
         const { data: initResult, error: initError } = await supabase.rpc(
           "init_tenant_if_empty",
@@ -64,7 +71,7 @@ export default function AuthProvider({ children }) {
       console.log("[AuthProvider] tenant_members result", { data, error });
 
       if (error) {
-        console.error("Error loading profile/tenants", error);
+        console.error("[AuthProvider] Error loading tenant_members", error);
         setProfile(null);
         setTenants([]);
         return;
@@ -74,7 +81,7 @@ export default function AuthProvider({ children }) {
       setTenants(rows);
 
       if (rows.length === 0) {
-        // Caso muy raro: no hay tenant ni siquiera después de init_tenant_if_empty
+        // Caso muy raro: no hay tenant ni siquiera después del init
         setProfile({
           role: "tenant",
           tenant_id: null,
@@ -83,12 +90,10 @@ export default function AuthProvider({ children }) {
         return;
       }
 
-      // Si tiene varios tenants, preferimos uno con rol "owner", si no el primero
+      // Preferimos un tenant con rol owner, si existe
       let chosen = rows[0];
       const owner = rows.find((t) => t.role === "owner");
-      if (owner) {
-        chosen = owner;
-      }
+      if (owner) chosen = owner;
 
       setProfile({
         role: chosen.role || "tenant",
@@ -96,45 +101,49 @@ export default function AuthProvider({ children }) {
         tenant: chosen.tenants || null, // { name, slug }
       });
     } catch (e) {
-      console.error("Unexpected error loading profile", e);
+      console.error("[AuthProvider] Unexpected error loading profile", e);
       setProfile(null);
       setTenants([]);
+    } finally {
+      // Pase lo que pase, salimos del modo “Cargando sesión…”
+      setLoading(false);
     }
   };
 
-  // Cargar sesión inicial + suscripción a cambios de auth
+  // 🔹 Cargar sesión inicial + suscripción a cambios de auth
   useEffect(() => {
     const init = async () => {
-      setLoading(true); // Estamos averiguando si hay sesión
+      setLoading(true);
 
       try {
         const { data, error } = await supabase.auth.getSession();
-
         console.log("[AuthProvider] init.getSession()", { data, error });
 
         if (error) {
-          console.error("Error getting session", error);
+          console.error("[AuthProvider] Error getting session", error);
           setSession(null);
           setProfile(null);
           setTenants([]);
-        } else {
-          const currentSession = data.session ?? null;
-          setSession(currentSession);
+          setLoading(false);
+          return;
+        }
 
-          if (currentSession?.user) {
-            await loadTenantsAndProfile(currentSession.user.id);
-          } else {
-            setProfile(null);
-            setTenants([]);
-          }
+        const currentSession = data.session ?? null;
+        setSession(currentSession);
+
+        if (currentSession?.user) {
+          // ⬅️ loadTenantsAndProfile manejará loading
+          await loadTenantsAndProfile(currentSession.user.id);
+        } else {
+          setProfile(null);
+          setTenants([]);
+          setLoading(false);
         }
       } catch (e) {
         console.error("[AuthProvider] unexpected error in getSession", e);
         setSession(null);
         setProfile(null);
         setTenants([]);
-      } finally {
-        // Ya sabemos si hay sesión o no
         setLoading(false);
       }
     };
@@ -146,27 +155,25 @@ export default function AuthProvider({ children }) {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("[AuthProvider] onAuthStateChange", { event, session });
 
-      // Auth cambió → actualizamos sesión
       setSession(session ?? null);
 
       if (session?.user) {
+        // ⬅️ De nuevo, el que maneja loading es loadTenantsAndProfile
         await loadTenantsAndProfile(session.user.id);
       } else {
         setProfile(null);
         setTenants([]);
+        setLoading(false);
       }
-
-      setLoading(false); // Ya tenemos respuesta de auth
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const login = async (email, password) => {
-    setLoading(true); // estamos intentando loguear
-
+    setLoading(true);
     console.log("[AuthProvider] login() called", { email });
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -189,9 +196,8 @@ export default function AuthProvider({ children }) {
     } else {
       setProfile(null);
       setTenants([]);
+      setLoading(false);
     }
-
-    setLoading(false); // ya sabemos si el login fue correcto
 
     return { ok: true, session: currentSession };
   };
@@ -226,11 +232,15 @@ export default function AuthProvider({ children }) {
     profile,   // { role, tenant_id, tenant }
     tenant,    // { id, name, slug } o null
     tenants,   // lista completa de memberships
-    loading,   // SOLO auth (saber si hay sesión)
+    loading,   // ⬅️ ahora SIEMPRE vuelve a false
     login,
     logout,
-    supabase,  // para usar en páginas / hooks
+    supabase,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }

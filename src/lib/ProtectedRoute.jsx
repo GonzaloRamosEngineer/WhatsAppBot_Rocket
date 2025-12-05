@@ -20,7 +20,6 @@ export default function ProtectedRoute({ children, roles }) {
     );
   }
 
-  // Sin sesión → a login
   if (!session) {
     console.log("[ProtectedRoute] no session → /login");
     return (
@@ -32,7 +31,6 @@ export default function ProtectedRoute({ children, roles }) {
     );
   }
 
-  // Si se especifican roles y el usuario no los tiene → redirigir
   if (roles && !roles.includes(profile?.role)) {
     console.log("[ProtectedRoute] role not allowed", {
       have: profile?.role,
