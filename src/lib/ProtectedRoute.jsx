@@ -9,7 +9,9 @@ export default function ProtectedRoute({ children, roles }) {
 
   console.log("[ProtectedRoute] render", { session, profile, loading, roles });
 
-  if (loading) {
+  // 1) Estado inicial: todavía no sabemos si hay sesión o no
+  //    → mostramos "Cargando sesión..."
+  if (loading && !session) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
@@ -20,6 +22,8 @@ export default function ProtectedRoute({ children, roles }) {
     );
   }
 
+  // 2) Ya sabemos que NO hay sesión
+  //    (loading puede ser true o false, pero no tenemos session)
   if (!session) {
     console.log("[ProtectedRoute] no session → /login");
     return (
@@ -31,6 +35,9 @@ export default function ProtectedRoute({ children, roles }) {
     );
   }
 
+  // 3) Sí hay sesión.
+  //    Aunque loading siga true (porque se está cargando el profile / tenants),
+  //    dejamos pasar a la ruta protegida.
   if (roles && !roles.includes(profile?.role)) {
     console.log("[ProtectedRoute] role not allowed", {
       have: profile?.role,
