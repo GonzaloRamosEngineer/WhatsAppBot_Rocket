@@ -16,30 +16,30 @@ const UserProfileDropdown = ({
   const dropdownRef = useRef(null);
 
   const menuItems = [
-    {
-      label: 'Profile Settings',
-      icon: 'User',
-      onClick: () => {
-        onProfileClick?.();
-        setIsOpen(false);
-      }
-    },
-    {
-      label: 'Account Settings',
-      icon: 'Settings',
-      onClick: () => {
-        // Handle account settings
-        setIsOpen(false);
-      }
-    },
-    {
-      label: 'Help & Support',
-      icon: 'HelpCircle',
-      onClick: () => {
-        // Handle help
-        setIsOpen(false);
-      }
-    },
+    // {
+    //   label: 'Profile Settings',
+    //   icon: 'User',
+    //   onClick: () => {
+    //     onProfileClick?.();
+    //     setIsOpen(false);
+    //   }
+    // },
+    // {
+    //   label: 'Account Settings',
+    //   icon: 'Settings',
+    //   onClick: () => {
+    //     // Handle account settings
+    //     setIsOpen(false);
+    //   }
+    // },
+    // {
+    //   label: 'Help & Support',
+    //   icon: 'HelpCircle',
+    //   onClick: () => {
+    //     // Handle help
+    //     setIsOpen(false);
+    //   }
+    // },
     {
       type: 'divider'
     },
