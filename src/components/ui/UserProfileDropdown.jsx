@@ -79,7 +79,12 @@ const UserProfileDropdown = ({
   }, [isOpen]);
 
   const getInitials = (name) => {
-    return name?.split(' ')?.map(word => word?.charAt(0))?.join('')?.toUpperCase()?.slice(0, 2);
+    return name
+      ?.split(' ')
+      ?.map(word => word?.charAt(0))
+      ?.join('')
+      ?.toUpperCase()
+      ?.slice(0, 2);
   };
 
   return (
@@ -119,9 +124,18 @@ const UserProfileDropdown = ({
           className="text-muted-foreground flex-shrink-0"
         />
       </button>
+
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 bg-popover border border-border rounded-md shadow-lg z-200 py-1">
+        <div
+          className="
+            absolute top-full right-0 mt-2
+            bg-popover border border-border rounded-md shadow-lg
+            py-1
+            z-[9999]
+            min-w-[220px]
+          "
+        >
           {menuItems?.map((item, index) => {
             if (item?.type === 'divider') {
               return (
@@ -139,7 +153,10 @@ const UserProfileDropdown = ({
                 className={`
                   w-full flex items-center space-x-3 px-3 py-2 text-left text-sm
                   micro-animation
-                  ${item?.variant === 'destructive' ?'text-destructive hover:bg-destructive hover:text-destructive-foreground' :'text-popover-foreground hover:bg-muted'
+                  ${
+                    item?.variant === 'destructive'
+                      ? 'text-destructive hover:bg-destructive hover:text-destructive-foreground'
+                      : 'text-popover-foreground hover:bg-muted'
                   }
                 `}
               >
