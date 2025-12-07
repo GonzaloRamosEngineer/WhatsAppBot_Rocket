@@ -11,7 +11,10 @@ import FlowEditor from "./components/FlowEditor";
 import FlowPreview from "./components/FlowPreview";
 import TemplateLibrary from "./components/TemplateLibrary";
 
-// Hook global con supabase + tenant + profile
+// 👇 NUEVO: import del modal Blueprint Meta
+import MetaTemplateBlueprints from "./components/MetaTemplateBlueprints";
+
+// Hook global
 import { useAuth } from "@/lib/AuthProvider";
 
 const RULES_KEY = "rules_v1";
@@ -27,13 +30,13 @@ const FlowBuilder = () => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isTemplateLibraryOpen, setIsTemplateLibraryOpen] = useState(false);
 
-  // Flujos en memoria (rules_v1.rules[])
-  const [localFlows, setLocalFlows] = useState([]);
+  // 👇 NUEVO: estado para el modal Blueprints
+  const [showMetaBlueprints, setShowMetaBlueprints] = useState(false);
 
-  // Fila de flows (key = 'rules_v1') asociada al bot
+  // flows en memoria
+  const [localFlows, setLocalFlows] = useState([]);
   const [rulesFlowRow, setRulesFlowRow] = useState(null);
 
-  // Estado de carga / guardado / errores
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uiMessage, setUiMessage] = useState(null);
@@ -45,7 +48,7 @@ const FlowBuilder = () => {
   const handleProfileClick = () => console.log("Opening profile...");
 
   // --------------------------------------------------
-  //  Load: obtener bot + flow rules_v1 desde Supabase
+  //     Load flows del tenant (tabla flows)
   // --------------------------------------------------
   useEffect(() => {
     const loadRulesFlow = async () => {
@@ -55,8 +58,7 @@ const FlowBuilder = () => {
       setUiMessage(null);
 
       try {
-        // 1) Obtener bot principal del tenant (mismo criterio que webhook)
-        const { data: bot, error: botError } = await supabase
+        const { data: bot } = await supabase
           .from("bots")
           .select("id, name")
           .eq("tenant_id", tenant.id)
@@ -64,52 +66,30 @@ const FlowBuilder = () => {
           .limit(1)
           .maybeSingle();
 
-        if (botError) {
-          console.error("[FlowBuilder] Error loading bot:", botError);
-          setUiError("No se pudo cargar el bot del tenant.");
-          setIsLoading(false);
-          return;
-        }
-
         if (!bot) {
-          setUiError(
-            "No hay ningún bot configurado para este tenant. Primero conectá un canal de WhatsApp."
-          );
+          setUiError("No hay ningún bot configurado para este tenant.");
           setLocalFlows([]);
           setIsLoading(false);
           return;
         }
 
-        // 2) Buscar flow con key = 'rules_v1'
-        const { data: flowRow, error: flowError } = await supabase
+        const { data: flowRow } = await supabase
           .from("flows")
           .select("id, bot_id, key, definition")
           .eq("bot_id", bot.id)
           .eq("key", RULES_KEY)
           .maybeSingle();
 
-        if (flowError) {
-          console.error("[FlowBuilder] Error loading rules_v1 flow:", flowError);
-          setUiError("No se pudieron cargar las reglas del bot.");
-          setIsLoading(false);
-          return;
-        }
-
         if (!flowRow) {
-          // Aún no existe ningún flow de reglas → inicial vacío
           const def = { version: 1, engine: "rules_v1", rules: [] };
           setRulesFlowRow({
             id: null,
             bot_id: bot.id,
             key: RULES_KEY,
-            definition: def,
+            definition: def
           });
           setLocalFlows([]);
-          setUiMessage(
-            "Todavía no hay reglas configuradas. Creá tu primer flujo automático."
-          );
         } else {
-          // Normalizamos el formato por si el engine cambió
           const def = flowRow.definition || {};
           const rules = Array.isArray(def.rules) ? def.rules : [];
           setRulesFlowRow({
@@ -117,16 +97,16 @@ const FlowBuilder = () => {
             definition: {
               version: def.version || 1,
               engine: def.engine || "rules_v1",
-              rules,
-            },
+              rules
+            }
           });
           setLocalFlows(rules);
         }
 
         setIsLoading(false);
       } catch (e) {
-        console.error("[FlowBuilder] Unexpected error:", e);
-        setUiError("Ocurrió un error inesperado al cargar las reglas.");
+        console.error("[FlowBuilder] error:", e);
+        setUiError("Error inesperado al cargar las reglas.");
         setIsLoading(false);
       }
     };
@@ -135,15 +115,13 @@ const FlowBuilder = () => {
   }, [supabase, tenant?.id]);
 
   // --------------------------------------------------
-  //  Persistencia: guardar reglas en flows.definition
+  //   Guardar (insert/update) reglas en DB
   // --------------------------------------------------
-  const buildDefinitionFromLocalFlows = () => {
-    return {
-      version: 1,
-      engine: "rules_v1",
-      rules: localFlows,
-    };
-  };
+  const buildDefinitionFromLocalFlows = () => ({
+    version: 1,
+    engine: "rules_v1",
+    rules: localFlows
+  });
 
   const handlePersistRules = async () => {
     if (!supabase || !rulesFlowRow) return;
@@ -155,48 +133,43 @@ const FlowBuilder = () => {
       const definition = buildDefinitionFromLocalFlows();
 
       if (rulesFlowRow.id) {
-        // UPDATE existente
         const { error } = await supabase
           .from("flows")
           .update({ definition })
           .eq("id", rulesFlowRow.id);
 
         if (error) {
-          console.error("[FlowBuilder] Error updating rules flow:", error);
-          setUiError("No se pudieron guardar los cambios en las reglas.");
+          setUiError("No se pudieron guardar las reglas.");
         } else {
           setUiMessage("Reglas guardadas correctamente.");
         }
       } else {
-        // INSERT nuevo
         const { data, error } = await supabase
           .from("flows")
           .insert({
             bot_id: rulesFlowRow.bot_id,
             key: RULES_KEY,
-            definition,
+            definition
           })
           .select()
           .single();
 
         if (error) {
-          console.error("[FlowBuilder] Error inserting rules flow:", error);
-          setUiError("No se pudieron crear las reglas.");
+          setUiError("Error creando las reglas.");
         } else {
           setRulesFlowRow(data);
-          setUiMessage("Reglas creadas y guardadas correctamente.");
+          setUiMessage("Reglas creadas correctamente.");
         }
       }
     } catch (e) {
-      console.error("[FlowBuilder] Unexpected error on save:", e);
-      setUiError("Ocurrió un error inesperado al guardar las reglas.");
+      setUiError("Error inesperado al guardar.");
     } finally {
       setIsSaving(false);
     }
   };
 
   // --------------------------------------------------
-  //  Eventos UI de flujos (en memoria)
+  //        Eventos UI de flows
   // --------------------------------------------------
   const handleCreateFlow = () => {
     setSelectedFlow(null);
@@ -210,8 +183,8 @@ const FlowBuilder = () => {
 
   const handleDeleteFlow = (flowId) => {
     if (window.confirm("¿Seguro que querés eliminar este flujo?")) {
-      setLocalFlows((prev) => prev.filter((flow) => flow.id !== flowId));
-      setUiMessage("Flujo eliminado. No olvides guardar las reglas.");
+      setLocalFlows((prev) => prev.filter((f) => f.id !== flowId));
+      setUiMessage("Flujo eliminado.");
     }
   };
 
@@ -221,8 +194,8 @@ const FlowBuilder = () => {
         flow.id === flowId ? { ...flow, isActive: !flow.isActive } : flow
       );
 
-      // Regla de coherencia: solo un welcome activo y un fallback activo
       const toggled = updated.find((f) => f.id === flowId);
+
       if (
         toggled &&
         toggled.isActive &&
@@ -238,8 +211,6 @@ const FlowBuilder = () => {
 
       return updated;
     });
-
-    setUiMessage("Estado del flujo actualizado. No olvides guardar las reglas.");
   };
 
   const handlePreviewFlow = (flow) => {
@@ -250,17 +221,13 @@ const FlowBuilder = () => {
   const handleSaveFlow = (flowData) => {
     setLocalFlows((prev) => {
       let next;
+
       if (selectedFlow) {
-        // update
-        next = prev.map((flow) =>
-          flow.id === selectedFlow.id ? flowData : flow
-        );
+        next = prev.map((f) => (f.id === selectedFlow.id ? flowData : f));
       } else {
-        // create
         next = [flowData, ...prev];
       }
 
-      // Regla: solo un welcome activo y un fallback activo
       if (
         flowData.isActive &&
         (flowData.triggerType === "welcome" ||
@@ -278,17 +245,13 @@ const FlowBuilder = () => {
 
     setIsEditorOpen(false);
     setSelectedFlow(null);
-    setUiMessage(
-      "Flujo actualizado en borrador. No olvides guardar las reglas."
-    );
+    setUiMessage("Flujo actualizado en borrador.");
   };
 
   const handleSelectTemplate = (templateData) => {
     setLocalFlows((prev) => {
       let next = [templateData, ...prev];
 
-      // Si la plantilla es welcome o fallback y viene activa,
-      // respetamos la misma regla de unicidad
       if (
         templateData.isActive &&
         (templateData.triggerType === "welcome" ||
@@ -304,7 +267,8 @@ const FlowBuilder = () => {
 
       return next;
     });
-    setUiMessage("Plantilla agregada. No olvides guardar las reglas.");
+
+    setUiMessage("Plantilla agregada. No olvides guardar.");
   };
 
   // --------------------------------------------------
@@ -315,8 +279,8 @@ const FlowBuilder = () => {
       flow.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       flow.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (flow.keywords &&
-        flow.keywords.some((keyword) =>
-          keyword.toLowerCase().includes(searchTerm.toLowerCase())
+        flow.keywords.some((kw) =>
+          kw.toLowerCase().includes(searchTerm.toLowerCase())
         ));
 
     const matchesFilter =
@@ -327,27 +291,27 @@ const FlowBuilder = () => {
     return matchesSearch && matchesFilter;
   });
 
-  const getFlowStats = () => {
-    const totalFlows = localFlows.length;
-    const activeFlows = localFlows.filter((f) => f.isActive).length;
-    const totalTriggers = localFlows.reduce(
+  const stats = {
+    totalFlows: localFlows.length,
+    activeFlows: localFlows.filter((f) => f.isActive).length,
+    totalTriggers: localFlows.reduce(
       (sum, f) => sum + (f.triggerCount || 0),
       0
-    );
-    return { totalFlows, activeFlows, totalTriggers };
+    )
   };
 
-  const stats = getFlowStats();
-
-const currentUser = {
-  name: tenant?.name || "Tenant",
-  email:
-    profile?.role === "tenant"
-      ? "tenant@business.com"
-      : "admin@whatsappbot.com",
-  avatar: null,                     // 👈 antes era una URL
-  role: profile?.role || "tenant",
-};
+  // --------------------------------------------------
+  //  Usuario actual (para el dropdown)
+  // --------------------------------------------------
+  const currentUser = {
+    name: tenant?.name || "Tenant",
+    email:
+      profile?.role === "tenant"
+        ? "tenant@business.com"
+        : "admin@whatsappbot.com",
+    avatar: null,
+    role: profile?.role || "tenant"
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -366,12 +330,9 @@ const currentUser = {
         <header className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-foreground">
-                Flow Builder
-              </h1>
+              <h1 className="text-2xl font-semibold">Flow Builder</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Diseñá y administrá las respuestas automáticas de tu bot
-                (motor <span className="font-mono">rules_v1</span>).
+                Diseñá y administrá las respuestas automáticas del bot.
               </p>
             </div>
 
@@ -379,9 +340,8 @@ const currentUser = {
               <Button
                 variant="outline"
                 iconName="Save"
-                iconPosition="left"
                 onClick={handlePersistRules}
-                disabled={isSaving || isLoading || !tenant}
+                disabled={isSaving || isLoading}
               >
                 {isSaving ? "Guardando..." : "Guardar reglas"}
               </Button>
@@ -395,84 +355,66 @@ const currentUser = {
           </div>
         </header>
 
-        {/* Mensajes de estado */}
+        {/* Mensajes UI */}
         <div className="px-6 pt-4">
           {isLoading && (
-            <div className="mb-4 rounded-md bg-muted px-4 py-2 text-sm text-muted-foreground">
-              Cargando reglas del bot…
+            <div className="mb-4 rounded bg-muted px-4 py-2 text-sm">
+              Cargando reglas…
             </div>
           )}
           {uiError && (
-            <div className="mb-4 rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
+            <div className="mb-4 rounded bg-destructive/10 px-4 py-2 text-sm text-destructive">
               {uiError}
             </div>
           )}
           {uiMessage && !uiError && (
-            <div className="mb-4 rounded-md bg-emerald-500/10 px-4 py-2 text-sm text-emerald-500">
+            <div className="mb-4 rounded bg-emerald-500/10 px-4 py-2 text-sm text-emerald-500">
               {uiMessage}
             </div>
           )}
         </div>
 
-        {/* Stats Cards */}
+        {/* Estadísticas */}
         <div className="p-6">
+          {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-card border border-border rounded-lg p-6">
+            <div className="bg-card border rounded-lg p-6">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <Icon name="GitBranch" size={24} className="text-primary" />
-                </div>
+                <Icon name="GitBranch" className="text-primary" size={24} />
                 <div>
-                  <p className="text-2xl font-semibold text-foreground">
-                    {stats.totalFlows}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Flujos totales
-                  </p>
+                  <p className="text-2xl font-semibold">{stats.totalFlows}</p>
+                  <p className="text-sm text-muted-foreground">Flujos totales</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-card border border-border rounded-lg p-6">
+            <div className="bg-card border rounded-lg p-6">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-success/10 rounded-lg flex items-center justify-center">
-                  <Icon
-                    name="CheckCircle"
-                    size={24}
-                    className="text-success"
-                  />
-                </div>
+                <Icon name="CheckCircle" className="text-success" size={24} />
                 <div>
-                  <p className="text-2xl font-semibold text-foreground">
-                    {stats.activeFlows}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Flujos activos
-                  </p>
+                  <p className="text-2xl font-semibold">{stats.activeFlows}</p>
+                  <p className="text-sm text-muted-foreground">Activos</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-card border border-border rounded-lg p-6">
+            <div className="bg-card border rounded-lg p-6">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
-                  <Icon name="Zap" size={24} className="text-secondary" />
-                </div>
+                <Icon name="Zap" className="text-secondary" size={24} />
                 <div>
-                  <p className="text-2xl font-semibold text-foreground">
+                  <p className="text-2xl font-semibold">
                     {stats.totalTriggers.toLocaleString()}
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    Disparos totales (histórico)
-                  </p>
+                  <p className="text-sm text-muted-foreground">Disparos</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Controles */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+          {/* Filtros + botones */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+
+            <div className="flex flex-col sm:flex-row gap-4">
               <Input
                 placeholder="Buscar flows..."
                 value={searchTerm}
@@ -483,11 +425,11 @@ const currentUser = {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 border border-border rounded-md bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="px-3 py-2 border rounded-md bg-card"
               >
-                <option value="all">Todos los flujos</option>
-                <option value="active">Solo activos</option>
-                <option value="inactive">Solo inactivos</option>
+                <option value="all">Todos</option>
+                <option value="active">Activos</option>
+                <option value="inactive">Inactivos</option>
               </select>
             </div>
 
@@ -495,24 +437,31 @@ const currentUser = {
               <Button
                 variant="outline"
                 iconName="BookOpen"
-                iconPosition="left"
                 onClick={() => setIsTemplateLibraryOpen(true)}
               >
                 Plantillas
               </Button>
+
+              {/*  NUEVO BOTÓN DE BLUEPRINTS META  */}
+              <Button
+                variant="outline"
+                iconName="Layers"
+                onClick={() => setShowMetaBlueprints(true)}
+              >
+                Plantillas Meta
+              </Button>
+
               <Button
                 variant="default"
                 iconName="Plus"
-                iconPosition="left"
                 onClick={handleCreateFlow}
-                disabled={!tenant || isLoading}
               >
                 Crear flujo
               </Button>
             </div>
           </div>
 
-          {/* Flows Grid */}
+          {/* Flujos */}
           {filteredFlows.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {filteredFlows.map((flow) => (
@@ -528,44 +477,11 @@ const currentUser = {
             </div>
           ) : (
             <div className="text-center py-12">
-              <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                <Icon
-                  name="GitBranch"
-                  size={32}
-                  className="text-muted-foreground"
-                />
-              </div>
-              <h3 className="text-lg font-medium text-foreground mb-2">
-                {searchTerm || filterStatus !== "all"
-                  ? "No se encontraron flujos"
-                  : "Todavía no creaste flujos"}
-              </h3>
-              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                {searchTerm || filterStatus !== "all"
-                  ? "Probá cambiando el criterio de búsqueda o los filtros."
-                  : "Creá tu primer flujo automático para empezar a responder en WhatsApp."}
+              <Icon name="GitBranch" size={32} className="text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium">No se encontraron flujos</h3>
+              <p className="text-muted-foreground mb-6">
+                Probá cambiando el filtro o creando un nuevo flujo.
               </p>
-              {!searchTerm && filterStatus === "all" && (
-                <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-3">
-                  <Button
-                    variant="outline"
-                    iconName="BookOpen"
-                    iconPosition="left"
-                    onClick={() => setIsTemplateLibraryOpen(true)}
-                  >
-                    Ver plantillas
-                  </Button>
-                  <Button
-                    variant="default"
-                    iconName="Plus"
-                    iconPosition="left"
-                    onClick={handleCreateFlow}
-                    disabled={!tenant || isLoading}
-                  >
-                    Crear flujo
-                  </Button>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -581,6 +497,7 @@ const currentUser = {
         }}
         onSave={handleSaveFlow}
       />
+
       <FlowPreview
         flow={selectedFlow}
         isOpen={isPreviewOpen}
@@ -589,10 +506,17 @@ const currentUser = {
           setSelectedFlow(null);
         }}
       />
+
       <TemplateLibrary
         isOpen={isTemplateLibraryOpen}
         onClose={() => setIsTemplateLibraryOpen(false)}
         onSelectTemplate={handleSelectTemplate}
+      />
+
+      {/* NUEVO: Modal de BLUEPRINTS META */}
+      <MetaTemplateBlueprints
+        isOpen={showMetaBlueprints}
+        onClose={() => setShowMetaBlueprints(false)}
       />
     </div>
   );

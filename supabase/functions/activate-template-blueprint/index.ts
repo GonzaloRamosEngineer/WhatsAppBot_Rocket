@@ -13,22 +13,22 @@ serve(async (req) => {
     if (!blueprintId || !channelId)
       return new Response("Missing params", { status: 400 });
 
-    // 1. Cargar blueprint
+    // Blueprint
     const { data: bp, error: bpErr } = await supabase
       .from("template_blueprints")
       .select("*")
       .eq("id", blueprintId)
       .single();
-
     if (bpErr) throw bpErr;
 
-    // 2. Resolver canal + token
+    // Canal → necesito waba + tenant
     const { data: channel } = await supabase
       .from("channels")
-      .select("meta_waba_id, tenant_id, token_alias")
+      .select("meta_waba_id, tenant_id")
       .eq("id", channelId)
       .single();
 
+    // Token del tenant
     const { data: tokenRow } = await supabase
       .from("meta_tokens")
       .select("access_token")
@@ -36,55 +36,61 @@ serve(async (req) => {
       .eq("provider", "facebook")
       .single();
 
-    // 3. Armar payload Meta
-    const payload = {
-      name: bp.name.toLowerCase().replace(/\s+/g, "_"),
-      category: bp.category.toUpperCase(),
-      language: bp.language,
-      components: [
-        {
-          type: "BODY",
-          text: bp.body,
-        },
-      ],
-    };
+    const uniqueName =
+      bp.name.toLowerCase().replace(/\s+/g, "_") +
+      "_" +
+      crypto.randomUUID().slice(0, 6);
 
-    // 4. Llamar a Meta
+    const components = [
+      {
+        type: "BODY",
+        text: bp.body
+      }
+    ];
+
+    // Enviar a Meta
     const resMeta = await fetch(
       `https://graph.facebook.com/v20.0/${channel.meta_waba_id}/message_templates`,
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${tokenRow.access_token}`,
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          name: uniqueName,
+          category: bp.category.toUpperCase(),
+          language: bp.language,
+          components
+        })
       }
     );
 
     const metaResponse = await resMeta.json();
 
-    // 5. Guardar template en DB
+    // Guardar en DB
     await supabase.from("templates").insert({
       tenant_id: channel.tenant_id,
       channel_id: channelId,
-      name: payload.name,
-      language: payload.language,
-      category: payload.category,
+      name: uniqueName,
+      language: bp.language,
+      category: bp.category.toUpperCase(),
       body: bp.body,
       status: "PENDING",
-      definition: payload,
+      definition: {
+        name: uniqueName,
+        components
+      },
       external_id: metaResponse.id ?? null,
-      last_synced_at: new Date().toISOString(),
+      last_synced_at: new Date().toISOString()
     });
 
     return new Response(JSON.stringify(metaResponse), {
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" }
     });
-
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
+      status: 500
     });
   }
 });
