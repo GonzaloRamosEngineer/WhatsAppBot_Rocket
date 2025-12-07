@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("PROJECT_URL")!;
 const SERVICE_ROLE = Deno.env.get("SERVICE_ROLE_KEY")!;
 
-const corsHeaders = {
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
@@ -16,6 +16,7 @@ function resolveMetaToken(alias: string): string | null {
     meta_token_dm: Deno.env.get("META_TOKEN_DM") ?? "",
     meta_token_fea: Deno.env.get("META_TOKEN_FEA") ?? "",
   };
+
   if (map[alias]) return map[alias];
 
   const envKey =
@@ -23,6 +24,20 @@ function resolveMetaToken(alias: string): string | null {
   const val = Deno.env.get(envKey);
   return val ?? null;
 }
+
+// 👉 Tipos esperados del body (solo a nivel comentario/ayuda)
+// type TemplateVariables = {
+//   header?: string[];
+//   body?: string[];
+// };
+
+// type SendMessagePayload = {
+//   conversationId?: string;
+//   text?: string;
+//   templateId?: string;
+//   templateVariables?: TemplateVariables;
+//   meta?: Record<string, unknown>;
+// };
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -48,10 +63,15 @@ serve(async (req) => {
     },
   });
 
-  // 📦 Body
+  // 📦 Parseo body
   let body: {
     conversationId?: string;
     text?: string;
+    templateId?: string;
+    templateVariables?: {
+      header?: string[];
+      body?: string[];
+    };
     meta?: Record<string, unknown>;
   };
 
@@ -64,13 +84,33 @@ serve(async (req) => {
     });
   }
 
-  const { conversationId, text, meta: extraMeta } = body;
-  const messageText = (text ?? "").trim();
+  const {
+    conversationId,
+    text,
+    templateId,
+    templateVariables,
+    meta: extraMeta,
+  } = body;
 
-  if (!conversationId || !messageText) {
+  const messageText = (text ?? "").trim();
+  const isTemplateMode = !!templateId;
+  const isTextMode = !!messageText;
+
+  // ✅ Reglas de validación del contrato
+  if (!conversationId) {
+    return new Response(
+      JSON.stringify({ error: "conversationId is required" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (!isTemplateMode && !isTextMode) {
     return new Response(
       JSON.stringify({
-        error: "conversationId and text are required",
+        error: "Either text or templateId must be provided",
       }),
       {
         status: 400,
@@ -199,7 +239,141 @@ serve(async (req) => {
       );
     }
 
-    // 4) Enviar mensaje a WhatsApp Cloud
+    // 4) Construir payload para WhatsApp Cloud
+    let waPayload: Record<string, unknown> = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: conv.contact_phone,
+    };
+
+    let dbBody = messageText;
+    let templateMeta: Record<string, unknown> | null = null;
+
+    if (isTemplateMode) {
+      // 🧱 MODO TEMPLATE
+      // 4.1) Buscar template en la DB
+      const { data: template, error: tplError } = await supabase
+        .from("templates")
+        .select(
+          `
+          id,
+          tenant_id,
+          name,
+          language,
+          category,
+          status
+        `,
+        )
+        .eq("id", templateId)
+        .maybeSingle();
+
+      if (tplError) {
+        console.error("Error fetching template:", tplError);
+        return new Response(
+          JSON.stringify({ error: "Failed to load template" }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (!template) {
+        return new Response(
+          JSON.stringify({ error: "Template not found" }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      // Seguridad multi-tenant
+      if (template.tenant_id !== conv.tenant_id) {
+        return new Response(
+          JSON.stringify({ error: "Template does not belong to this tenant" }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      // Solo permitimos templates aprobados por Meta
+      const status = (template.status ?? "").toUpperCase();
+      if (status && status !== "APPROVED") {
+        return new Response(
+          JSON.stringify({
+            error: "Template is not approved",
+            templateStatus: template.status,
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      const vars = templateVariables ?? {};
+      const components: any[] = [];
+
+      // Solo soportamos variables de HEADER/BODY por ahora (80% de los casos)
+      if (vars.header && vars.header.length > 0) {
+        components.push({
+          type: "header",
+          parameters: vars.header.map((v) => ({
+            type: "text",
+            text: String(v),
+          })),
+        });
+      }
+
+      if (vars.body && vars.body.length > 0) {
+        components.push({
+          type: "body",
+          parameters: vars.body.map((v) => ({
+            type: "text",
+            text: String(v),
+          })),
+        });
+      }
+
+      const templatePayload: any = {
+        name: template.name,
+        language: {
+          code: template.language,
+        },
+      };
+
+      if (components.length > 0) {
+        templatePayload.components = components;
+      }
+
+      waPayload = {
+        ...waPayload,
+        type: "template",
+        template: templatePayload,
+      };
+
+      dbBody = `[TEMPLATE] ${template.name}`;
+      templateMeta = {
+        id: template.id,
+        name: template.name,
+        language: template.language,
+        category: template.category,
+        status: template.status,
+        variables: vars,
+      };
+    } else {
+      // 🧱 MODO TEXTO
+      waPayload = {
+        ...waPayload,
+        type: "text",
+        text: { body: messageText },
+      };
+    }
+
+    // 5) Llamar a la API de WhatsApp
     const waRes = await fetch(
       `https://graph.facebook.com/v20.0/${channel.phone_id}/messages`,
       {
@@ -208,11 +382,7 @@ serve(async (req) => {
           Authorization: `Bearer ${metaToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: conv.contact_phone,
-          text: { body: messageText },
-        }),
+        body: JSON.stringify(waPayload),
       },
     );
 
@@ -232,13 +402,17 @@ serve(async (req) => {
       );
     }
 
-    // 5) Insertar mensaje en tabla messages
-    const metaPayload = {
+    // 6) Insertar mensaje en tabla messages
+    const metaPayload: Record<string, unknown> = {
       via: user ? "agent" : "system",
       sent_by: user ? user.id : "system",
       ...(extraMeta || {}),
       whatsapp_response: waJson,
     };
+
+    if (templateMeta) {
+      metaPayload.whatsapp_template = templateMeta;
+    }
 
     const { data: newMsg, error: msgError } = await supabase
       .from("messages")
@@ -248,7 +422,7 @@ serve(async (req) => {
         channel_id: conv.channel_id,
         direction: "out", // 👈 consistente con whatsapp-webhook
         sender: user ? user.id : "system",
-        body: messageText,
+        body: dbBody,
         meta: metaPayload,
       })
       .select()
@@ -265,7 +439,7 @@ serve(async (req) => {
       );
     }
 
-    // 6) Actualizar conversación (last_message_at, status, assigned_agent)
+    // 7) Actualizar conversación (last_message_at, status, assigned_agent)
     const nowIso = new Date().toISOString();
 
     // Si viene de agente → aseguramos assigned_agent

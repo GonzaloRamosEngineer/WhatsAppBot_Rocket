@@ -97,7 +97,9 @@ const ChannelSetup = () => {
               "Tu negocio",
           });
 
+          // ⚙️ channelData con channelId incluido
           setChannelData({
+            channelId: active.id,
             businessName:
               active.display_name ||
               savedCreds.businessName ||
@@ -195,7 +197,9 @@ const ChannelSetup = () => {
         "Tu negocio",
     });
 
+    // ⚙️ channelData con channelId incluido
     setChannelData({
+      channelId: channel.id,
       businessName:
         channel.display_name ||
         savedCreds.businessName ||
@@ -287,9 +291,10 @@ const ChannelSetup = () => {
           return [...prev, resultChannel];
         });
 
-        // Actualizar datos del canal seleccionado
+        // ⚙️ Actualizar datos del canal seleccionado (incluyendo channelId)
         setChannelData((prev) => ({
           ...(prev || {}),
+          channelId: resultChannel.id,
           businessName: resultChannel.display_name,
           phoneNumber: resultChannel.phone || prev?.phoneNumber || null,
           phoneNumberId: resultChannel.phone_id,
@@ -327,6 +332,8 @@ const ChannelSetup = () => {
       setIsConnected(true);
       setChannelData((prev) => ({
         ...(prev || {}),
+        // 🧩 preservamos channelId, o usamos el seleccionado
+        channelId: prev?.channelId || selectedChannelId || null,
         businessName:
           credentials.businessName || tenant?.name || "Tu negocio",
         phoneNumber,
@@ -349,6 +356,7 @@ const ChannelSetup = () => {
   };
 
   const handleToggleChannel = async (isActive) => {
+    // 🧩 acá preservamos channelId y resto de campos
     setChannelData((prev) => ({
       ...prev,
       isActive,
@@ -382,118 +390,116 @@ const ChannelSetup = () => {
     await logout();
   };
 
-// 🔌 Botón "Conectar con Meta (Facebook)" → crea oauth_state y abre popup (login estándar con scopes)
-const handleConnectWithMeta = async () => {
-  try {
-    if (!supabase || !tenant?.id) {
-      console.error("[ChannelSetup] falta supabase o tenant para OAuth", {
-        hasSupabase: !!supabase,
-        tenantId: tenant?.id,
+  // 🔌 Botón "Conectar con Meta (Facebook)" → crea oauth_state y abre popup (login estándar con scopes)
+  const handleConnectWithMeta = async () => {
+    try {
+      if (!supabase || !tenant?.id) {
+        console.error("[ChannelSetup] falta supabase o tenant para OAuth", {
+          hasSupabase: !!supabase,
+          tenantId: tenant?.id,
+        });
+        alert("No se pudo preparar la conexión con Meta. Falta información del tenant.");
+        return;
+      }
+
+      setConnecting(true);
+
+      // 1) Obtener el usuario actual desde Supabase Auth
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error(
+          "[ChannelSetup] no se pudo obtener el usuario de Supabase Auth",
+          userError
+        );
+        alert("No se pudo preparar la conexión con Meta. No se encontró el usuario.");
+        return;
+      }
+
+      const userId = user.id;
+
+      // 2) Crear registro en oauth_states
+      const { data, error } = await supabase
+        .from("oauth_states")
+        .insert({
+          tenant_id: tenant.id,
+          user_id: userId,
+          provider: "facebook",
+          redirect_to: window.location.href,
+        })
+        .select()
+        .single();
+
+      if (error || !data) {
+        console.error("[ChannelSetup] error creando oauth_state", error);
+        alert("No se pudo preparar la conexión con Meta. Error creando el estado OAuth.");
+        return;
+      }
+
+      const stateId = data.id;
+
+      const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
+      const redirectUri = import.meta.env.VITE_FACEBOOK_REDIRECT_URI;
+
+      if (!appId || !redirectUri) {
+        console.error(
+          "[ChannelSetup] faltan VITE_FACEBOOK_APP_ID o VITE_FACEBOOK_REDIRECT_URI"
+        );
+        alert("Faltan variables de entorno para conectar con Meta.");
+        return;
+      }
+
+      // 3) SCOPES CLÁSICOS
+      const scopes = [
+        "public_profile",
+        "email",
+        "business_management",
+        "whatsapp_business_management",
+        "whatsapp_business_messaging",
+      ].join(",");
+
+      const params = new URLSearchParams({
+        client_id: appId,
+        redirect_uri: redirectUri,
+        state: stateId,
+        scope: scopes,
+        response_type: "code",
+        auth_type: "rerequest",
       });
-      alert("No se pudo preparar la conexión con Meta. Falta información del tenant.");
-      return;
-    }
 
-    setConnecting(true);
+      const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?${params.toString()}`;
 
-    // 1) Obtener el usuario actual desde Supabase Auth
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+      // 4) Abrir popup
+      const width = 600;
+      const height = 800;
+      const left = window.screenX + (window.innerWidth - width) / 2;
+      const top = window.screenY + (window.innerHeight - height) / 2;
 
-    if (userError || !user) {
-      console.error(
-        "[ChannelSetup] no se pudo obtener el usuario de Supabase Auth",
-        userError
+      window.open(
+        oauthUrl,
+        "facebook_oauth_popup",
+        `width=${width},height=${height},left=${left},top=${top}`
       );
-      alert("No se pudo preparar la conexión con Meta. No se encontró el usuario.");
-      return;
+    } catch (err) {
+      console.error("[ChannelSetup] handleConnectWithMeta error:", err);
+      alert("Error preparando la conexión con Meta.");
+    } finally {
+      setConnecting(false);
     }
+  };
 
-    const userId = user.id;
-
-    // 2) Crear registro en oauth_states
-    const { data, error } = await supabase
-      .from("oauth_states")
-      .insert({
-        tenant_id: tenant.id,
-        user_id: userId,
-        provider: "facebook",
-        redirect_to: window.location.href,
-      })
-      .select()
-      .single();
-
-    if (error || !data) {
-      console.error("[ChannelSetup] error creando oauth_state", error);
-      alert("No se pudo preparar la conexión con Meta. Error creando el estado OAuth.");
-      return;
-    }
-
-    const stateId = data.id;
-
-    const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
-    const redirectUri = import.meta.env.VITE_FACEBOOK_REDIRECT_URI;
-
-    if (!appId || !redirectUri) {
-      console.error(
-        "[ChannelSetup] faltan VITE_FACEBOOK_APP_ID o VITE_FACEBOOK_REDIRECT_URI"
-      );
-      alert("Faltan variables de entorno para conectar con Meta.");
-      return;
-    }
-
-    // 3) SCOPES CLÁSICOS
-    const scopes = [
-      "public_profile",
-      "email",
-      "business_management",
-      "whatsapp_business_management",
-      "whatsapp_business_messaging",
-    ].join(",");
-
-    const params = new URLSearchParams({
-      client_id: appId,
-      redirect_uri: redirectUri,
-      state: stateId,
-      scope: scopes,
-      response_type: "code",
-      auth_type: "rerequest",
-    });
-
-    const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?${params.toString()}`;
-
-    // 4) Abrir popup
-    const width = 600;
-    const height = 800;
-    const left = window.screenX + (window.innerWidth - width) / 2;
-    const top = window.screenY + (window.innerHeight - height) / 2;
-
-    window.open(
-      oauthUrl,
-      "facebook_oauth_popup",
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-  } catch (err) {
-    console.error("[ChannelSetup] handleConnectWithMeta error:", err);
-    alert("Error preparando la conexión con Meta.");
-  } finally {
-    setConnecting(false);
-  }
-};
-
-
-const currentUser = {
-  name: tenant?.name || "Tenant",
-  email:
-    profile?.role === "tenant"
-      ? "tenant@business.com"
-      : "admin@whatsappbot.com",
-  avatar: null,                     // 👈 antes era una URL
-  role: profile?.role || "tenant",
-};
-
+  const currentUser = {
+    name: tenant?.name || "Tenant",
+    email:
+      profile?.role === "tenant"
+        ? "tenant@business.com"
+        : "admin@whatsappbot.com",
+    avatar: null,
+    role: profile?.role || "tenant",
+  };
 
   return (
     <div className="min-h-screen bg-background">

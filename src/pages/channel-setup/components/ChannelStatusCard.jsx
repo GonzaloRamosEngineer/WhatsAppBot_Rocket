@@ -1,9 +1,15 @@
 import React, { useState } from "react";
 import Button from "../../../components/ui/Button";
 import Icon from "../../../components/AppIcon";
+import { syncMetaTemplates } from "../../../lib/templatesApi";
 
 const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
   const [isLoading, setIsLoading] = useState(false);
+
+  // 🔄 Estado para sync de templates
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [syncError, setSyncError] = useState(null);
 
   const handleToggleChannel = async () => {
     setIsLoading(true);
@@ -32,6 +38,30 @@ const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
     return channelData?.isActive ? "CheckCircle" : "Clock";
   };
 
+  const handleSyncTemplates = async () => {
+    if (!channelData?.channelId) {
+      alert("No se encontró el ID del canal para sincronizar templates.");
+      return;
+    }
+
+    try {
+      setSyncLoading(true);
+      setSyncError(null);
+      setSyncResult(null);
+
+      const result = await syncMetaTemplates(channelData.channelId, {
+        dryRun: false,
+      });
+
+      setSyncResult(result);
+    } catch (err) {
+      console.error("[ChannelStatusCard] sync templates error:", err);
+      setSyncError(err.message || "Error al sincronizar plantillas.");
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   return (
     <div className="bg-card border border-border rounded-lg p-6">
       <div className="flex items-center justify-between mb-6">
@@ -54,6 +84,7 @@ const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
           <span className="font-medium">{getStatusText()}</span>
         </div>
       </div>
+
       {isConnected && channelData ? (
         <div className="space-y-4">
           {/* Información del canal */}
@@ -71,7 +102,8 @@ const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
                 Número de WhatsApp
               </label>
               <p className="text-sm text-muted-foreground">
-                {channelData?.phoneNumber || "No detectado (se completará al enviar mensajes)"}
+                {channelData?.phoneNumber ||
+                  "No detectado (se completará al enviar mensajes)"}
               </p>
             </div>
             <div>
@@ -96,7 +128,7 @@ const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
           </div>
 
           {/* Controles */}
-          <div className="flex items-center justify-between p-4 border border-border rounded-md">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-4 border border-border rounded-md">
             <div>
               <h4 className="font-medium text-foreground">
                 Procesamiento de mensajes
@@ -128,7 +160,11 @@ const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 bg-primary/5 border border-primary/20 rounded-md">
               <div className="flex items-center space-x-2 mb-2">
-                <Icon name="MessageCircle" size={16} className="text-primary" />
+                <Icon
+                  name="MessageCircle"
+                  size={16}
+                  className="text-primary"
+                />
                 <span className="text-sm font-medium text-primary">
                   Mensajes hoy
                 </span>
@@ -161,6 +197,47 @@ const ChannelStatusCard = ({ isConnected, channelData, onToggleChannel }) => {
                 {channelData?.stats?.activeChats || 0}
               </p>
             </div>
+          </div>
+
+          {/* 🔥 Sección Sync de Templates Meta */}
+          <div className="mt-4 p-4 border border-border rounded-md">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="font-medium text-foreground flex items-center gap-2">
+                  <Icon name="BookOpen" size={16} />
+                  Plantillas de WhatsApp (Meta)
+                </h4>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Sincronizá las plantillas oficiales del número de WhatsApp
+                  conectado. Se guardan en la tabla{" "}
+                  <span className="font-mono text-xs">public.templates</span>{" "}
+                  con campos de Meta (status, quality, components, etc.).
+                </p>
+              </div>
+              <Button
+                onClick={handleSyncTemplates}
+                loading={syncLoading}
+                variant="outline"
+                iconName="RefreshCw"
+                iconPosition="left"
+                disabled={!channelData?.channelId}
+              >
+                {syncLoading ? "Sincronizando..." : "Sync templates desde Meta"}
+              </Button>
+            </div>
+
+            {syncError && (
+              <p className="mt-2 text-xs text-destructive">{syncError}</p>
+            )}
+
+            {syncResult && (
+              <div className="mt-3 text-xs bg-muted p-2 rounded-md">
+                <p className="font-medium mb-1">Resultado de la sincronización:</p>
+                <pre className="whitespace-pre-wrap break-words">
+{JSON.stringify(syncResult, null, 2)}
+                </pre>
+              </div>
+            )}
           </div>
         </div>
       ) : (
