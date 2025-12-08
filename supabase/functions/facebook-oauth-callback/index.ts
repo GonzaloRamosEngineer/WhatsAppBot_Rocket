@@ -8,21 +8,61 @@ const FACEBOOK_APP_ID = Deno.env.get("FACEBOOK_APP_ID")!;
 const FACEBOOK_APP_SECRET = Deno.env.get("FACEBOOK_APP_SECRET")!;
 const OAUTH_REDIRECT_URL = Deno.env.get("OAUTH_REDIRECT_URL")!;
 const DEFAULT_REDIRECT = "/channel-setup";
+const DEFAULT_ORIGIN = "https://matchbot.digitalmatchglobal.com";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
+function buildCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? DEFAULT_ORIGIN;
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, apikey, x-client-info",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
+function json(
+  req: Request,
+  body: unknown,
+  status = 200,
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      ...buildCorsHeaders(req),
+    },
+  });
+}
+
 serve(async (req: Request): Promise<Response> => {
+  const corsHeaders = buildCorsHeaders(req);
+
+  // 1) Preflight CORS
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
+
+  // 2) Solo aceptamos POST real
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return new Response("Method not allowed", {
+      status: 405,
+      headers: corsHeaders,
+    });
   }
 
   try {
     const { code, state } = await req.json();
 
     if (!code || !state) {
-      return json({ error: "Missing code or state" }, 400);
+      return json(req, { error: "Missing code or state" }, 400);
     }
 
     // 1) Buscar el state (tenant + user + redirect)
@@ -34,11 +74,13 @@ serve(async (req: Request): Promise<Response> => {
 
     if (stateError || !oauthState) {
       console.error("oauth_states error:", stateError);
-      return json({ error: "Invalid or expired state" }, 400);
+      return json(req, { error: "Invalid or expired state" }, 400);
     }
 
     // 2) Intercambiar code -> short-lived token
-    const tokenUrl = new URL("https://graph.facebook.com/v20.0/oauth/access_token");
+    const tokenUrl = new URL(
+      "https://graph.facebook.com/v20.0/oauth/access_token",
+    );
     tokenUrl.searchParams.set("client_id", FACEBOOK_APP_ID);
     tokenUrl.searchParams.set("client_secret", FACEBOOK_APP_SECRET);
     tokenUrl.searchParams.set("redirect_uri", OAUTH_REDIRECT_URL);
@@ -49,7 +91,7 @@ serve(async (req: Request): Promise<Response> => {
     if (!tokenRes.ok) {
       const errBody = await tokenRes.text();
       console.error("FB short-lived token error:", errBody);
-      return json({ error: "Error getting Facebook access token" }, 500);
+      return json(req, { error: "Error getting Facebook access token" }, 500);
     }
 
     const shortToken = await tokenRes.json() as {
@@ -61,9 +103,11 @@ serve(async (req: Request): Promise<Response> => {
     let accessToken = shortToken.access_token;
     let expiresIn = shortToken.expires_in ?? (60 * 60 * 2);
 
-    // 3) Intentar long-lived token
+    // 3) Intentar long-lived token (best effort)
     try {
-      const longUrl = new URL("https://graph.facebook.com/v20.0/oauth/access_token");
+      const longUrl = new URL(
+        "https://graph.facebook.com/v20.0/oauth/access_token",
+      );
       longUrl.searchParams.set("grant_type", "fb_exchange_token");
       longUrl.searchParams.set("client_id", FACEBOOK_APP_ID);
       longUrl.searchParams.set("client_secret", FACEBOOK_APP_SECRET);
@@ -84,7 +128,10 @@ serve(async (req: Request): Promise<Response> => {
         }
       } else {
         const errBody = await longRes.text();
-        console.warn("FB long-lived token failed, using short-lived:", errBody);
+        console.warn(
+          "FB long-lived token failed, using short-lived:",
+          errBody,
+        );
       }
     } catch (e) {
       console.warn("FB long-lived token exception, using short-lived:", e);
@@ -103,25 +150,18 @@ serve(async (req: Request): Promise<Response> => {
 
     if (insertError) {
       console.error("meta_tokens insert error:", insertError);
-      return json({ error: "Error saving token" }, 500);
+      return json(req, { error: "Error saving token" }, 500);
     }
 
     // 5) Limpiar state usado
     await supabase.from("oauth_states").delete().eq("id", oauthState.id);
 
-    return json({
+    return json(req, {
       ok: true,
       redirect_to: oauthState.redirect_to ?? DEFAULT_REDIRECT,
     });
   } catch (e) {
     console.error("facebook-oauth-callback exception:", e);
-    return json({ error: "Internal server error" }, 500);
+    return json(req, { error: "Internal server error" }, 500);
   }
 });
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
