@@ -601,74 +601,71 @@ const ChannelSetup = () => {
     }
   };
 
-  // 🔗 Paso 4: conectar un número concreto (llama a whatsapp-connect)
-  const handleConnectFromMeta = async (waba, phone) => {
-    if (!supabase || !tenant?.id) {
-      console.error("[ChannelSetup] falta supabase o tenant para conectar", {
-        hasSupabase: !!supabase,
-        tenantId: tenant?.id,
-      });
-      alert(
-        "No se pudo conectar el número. Falta información del tenant."
-      );
-      return;
-    }
+// 🔗 Paso 4: conectar un número concreto (llama a whatsapp-connect)
+const handleConnectFromMeta = async (waba, phone) => {
+  if (!supabase || !tenant?.id) {
+    console.error("[ChannelSetup] falta supabase o tenant para conectar", {
+      hasSupabase: !!supabase,
+      tenantId: tenant?.id,
+    });
+    alert(
+      "No se pudo conectar el número. Falta información del tenant."
+    );
+    return;
+  }
 
-    // Validaciones para evitar mandar campos vacíos al Edge Function
-    if (!waba?.id || !phone?.id || !phone?.display_phone_number) {
-      console.error("[ChannelSetup] datos incompletos de WABA/phone", {
-        waba,
-        phone,
-      });
-      alert(
-        "No se pudo conectar el número. Meta no devolvió todos los datos necesarios (WABA ID / Phone ID / Display Phone Number)."
-      );
-      return;
-    }
+  // Solo log para ver qué llega desde whatsapp-discover
+  console.log("[ChannelSetup] conectando desde Meta con:", {
+    waba,
+    phone,
+  });
 
-    try {
-      setConnectingNumberId(phone.id);
+  try {
+    setConnectingNumberId(phone?.id);
 
-      const body = {
-        tenantId: tenant.id,
-        wabaId: waba.id,
-        phoneId: phone.id,
-        displayPhoneNumber: phone.display_phone_number,
-        channelName:
-          phone.verified_name ||
-          tenant?.name ||
-          `WhatsApp ${phone.display_phone_number}`,
-        tokenAlias: "default",
-      };
+    const body = {
+      tenantId: tenant.id,
+      wabaId: waba?.id,
+      phoneId: phone?.id,
+      displayPhoneNumber: phone?.display_phone_number,
+      channelName:
+        phone?.verified_name ||
+        tenant?.name ||
+        (phone?.display_phone_number
+          ? `WhatsApp ${phone.display_phone_number}`
+          : "WhatsApp principal"),
+      tokenAlias: "default",
+    };
 
-      console.log("[ChannelSetup] llamando whatsapp-connect con body:", body);
+    console.log("[ChannelSetup] llamando whatsapp-connect con body:", body);
 
-      const { data, error } = await supabase.functions.invoke(
-        "whatsapp-connect",
-        {
-          body,
-        }
-      );
-
-      if (error) {
-        console.error("[ChannelSetup] error en whatsapp-connect", error);
-        alert(
-          error.message || "No se pudo conectar el número de WhatsApp."
-        );
-        return;
+    const { data, error } = await supabase.functions.invoke(
+      "whatsapp-connect",
+      {
+        body,
       }
+    );
 
-      console.log("[ChannelSetup] whatsapp-connect OK:", data);
-
-      // Refrescamos canales para que el estado quede alineado a la DB
-      await refreshChannels();
-    } catch (e) {
-      console.error("[ChannelSetup] error inesperado en connect", e);
-      alert(e.message || "Error inesperado conectando el número.");
-    } finally {
-      setConnectingNumberId(null);
+    if (error) {
+      console.error("[ChannelSetup] error en whatsapp-connect", error);
+      alert(
+        error.message || "No se pudo conectar el número de WhatsApp."
+      );
+      return;
     }
-  };
+
+    console.log("[ChannelSetup] whatsapp-connect OK:", data);
+
+    // Refrescamos canales para que el estado quede alineado a la DB
+    await refreshChannels();
+  } catch (e) {
+    console.error("[ChannelSetup] error inesperado en connect", e);
+    alert(e.message || "Error inesperado conectando el número.");
+  } finally {
+    setConnectingNumberId(null);
+  }
+};
+
 
   const currentUser = {
     name: tenant?.name || "Tenant",
