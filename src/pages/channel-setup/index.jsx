@@ -211,7 +211,6 @@ const ChannelSetup = () => {
         console.log(
           "[ChannelSetup] OAuth Meta completado, refrescando canales..."
         );
-        // mantenemos la recarga completa para simplificar estados
         window.location.reload();
       }
 
@@ -603,30 +602,51 @@ const ChannelSetup = () => {
   };
 
   // 🔗 Paso 4: conectar un número concreto (llama a whatsapp-connect)
-  const handleConnectFromMeta = async (
-    wabaId,
-    phoneId,
-    displayPhoneNumber,
-    verifiedName
-  ) => {
-    if (!supabase || !tenant?.id) return;
+  const handleConnectFromMeta = async (waba, phone) => {
+    if (!supabase || !tenant?.id) {
+      console.error("[ChannelSetup] falta supabase o tenant para conectar", {
+        hasSupabase: !!supabase,
+        tenantId: tenant?.id,
+      });
+      alert(
+        "No se pudo conectar el número. Falta información del tenant."
+      );
+      return;
+    }
+
+    // Validaciones para evitar mandar campos vacíos al Edge Function
+    if (!waba?.id || !phone?.id || !phone?.display_phone_number) {
+      console.error("[ChannelSetup] datos incompletos de WABA/phone", {
+        waba,
+        phone,
+      });
+      alert(
+        "No se pudo conectar el número. Meta no devolvió todos los datos necesarios (WABA ID / Phone ID / Display Phone Number)."
+      );
+      return;
+    }
 
     try {
-      setConnectingNumberId(phoneId);
+      setConnectingNumberId(phone.id);
+
+      const body = {
+        tenantId: tenant.id,
+        wabaId: waba.id,
+        phoneId: phone.id,
+        displayPhoneNumber: phone.display_phone_number,
+        channelName:
+          phone.verified_name ||
+          tenant?.name ||
+          `WhatsApp ${phone.display_phone_number}`,
+        tokenAlias: "default",
+      };
+
+      console.log("[ChannelSetup] llamando whatsapp-connect con body:", body);
 
       const { data, error } = await supabase.functions.invoke(
         "whatsapp-connect",
         {
-          body: {
-            tenantId: tenant.id,
-            wabaId,
-            phoneId,
-            displayPhoneNumber,
-            tokenAlias: "default",
-            channelName:
-              verifiedName ||
-              `WhatsApp - ${tenant?.name || "Principal"}`,
-          },
+          body,
         }
       );
 
@@ -642,8 +662,6 @@ const ChannelSetup = () => {
 
       // Refrescamos canales para que el estado quede alineado a la DB
       await refreshChannels();
-      // opcional: recargar discover para ver el mapa actualizado
-      // await handleDiscoverFromMeta();
     } catch (e) {
       console.error("[ChannelSetup] error inesperado en connect", e);
       alert(e.message || "Error inesperado conectando el número.");
@@ -750,11 +768,7 @@ const ChannelSetup = () => {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex items-start space-x-3">
                   <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
-                    <Icon
-                      name="Search"
-                      size={18}
-                      className="text-accent"
-                    />
+                    <Icon name="Search" size={18} className="text-accent" />
                   </div>
                   <div>
                     <h2 className="text-sm font-semibold text-foreground">
@@ -827,12 +841,7 @@ const ChannelSetup = () => {
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleConnectFromMeta(
-                                    waba.id,
-                                    p.id,
-                                    p.display_phone_number,
-                                    p.verified_name
-                                  )
+                                  handleConnectFromMeta(waba, p)
                                 }
                                 disabled={
                                   !!connectingNumberId &&
