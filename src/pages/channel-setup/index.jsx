@@ -1,6 +1,6 @@
 // C:\Projects\WhatsAppBot_Rocket\src\pages\channel-setup\index.jsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import NavigationSidebar from "../../components/ui/NavigationSidebar";
 import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
 import Icon from "../../components/AppIcon";
@@ -12,11 +12,8 @@ import ChannelStatusCard from "./components/ChannelStatusCard";
 import TroubleshootingCard from "./components/TroubleshootingCard";
 import ChannelSelector from "./components/ChannelSelector";
 
-// Sesión + Supabase
 import { useAuth } from "@/lib/AuthProvider";
-// Hook de sync de plantillas
 import { useSyncTemplates } from "@/lib/useSyncTemplates";
-// Tabla simple de plantillas
 import TemplatesListCard from "./components/TemplatesListCard";
 
 const ChannelSetup = () => {
@@ -24,14 +21,14 @@ const ChannelSetup = () => {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // 🔌 estado para el botón "Conectar con Meta"
-  const [connecting, setConnecting] = useState(false);
+  // 🔌 estado botón “Conectar con Meta (Facebook)” (OAuth)
+  const [connectingOAuth, setConnectingOAuth] = useState(false);
 
   // Lista de canales WhatsApp del tenant
   const [channels, setChannels] = useState([]);
-  const [selectedChannelId, setSelectedChannelId] = useState(null); // null = nuevo canal
+  const [selectedChannelId, setSelectedChannelId] = useState(null);
 
-  // Credenciales del formulario (modo manual / avanzado)
+  // Credenciales (modo manual)
   const [credentials, setCredentials] = useState({
     phoneNumberId: "",
     wabaId: "",
@@ -44,17 +41,22 @@ const ChannelSetup = () => {
   const [channelData, setChannelData] = useState(null);
   const [loadError, setLoadError] = useState(null);
 
-  // 📄 Plantillas Meta del canal seleccionado
+  // 📄 Plantillas
   const [templates, setTemplates] = useState([]);
 
-  // ⚙️ Hook de sincronización de plantillas (Edge Function whatsapp-sync-templates)
   const {
     loading: syncingTemplates,
-    result: syncResult, // por ahora solo log; a futuro puede alimentar toasts
+    result: syncResult,
     sync,
   } = useSyncTemplates();
 
-  // 🔐 Helper localStorage (un solo set por tenant, sirve para todos los canales)
+  // 🌐 Discover & connect desde Meta
+  const [discovering, setDiscovering] = useState(false);
+  const [discoverError, setDiscoverError] = useState(null);
+  const [wabas, setWabas] = useState([]); // [{id,name,phone_numbers:[...]}]
+  const [connectingNumberId, setConnectingNumberId] = useState(null);
+
+  // Helpers localStorage
   const loadLocalCredentials = () => {
     const saved = localStorage.getItem("whatsapp_credentials");
     return saved ? JSON.parse(saved) : {};
@@ -67,165 +69,154 @@ const ChannelSetup = () => {
     );
   };
 
-  // 🧾 Cargar plantillas para un canal
-  const loadTemplatesForChannel = async (channelId) => {
-    if (!supabase || !channelId) {
-      setTemplates([]);
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from("templates")
-        .select(
-          "id, name, language, category, status, body, last_synced_at"
-        )
-        .eq("channel_id", channelId)
-        .order("last_synced_at", { ascending: false });
-
-      if (error) {
-        console.error("[ChannelSetup] error cargando templates", error);
+  // 🧾 Cargar plantillas de un canal
+  const loadTemplatesForChannel = useCallback(
+    async (channelId) => {
+      if (!supabase || !channelId) {
         setTemplates([]);
         return;
       }
 
-      setTemplates(data || []);
-    } catch (e) {
-      console.error("[ChannelSetup] error inesperado cargando templates", e);
-      setTemplates([]);
-    }
-  };
-
-  // 🧠 Cargar canales + seleccionar uno inicial
-  useEffect(() => {
-    if (!supabase || !tenant?.id) return;
-
-    const loadChannels = async () => {
       try {
-        setLoadError(null);
-
         const { data, error } = await supabase
-          .from("channels")
-          .select("*")
-          .eq("tenant_id", tenant.id)
-          .eq("type", "whatsapp")
-          .order("created_at", { ascending: true });
+          .from("templates")
+          .select(
+            "id, name, language, category, status, body, last_synced_at"
+          )
+          .eq("channel_id", channelId)
+          .order("last_synced_at", { ascending: false });
 
         if (error) {
-          console.error("[ChannelSetup] error cargando canales", error);
-          setLoadError(error.message);
-          setChannels([]);
-          setSelectedChannelId(null);
-          setChannelData(null);
-          setIsConnected(false);
+          console.error("[ChannelSetup] error cargando templates", error);
           setTemplates([]);
           return;
         }
 
-        const list = data || [];
-        setChannels(list);
-
-        const savedCreds = loadLocalCredentials();
-
-        if (list.length > 0) {
-          // Elegimos el canal activo; si no hay, el primero
-          const active =
-            list.find((c) => c.status === "active") || list[0];
-
-          setSelectedChannelId(active.id);
-          // Guardamos canal activo para otras vistas (Blueprints)
-          localStorage.setItem("activeChannel", active.id);
-
-          // Armamos credenciales mezclando DB + localStorage
-          setCredentials({
-            phoneNumberId:
-              active.phone_id || savedCreds.phoneNumberId || "",
-            wabaId: active.meta_waba_id || savedCreds.wabaId || "",
-            accessToken: savedCreds.accessToken || "",
-            businessName:
-              active.display_name ||
-              savedCreds.businessName ||
-              tenant?.name ||
-              "Tu negocio",
-          });
-
-          // ⚙️ channelData con channelId incluido
-          setChannelData({
-            channelId: active.id,
-            businessName:
-              active.display_name ||
-              savedCreds.businessName ||
-              tenant?.name ||
-              "Tu negocio",
-            phoneNumber: active.phone || null,
-            phoneNumberId: active.phone_id || null,
-            wabaId: active.meta_waba_id || null,
-            isActive: active.status === "active",
-            lastSync: active.created_at || new Date().toISOString(),
-            stats: {
-              messagesToday: 0,
-              messagesThisMonth: 0,
-              activeChats: 0,
-            },
-          });
-
-          setIsConnected(
-            !!active.status && active.status !== "disconnected"
-          );
-
-          // 🧾 cargar plantillas de este canal
-          await loadTemplatesForChannel(active.id);
-        } else {
-          // Sin canales todavía → modo "nuevo canal"
-          setSelectedChannelId(null);
-          localStorage.removeItem("activeChannel");
-
-          setCredentials({
-            phoneNumberId: "",
-            wabaId: "",
-            accessToken: "",
-            businessName: tenant?.name || "Tu negocio",
-          });
-          setChannelData(null);
-          setIsConnected(false);
-          setTemplates([]);
-        }
+        setTemplates(data || []);
       } catch (e) {
-        console.error(
-          "[ChannelSetup] error inesperado cargando canales",
-          e
-        );
-        setLoadError(e.message);
+        console.error("[ChannelSetup] error inesperado cargando templates", e);
+        setTemplates([]);
+      }
+    },
+    [supabase]
+  );
+
+  // 🧠 Función reutilizable para cargar canales
+  const refreshChannels = useCallback(async () => {
+    if (!supabase || !tenant?.id) return;
+
+    try {
+      setLoadError(null);
+
+      const { data, error } = await supabase
+        .from("channels")
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .eq("type", "whatsapp")
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        console.error("[ChannelSetup] error cargando canales", error);
+        setLoadError(error.message);
         setChannels([]);
         setSelectedChannelId(null);
         setChannelData(null);
         setIsConnected(false);
         setTemplates([]);
+        return;
       }
-    };
 
-    loadChannels();
-  }, [supabase, tenant?.id]);
+      const list = data || [];
+      setChannels(list);
+
+      const savedCreds = loadLocalCredentials();
+
+      if (list.length > 0) {
+        const active = list.find((c) => c.status === "active") || list[0];
+
+        setSelectedChannelId(active.id);
+        localStorage.setItem("activeChannel", active.id);
+
+        setCredentials({
+          phoneNumberId: active.phone_id || savedCreds.phoneNumberId || "",
+          wabaId: active.meta_waba_id || savedCreds.wabaId || "",
+          accessToken: savedCreds.accessToken || "",
+          businessName:
+            active.display_name ||
+            savedCreds.businessName ||
+            tenant?.name ||
+            "Tu negocio",
+        });
+
+        setChannelData({
+          channelId: active.id,
+          businessName:
+            active.display_name ||
+            savedCreds.businessName ||
+            tenant?.name ||
+            "Tu negocio",
+          phoneNumber: active.phone || null,
+          phoneNumberId: active.phone_id || null,
+          wabaId: active.meta_waba_id || null,
+          isActive: active.status === "active",
+          lastSync: active.created_at || new Date().toISOString(),
+          stats: {
+            messagesToday: 0,
+            messagesThisMonth: 0,
+            activeChats: 0,
+          },
+        });
+
+        const connected = !!active.status && active.status !== "disconnected";
+        setIsConnected(connected);
+
+        await loadTemplatesForChannel(active.id);
+      } else {
+        setSelectedChannelId(null);
+        localStorage.removeItem("activeChannel");
+
+        setCredentials({
+          phoneNumberId: "",
+          wabaId: "",
+          accessToken: "",
+          businessName: tenant?.name || "Tu negocio",
+        });
+        setChannelData(null);
+        setIsConnected(false);
+        setTemplates([]);
+      }
+    } catch (e) {
+      console.error("[ChannelSetup] error inesperado cargando canales", e);
+      setLoadError(e.message);
+      setChannels([]);
+      setSelectedChannelId(null);
+      setChannelData(null);
+      setIsConnected(false);
+      setTemplates([]);
+    }
+  }, [supabase, tenant?.id, tenant?.name, loadTemplatesForChannel]);
+
+  // Al montar o cambiar tenant → cargar canales
+  useEffect(() => {
+    if (!supabase || !tenant?.id) return;
+    refreshChannels();
+  }, [supabase, tenant?.id, refreshChannels]);
 
   // 📨 Listener del popup OAuth (éxito / error)
   useEffect(() => {
     const handler = (event) => {
-      // Solo aceptamos mensajes del mismo origen
       if (event.origin !== window.location.origin) return;
 
       if (event.data?.type === "facebook_oauth_success") {
         console.log(
-          "[ChannelSetup] OAuth Meta completado, recargando canales..."
+          "[ChannelSetup] OAuth Meta completado, refrescando canales..."
         );
-        // Lo más simple: recargar la página completa
+        // mantenemos la recarga completa para simplificar estados
         window.location.reload();
       }
 
       if (event.data?.type === "facebook_oauth_error") {
-        console.error(
-          "[ChannelSetup] error en OAuth Meta",
-          event.data.error
-        );
+        console.error("[ChannelSetup] error en OAuth Meta", event.data.error);
       }
     };
 
@@ -233,13 +224,12 @@ const ChannelSetup = () => {
     return () => window.removeEventListener("message", handler);
   }, []);
 
-  // Cambio de canal seleccionado desde el selector
+  // Cambio de canal desde el selector
   const handleSelectChannel = (channelId) => {
     setSelectedChannelId(channelId);
 
     const savedCreds = loadLocalCredentials();
 
-    // Actualizamos canal activo global (para Blueprints / otras vistas)
     if (channelId) {
       localStorage.setItem("activeChannel", channelId);
     } else {
@@ -247,13 +237,11 @@ const ChannelSetup = () => {
     }
 
     if (!channelId) {
-      // Nuevo canal
       setCredentials({
         phoneNumberId: "",
         wabaId: "",
         accessToken: savedCreds.accessToken || "",
-        businessName:
-          savedCreds.businessName || tenant?.name || "Tu negocio",
+        businessName: savedCreds.businessName || tenant?.name || "Tu negocio",
       });
       setChannelData(null);
       setIsConnected(false);
@@ -265,8 +253,7 @@ const ChannelSetup = () => {
     if (!channel) return;
 
     setCredentials({
-      phoneNumberId:
-        channel.phone_id || savedCreds.phoneNumberId || "",
+      phoneNumberId: channel.phone_id || savedCreds.phoneNumberId || "",
       wabaId: channel.meta_waba_id || savedCreds.wabaId || "",
       accessToken: savedCreds.accessToken || "",
       businessName:
@@ -276,7 +263,6 @@ const ChannelSetup = () => {
         "Tu negocio",
     });
 
-    // ⚙️ channelData con channelId incluido
     setChannelData({
       channelId: channel.id,
       businessName:
@@ -296,11 +282,8 @@ const ChannelSetup = () => {
       },
     });
 
-    setIsConnected(
-      !!channel.status && channel.status !== "disconnected"
-    );
+    setIsConnected(!!channel.status && channel.status !== "disconnected");
 
-    // 🧾 cargar plantillas del nuevo canal
     loadTemplatesForChannel(channelId);
   };
 
@@ -308,16 +291,14 @@ const ChannelSetup = () => {
     setCredentials(newCredentials);
   };
 
-  // 💾 Guardar credenciales + persistir canal (modo manual)
+  // 💾 Guardar credenciales (modo manual)
   const handleSaveCredentials = async (credentialsData) => {
     if (!supabase || !tenant?.id) return;
 
     setIsSaving(true);
     try {
-      // 1) Token y datos sensibles → solo localStorage
       saveLocalCredentials(credentialsData);
 
-      // 2) Insert / update en channels
       const payload = {
         display_name: credentialsData.businessName,
         phone_id: credentialsData.phoneNumberId,
@@ -327,7 +308,6 @@ const ChannelSetup = () => {
       let resultChannel = null;
 
       if (selectedChannelId) {
-        // Actualizar canal existente
         const { data, error } = await supabase
           .from("channels")
           .update(payload)
@@ -336,15 +316,11 @@ const ChannelSetup = () => {
           .single();
 
         if (error) {
-          console.error(
-            "[ChannelSetup] error actualizando canal",
-            error
-          );
+          console.error("[ChannelSetup] error actualizando canal", error);
         } else {
           resultChannel = data;
         }
       } else {
-        // Crear nuevo canal para este tenant
         const { data, error } = await supabase
           .from("channels")
           .insert({
@@ -359,10 +335,7 @@ const ChannelSetup = () => {
           .single();
 
         if (error) {
-          console.error(
-            "[ChannelSetup] error creando canal",
-            error
-          );
+          console.error("[ChannelSetup] error creando canal", error);
         } else {
           resultChannel = data;
           setSelectedChannelId(data.id);
@@ -371,7 +344,6 @@ const ChannelSetup = () => {
       }
 
       if (resultChannel) {
-        // Actualizar lista de canales en memoria
         setChannels((prev) => {
           const exists = prev.some((c) => c.id === resultChannel.id);
           if (exists) {
@@ -382,13 +354,11 @@ const ChannelSetup = () => {
           return [...prev, resultChannel];
         });
 
-        // ⚙️ Actualizar datos del canal seleccionado (incluyendo channelId)
         setChannelData((prev) => ({
           ...(prev || {}),
           channelId: resultChannel.id,
           businessName: resultChannel.display_name,
-          phoneNumber:
-            resultChannel.phone || prev?.phoneNumber || null,
+          phoneNumber: resultChannel.phone || prev?.phoneNumber || null,
           phoneNumberId: resultChannel.phone_id,
           wabaId: resultChannel.meta_waba_id,
           isActive: resultChannel.status === "active",
@@ -400,23 +370,16 @@ const ChannelSetup = () => {
               activeChats: 0,
             },
         }));
-
-        // No recargamos plantillas acá porque todavía no se conectó a Meta;
-        // el botón de "Sincronizar" se encargará de traerlas.
       }
 
       console.log("[ChannelSetup] Credenciales guardadas correctamente");
     } catch (error) {
-      console.error(
-        "[ChannelSetup] error al guardar credenciales",
-        error
-      );
+      console.error("[ChannelSetup] error al guardar credenciales", error);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Recibe el resultado del ConnectionTestCard
   const handleConnectionTest = (result) => {
     if (!result) return;
 
@@ -430,10 +393,8 @@ const ChannelSetup = () => {
       setIsConnected(true);
       setChannelData((prev) => ({
         ...(prev || {}),
-        // 🧩 preservamos channelId, o usamos el seleccionado
         channelId: prev?.channelId || selectedChannelId || null,
-        businessName:
-          credentials.businessName || tenant?.name || "Tu negocio",
+        businessName: credentials.businessName || tenant?.name || "Tu negocio",
         phoneNumber,
         phoneNumberId:
           credentials.phoneNumberId || prev?.phoneNumberId || null,
@@ -449,12 +410,10 @@ const ChannelSetup = () => {
       }));
     } else {
       setIsConnected(false);
-      // dejamos channelData para que el usuario no pierda info visual
     }
   };
 
   const handleToggleChannel = async (isActive) => {
-    // 🧩 acá preservamos channelId y resto de campos
     setChannelData((prev) => ({
       ...prev,
       isActive,
@@ -472,22 +431,13 @@ const ChannelSetup = () => {
         .single();
 
       if (error) {
-        console.error(
-          "[ChannelSetup] error actualizando estado",
-          error
-        );
+        console.error("[ChannelSetup] error actualizando estado", error);
         return;
       }
 
-      // Actualizar lista en memoria
-      setChannels((prev) =>
-        prev.map((c) => (c.id === data.id ? data : c))
-      );
+      setChannels((prev) => prev.map((c) => (c.id === data.id ? data : c)));
     } catch (e) {
-      console.error(
-        "[ChannelSetup] error inesperado actualizando estado",
-        e
-      );
+      console.error("[ChannelSetup] error inesperado actualizando estado", e);
     }
   };
 
@@ -496,26 +446,22 @@ const ChannelSetup = () => {
     await logout();
   };
 
-  // 🔌 Botón "Conectar con Meta (Facebook)" → crea oauth_state y abre popup (login estándar con scopes)
+  // 🔌 Botón “Conectar con Meta (Facebook)” → crea oauth_state y abre popup
   const handleConnectWithMeta = async () => {
     try {
       if (!supabase || !tenant?.id) {
-        console.error(
-          "[ChannelSetup] falta supabase o tenant para OAuth",
-          {
-            hasSupabase: !!supabase,
-            tenantId: tenant?.id,
-          }
-        );
+        console.error("[ChannelSetup] falta supabase o tenant para OAuth", {
+          hasSupabase: !!supabase,
+          tenantId: tenant?.id,
+        });
         alert(
           "No se pudo preparar la conexión con Meta. Falta información del tenant."
         );
         return;
       }
 
-      setConnecting(true);
+      setConnectingOAuth(true);
 
-      // 1) Obtener el usuario actual desde Supabase Auth
       const {
         data: { user },
         error: userError,
@@ -532,14 +478,11 @@ const ChannelSetup = () => {
         return;
       }
 
-      const userId = user.id;
-
-      // 2) Crear registro en oauth_states
       const { data, error } = await supabase
         .from("oauth_states")
         .insert({
           tenant_id: tenant.id,
-          user_id: userId,
+          user_id: user.id,
           provider: "facebook",
           redirect_to: window.location.href,
         })
@@ -547,10 +490,7 @@ const ChannelSetup = () => {
         .single();
 
       if (error || !data) {
-        console.error(
-          "[ChannelSetup] error creando oauth_state",
-          error
-        );
+        console.error("[ChannelSetup] error creando oauth_state", error);
         alert(
           "No se pudo preparar la conexión con Meta. Error creando el estado OAuth."
         );
@@ -558,7 +498,6 @@ const ChannelSetup = () => {
       }
 
       const stateId = data.id;
-
       const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
       const redirectUri = import.meta.env.VITE_FACEBOOK_REDIRECT_URI;
 
@@ -570,7 +509,6 @@ const ChannelSetup = () => {
         return;
       }
 
-      // 3) SCOPES CLÁSICOS
       const scopes = [
         "public_profile",
         "email",
@@ -590,7 +528,6 @@ const ChannelSetup = () => {
 
       const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?${params.toString()}`;
 
-      // 4) Abrir popup
       const width = 600;
       const height = 800;
       const left = window.screenX + (window.innerWidth - width) / 2;
@@ -605,7 +542,113 @@ const ChannelSetup = () => {
       console.error("[ChannelSetup] handleConnectWithMeta error:", err);
       alert("Error preparando la conexión con Meta.");
     } finally {
-      setConnecting(false);
+      setConnectingOAuth(false);
+    }
+  };
+
+  // 🔍 Paso 3: descubrir WABAs + números desde Meta
+  const handleDiscoverFromMeta = async () => {
+    if (!supabase || !tenant?.id) return;
+
+    try {
+      setDiscovering(true);
+      setDiscoverError(null);
+      setWabas([]);
+
+      // token más reciente del tenant
+      const { data: tokenRow, error: tokenError } = await supabase
+        .from("meta_tokens")
+        .select("access_token")
+        .eq("tenant_id", tenant.id)
+        .eq("provider", "facebook")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (tokenError || !tokenRow) {
+        console.error("[ChannelSetup] no se encontró token de Meta", {
+          tokenError,
+          tokenRow,
+        });
+        setDiscoverError(
+          "No se encontró un token de Meta para este tenant. Volvé a conectar con Meta."
+        );
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke(
+        "whatsapp-discover",
+        {
+          body: { facebookAccessToken: tokenRow.access_token },
+        }
+      );
+
+      if (error) {
+        console.error("[ChannelSetup] error en whatsapp-discover", error);
+        setDiscoverError(
+          error.message || "Error al descubrir cuentas de WhatsApp."
+        );
+        return;
+      }
+
+      setWabas(data?.wabas || []);
+    } catch (e) {
+      console.error("[ChannelSetup] error inesperado en discover", e);
+      setDiscoverError(
+        e.message || "Error inesperado al descubrir cuentas de WhatsApp."
+      );
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
+  // 🔗 Paso 4: conectar un número concreto (llama a whatsapp-connect)
+  const handleConnectFromMeta = async (
+    wabaId,
+    phoneId,
+    displayPhoneNumber,
+    verifiedName
+  ) => {
+    if (!supabase || !tenant?.id) return;
+
+    try {
+      setConnectingNumberId(phoneId);
+
+      const { data, error } = await supabase.functions.invoke(
+        "whatsapp-connect",
+        {
+          body: {
+            tenantId: tenant.id,
+            wabaId,
+            phoneId,
+            displayPhoneNumber,
+            tokenAlias: "default",
+            channelName:
+              verifiedName ||
+              `WhatsApp - ${tenant?.name || "Principal"}`,
+          },
+        }
+      );
+
+      if (error) {
+        console.error("[ChannelSetup] error en whatsapp-connect", error);
+        alert(
+          error.message || "No se pudo conectar el número de WhatsApp."
+        );
+        return;
+      }
+
+      console.log("[ChannelSetup] whatsapp-connect OK:", data);
+
+      // Refrescamos canales para que el estado quede alineado a la DB
+      await refreshChannels();
+      // opcional: recargar discover para ver el mapa actualizado
+      // await handleDiscoverFromMeta();
+    } catch (e) {
+      console.error("[ChannelSetup] error inesperado en connect", e);
+      alert(e.message || "Error inesperado conectando el número.");
+    } finally {
+      setConnectingNumberId(null);
     }
   };
 
@@ -621,20 +664,17 @@ const ChannelSetup = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Barra lateral */}
       <NavigationSidebar
         isCollapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         userRole="tenant"
       />
 
-      {/* Contenido principal */}
       <div
         className={`transition-all duration-200 ${
           sidebarCollapsed ? "md:ml-16" : "md:ml-60"
         }`}
       >
-        {/* Header */}
         <header className="bg-card border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
@@ -647,7 +687,6 @@ const ChannelSetup = () => {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Indicador de conexión */}
               <div className="flex items-center space-x-2">
                 <div
                   className={`w-2 h-2 rounded-full ${
@@ -667,7 +706,6 @@ const ChannelSetup = () => {
           </div>
         </header>
 
-        {/* Contenido de la página */}
         <main className="p-6">
           {loadError && (
             <div className="mb-4 p-4 border border-destructive rounded bg-destructive/10 text-destructive text-sm">
@@ -675,7 +713,7 @@ const ChannelSetup = () => {
             </div>
           )}
 
-          {/* 🔥 Card Modo Wasapi / OAuth */}
+          {/* Card OAuth Meta */}
           <div className="mb-6">
             <div className="bg-card border border-border rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex items-start space-x-3">
@@ -687,22 +725,142 @@ const ChannelSetup = () => {
                     Conectá automáticamente con Meta (recomendado)
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    Usá el flujo oficial de Meta para seleccionar tu número
-                    de WhatsApp Business sin copiar tokens ni IDs a mano.
+                    Usá el flujo oficial de Meta para seleccionar tu número de
+                    WhatsApp Business sin copiar tokens ni IDs a mano.
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={handleConnectWithMeta}
-                disabled={connecting}
+                disabled={connectingOAuth}
                 className="inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 micro-animation disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Icon name="Zap" size={16} className="mr-2" />
-                {connecting
+                {connectingOAuth
                   ? "Preparando conexión..."
                   : "Conectar con Meta (Facebook)"}
               </button>
+            </div>
+          </div>
+
+          {/* Card Discover desde Meta */}
+          <div className="mb-6">
+            <div className="bg-card border border-border rounded-lg p-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex items-start space-x-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <Icon
+                      name="Search"
+                      size={18}
+                      className="text-accent"
+                    />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">
+                      Detectar cuentas de WhatsApp conectadas
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Leemos desde Meta los WABA y números habilitados con tu
+                      app ChatBot DigitalMatch para que elijas cuál conectar.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleDiscoverFromMeta}
+                  disabled={discovering}
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/90 micro-animation disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Icon name="Radar" size={16} className="mr-2" />
+                  {discovering
+                    ? "Buscando números..."
+                    : "Descubrir números desde Meta"}
+                </button>
+              </div>
+
+              {discoverError && (
+                <p className="mt-3 text-xs text-destructive">
+                  {discoverError}
+                </p>
+              )}
+
+              {wabas.length > 0 && (
+                <div className="mt-4 space-y-4">
+                  {wabas.map((waba) => (
+                    <div
+                      key={waba.id}
+                      className="border border-border rounded-md p-3"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <div className="text-sm font-semibold text-foreground">
+                            {waba.name || "WhatsApp Business Account"}
+                          </div>
+                          <div className="text-xs text-muted-foreground font-mono">
+                            WABA ID: {waba.id}
+                          </div>
+                        </div>
+                      </div>
+
+                      {waba.phone_numbers?.length > 0 ? (
+                        <div className="space-y-2">
+                          {waba.phone_numbers.map((p) => (
+                            <div
+                              key={p.id}
+                              className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 p-2 bg-muted rounded"
+                            >
+                              <div>
+                                <div className="text-sm text-foreground">
+                                  {p.display_phone_number}{" "}
+                                  {p.verified_name && (
+                                    <span className="text-xs text-muted-foreground">
+                                      — {p.verified_name}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-muted-foreground font-mono">
+                                  Phone ID: {p.id}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleConnectFromMeta(
+                                    waba.id,
+                                    p.id,
+                                    p.display_phone_number,
+                                    p.verified_name
+                                  )
+                                }
+                                disabled={
+                                  !!connectingNumberId &&
+                                  connectingNumberId !== p.id
+                                }
+                                className="inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 micro-animation disabled:opacity-60 disabled:cursor-not-allowed"
+                              >
+                                <Icon
+                                  name="PlugZap"
+                                  size={14}
+                                  className="mr-1"
+                                />
+                                {connectingNumberId === p.id
+                                  ? "Conectando..."
+                                  : "Conectar este número"}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          No se encontraron números de WhatsApp en este WABA.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -715,7 +873,7 @@ const ChannelSetup = () => {
             />
           </div>
 
-          {/* 🌐 Sincronización de plantillas Meta */}
+          {/* Plantillas Meta (por canal) */}
           {selectedChannelId && (
             <div className="mb-6 bg-card border border-border rounded-lg p-4">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
@@ -760,7 +918,7 @@ const ChannelSetup = () => {
             </div>
           )}
 
-          {/* Indicador de pasos */}
+          {/* Pasos */}
           <div className="mb-8">
             <div className="flex items-center space-x-4 mb-4">
               <div
@@ -814,7 +972,6 @@ const ChannelSetup = () => {
 
           {/* Grid principal */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {/* Columna izquierda */}
             <div className="space-y-6">
               <CredentialsForm
                 credentials={credentials}
@@ -830,7 +987,6 @@ const ChannelSetup = () => {
               />
             </div>
 
-            {/* Columna derecha */}
             <div className="space-y-6">
               <ChannelStatusCard
                 isConnected={isConnected}
@@ -842,12 +998,10 @@ const ChannelSetup = () => {
             </div>
           </div>
 
-          {/* Sección de ayuda */}
           <div className="mt-8">
             <TroubleshootingCard />
           </div>
 
-          {/* Mensaje de éxito final */}
           {isConnected && channelData?.isActive && (
             <div className="mt-8 p-6 bg-success/5 border border-success/20 rounded-lg">
               <div className="flex items-start space-x-3">
@@ -862,8 +1016,8 @@ const ChannelSetup = () => {
                   </h3>
                   <p className="text-success/80 mb-4">
                     Tu número de WhatsApp Business ya está conectado y
-                    activo. Ahora podés empezar a construir flujos de
-                    chatbot y gestionar conversaciones desde DigitalMatch.
+                    activo. Ahora podés empezar a construir flujos de chatbot
+                    y gestionar conversaciones desde DigitalMatch.
                   </p>
                   <div className="flex flex-wrap gap-3">
                     <a
