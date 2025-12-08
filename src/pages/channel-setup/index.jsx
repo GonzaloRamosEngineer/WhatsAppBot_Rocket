@@ -608,32 +608,47 @@ const handleConnectFromMeta = async (waba, phone) => {
       hasSupabase: !!supabase,
       tenantId: tenant?.id,
     });
-    alert(
-      "No se pudo conectar el número. Falta información del tenant."
-    );
+    alert("No se pudo conectar el número. Falta información del tenant.");
     return;
   }
 
-  // Solo log para ver qué llega desde whatsapp-discover
+  // 👀 Log para ver exactamente qué llega desde whatsapp-discover
   console.log("[ChannelSetup] conectando desde Meta con:", {
     waba,
     phone,
   });
 
+  // 🔍 Intentamos resolver el WABA ID desde varias propiedades posibles
+  const resolvedWabaId =
+    waba?.id ||
+    waba?.waba_id ||
+    waba?.wabaId ||
+    waba?.business_id ||
+    null;
+
+  if (!resolvedWabaId || !phone?.id || !phone?.display_phone_number) {
+    console.error("[ChannelSetup] datos incompletos para whatsapp-connect", {
+      resolvedWabaId,
+      phone,
+    });
+    alert(
+      "No se pudo conectar el número. Meta no devolvió todos los datos necesarios (WABA ID / Phone ID / Display Phone Number)."
+    );
+    return;
+  }
+
   try {
-    setConnectingNumberId(phone?.id);
+    setConnectingNumberId(phone.id);
 
     const body = {
       tenantId: tenant.id,
-      wabaId: waba?.id,
-      phoneId: phone?.id,
-      displayPhoneNumber: phone?.display_phone_number,
+      wabaId: resolvedWabaId,
+      phoneId: phone.id,
+      displayPhoneNumber: phone.display_phone_number,
       channelName:
-        phone?.verified_name ||
+        phone.verified_name ||
         tenant?.name ||
-        (phone?.display_phone_number
-          ? `WhatsApp ${phone.display_phone_number}`
-          : "WhatsApp principal"),
+        `WhatsApp ${phone.display_phone_number}`,
       tokenAlias: "default",
     };
 
@@ -648,9 +663,7 @@ const handleConnectFromMeta = async (waba, phone) => {
 
     if (error) {
       console.error("[ChannelSetup] error en whatsapp-connect", error);
-      alert(
-        error.message || "No se pudo conectar el número de WhatsApp."
-      );
+      alert(error.message || "No se pudo conectar el número de WhatsApp.");
       return;
     }
 
@@ -665,6 +678,7 @@ const handleConnectFromMeta = async (waba, phone) => {
     setConnectingNumberId(null);
   }
 };
+
 
 
   const currentUser = {
