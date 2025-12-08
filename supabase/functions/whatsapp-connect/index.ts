@@ -46,7 +46,7 @@ serve(async (req) => {
     wabaId?: string;
     phoneId?: string;
     displayPhoneNumber?: string;
-    tokenAlias?: string;
+    tokenAlias?: string; // ahora es opcional
     channelName?: string;
   };
 
@@ -68,11 +68,22 @@ serve(async (req) => {
     channelName,
   } = body;
 
-  if (!tenantId || !wabaId || !phoneId || !displayPhoneNumber || !tokenAlias) {
+  // Log para debug fino (no incluye tokens ni cosas sensibles)
+  console.log("[whatsapp-connect] body recibido:", {
+    tenantId,
+    wabaId,
+    phoneId,
+    displayPhoneNumber,
+    hasTokenAlias: !!tokenAlias,
+    channelName,
+  });
+
+  // ➜ Solo validamos estos cuatro campos. El token lo buscamos si falta.
+  if (!tenantId || !wabaId || !phoneId || !displayPhoneNumber) {
     return new Response(
       JSON.stringify({
         error:
-          "tenantId, wabaId, phoneId, displayPhoneNumber and tokenAlias are required",
+          "tenantId, wabaId, phoneId y displayPhoneNumber son obligatorios",
       }),
       {
         status: 400,
@@ -81,10 +92,8 @@ serve(async (req) => {
     );
   }
 
-  const normalizedPhone = displayPhoneNumber.replace(/\s+/g, "");
-
   try {
-    // Verificar que el usuario sea owner/admin del tenant
+    // 1) Verificar que el usuario sea owner/admin del tenant
     const { data: membership, error: memberError } = await supabase
       .from("tenant_members")
       .select("tenant_id, role")
@@ -114,7 +123,54 @@ serve(async (req) => {
       );
     }
 
-    // Upsert canal
+    // 2) Resolver tokenAlias:
+    //    - Si vino en el body, usarlo
+    //    - Si NO, buscamos el último meta_tokens del tenant/provider='facebook'
+    let finalTokenAlias = tokenAlias ?? null;
+
+    if (!finalTokenAlias) {
+      const { data: latestToken, error: tokenError } = await supabase
+        .from("meta_tokens")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("provider", "facebook")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (tokenError) {
+        console.error("Error fetching latest meta_token:", tokenError);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to resolve Meta token for this tenant",
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (!latestToken) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "No se encontró ningún token de Meta para este tenant. Volvé a conectar con Meta desde el botón superior.",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      finalTokenAlias = latestToken.id; // usamos el id del meta_tokens como alias
+    }
+
+    // 3) Normalizar teléfono
+    const normalizedPhone = displayPhoneNumber.replace(/\s+/g, "");
+
+    // 4) Upsert canal
     const { data: channelData, error: channelError } = await supabase
       .from("channels")
       .upsert(
@@ -125,7 +181,7 @@ serve(async (req) => {
           phone: normalizedPhone,
           meta_waba_id: wabaId,
           phone_id: phoneId,
-          token_alias: tokenAlias,
+          token_alias: finalTokenAlias,
           status: "active",
         },
         { onConflict: "tenant_id,type,phone_id" },
@@ -144,7 +200,7 @@ serve(async (req) => {
       );
     }
 
-    // Bot default
+    // 5) Bot default
     let bot: any = null;
     {
       const { data: existingBot } = await supabase
@@ -173,7 +229,7 @@ serve(async (req) => {
       }
     }
 
-    // Flow default (legacy de saludo simple)
+    // 6) Flows default + rules_v1 (igual que antes)
     if (bot?.id) {
       const { data: existingFlow } = await supabase
         .from("flows")
@@ -217,7 +273,6 @@ serve(async (req) => {
         }
       }
 
-      // Flow de reglas v1 (si no existe, lo inicializamos vacío con dos ejemplos)
       const { data: existingRulesFlow } = await supabase
         .from("flows")
         .select("id")
@@ -233,7 +288,8 @@ serve(async (req) => {
             {
               id: "welcome_default",
               name: "Bienvenida básica",
-              description: "Mensaje de bienvenida cuando inicia la conversación.",
+              description:
+                "Mensaje de bienvenida cuando inicia la conversación.",
               triggerType: "welcome",
               keywords: [],
               isActive: true,
