@@ -26,6 +26,40 @@ function resolveMetaToken(alias: string): string | null {
   return val ?? null;
 }
 
+// 🔐 Helper unificado: intenta env por alias, luego DB meta_tokens
+async function getMetaAccessToken(opts: {
+  supabase: any;
+  tenantId: string;
+  tokenAlias?: string | null;
+}): Promise<string | null> {
+  const { supabase, tenantId } = opts;
+  const alias = (opts.tokenAlias || "default").trim();
+
+  // 1) Intentar por env (alias → META_TOKEN_DM / FEA / META_TOKEN__ALGO)
+  const envToken = resolveMetaToken(alias);
+  if (envToken) return envToken;
+
+  // 2) Buscar en meta_tokens por tenant + provider + alias
+  const { data, error } = await supabase
+    .from("meta_tokens")
+    .select("access_token")
+    .eq("tenant_id", tenantId)
+    .eq("provider", "facebook")
+    .eq("alias", alias)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "[whatsapp-sync-templates] getMetaAccessToken meta_tokens error:",
+      error,
+      { tenantId, alias },
+    );
+    return null;
+  }
+
+  return data?.access_token ?? null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -62,7 +96,7 @@ serve(async (req) => {
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -74,7 +108,7 @@ serve(async (req) => {
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
@@ -92,7 +126,7 @@ serve(async (req) => {
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
     user = { id: supaUser.id };
@@ -116,7 +150,7 @@ serve(async (req) => {
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -126,7 +160,7 @@ serve(async (req) => {
         {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -142,7 +176,7 @@ serve(async (req) => {
       if (memberError) {
         console.error(
           "[whatsapp-sync-templates] error checking membership:",
-          memberError
+          memberError,
         );
         return new Response(
           JSON.stringify({
@@ -152,7 +186,7 @@ serve(async (req) => {
           {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -165,7 +199,7 @@ serve(async (req) => {
           {
             status: 403,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+          },
         );
       }
     }
@@ -179,21 +213,26 @@ serve(async (req) => {
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
-    const metaToken = resolveMetaToken(channel.token_alias ?? "");
+    const metaToken = await getMetaAccessToken({
+      supabase,
+      tenantId: channel.tenant_id,
+      tokenAlias: channel.token_alias ?? null,
+    });
+
     if (!metaToken) {
       return new Response(
         JSON.stringify({
-          error: "Meta token not configured for this channel",
+          error: "Meta token not configured for this channel (alias + tenant)",
           ok: false,
         }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -225,7 +264,7 @@ serve(async (req) => {
         console.error(
           "[whatsapp-sync-templates] WhatsApp API error:",
           waRes.status,
-          waJson
+          waJson,
         );
         return new Response(
           JSON.stringify({
@@ -236,7 +275,7 @@ serve(async (req) => {
           {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+          },
         );
       }
 
@@ -248,7 +287,6 @@ serve(async (req) => {
     } while (after && pageCount < 10); // safety limit
 
     // 4) Mapear a nuestro modelo
-    let synced = 0;
     let skippedNoCategory = 0;
     let skippedInvalidCategory = 0;
     let skippedNoBody = 0;
@@ -286,7 +324,7 @@ serve(async (req) => {
       let bodyText = "";
       if (metaComponents) {
         const bodyComp = metaComponents.find(
-          (c: any) => c.type === "BODY" && typeof c.text === "string"
+          (c: any) => c.type === "BODY" && typeof c.text === "string",
         );
         if (bodyComp && typeof bodyComp.text === "string") {
           bodyText = bodyComp.text;
@@ -348,7 +386,7 @@ serve(async (req) => {
       if (upsertError) {
         console.error(
           "[whatsapp-sync-templates] error upserting templates:",
-          upsertError
+          upsertError,
         );
         return new Response(
           JSON.stringify({
@@ -359,11 +397,9 @@ serve(async (req) => {
           {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+          },
         );
       }
-
-      synced = upsertRows.length;
     }
 
     const response = {
@@ -393,7 +429,7 @@ serve(async (req) => {
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 });

@@ -26,7 +26,7 @@ serve(async (req) => {
 
   const authHeader = req.headers.get("Authorization") ?? "";
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
-    global: { headers: { Authorization: authHeader } },
+    global: { headers: authHeader ? { Authorization: authHeader } : {} },
   });
 
   const {
@@ -124,14 +124,14 @@ serve(async (req) => {
     }
 
     // 2) Resolver tokenAlias:
-    //    - Si vino en el body, usarlo
+    //    - Si vino en el body, usarlo directamente
     //    - Si NO, buscamos el último meta_tokens del tenant/provider='facebook'
     let finalTokenAlias = tokenAlias ?? null;
 
     if (!finalTokenAlias) {
       const { data: latestToken, error: tokenError } = await supabase
         .from("meta_tokens")
-        .select("id")
+        .select("alias")
         .eq("tenant_id", tenantId)
         .eq("provider", "facebook")
         .order("created_at", { ascending: false })
@@ -164,7 +164,7 @@ serve(async (req) => {
         );
       }
 
-      finalTokenAlias = latestToken.id; // usamos el id del meta_tokens como alias
+      finalTokenAlias = latestToken.alias; // usamos el alias real
     }
 
     // 3) Normalizar teléfono

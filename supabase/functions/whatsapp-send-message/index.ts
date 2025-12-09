@@ -10,22 +10,57 @@ const corsHeaders: Record<string, string> = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// 🔐 Mismo patrón que en whatsapp-webhook
-function resolveMetaToken(alias: string): string | null {
-  const map: Record<string, string> = {
-    meta_token_dm: Deno.env.get("META_TOKEN_DM") ?? "",
-    meta_token_fea: Deno.env.get("META_TOKEN_FEA") ?? "",
-  };
+// ----------------------------------------------
+// Helper: obtener token de Meta desde meta_tokens
+// ----------------------------------------------
+async function getMetaTokenForChannel(
+  supabase: any,
+  tenantId: string,
+  tokenAlias: string | null | undefined,
+): Promise<string | null> {
+  const alias =
+    tokenAlias && tokenAlias.trim() !== "" ? tokenAlias.trim() : "default";
 
-  if (map[alias]) return map[alias];
+  const { data, error } = await supabase
+    .from("meta_tokens")
+    .select("access_token, expires_at")
+    .eq("tenant_id", tenantId)
+    .eq("provider", "facebook")
+    .eq("alias", alias)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  const envKey =
-    "META_TOKEN__" + alias.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-  const val = Deno.env.get(envKey);
-  return val ?? null;
+  if (error) {
+    console.error("getMetaTokenForChannel (send-message) error:", error);
+    return null;
+  }
+
+  if (!data?.access_token) {
+    console.warn(
+      "No meta_tokens row found (send-message) for tenant:",
+      tenantId,
+      "alias:",
+      alias,
+    );
+    return null;
+  }
+
+  if (data.expires_at) {
+    const exp = new Date(data.expires_at).getTime();
+    if (!isNaN(exp) && exp < Date.now()) {
+      console.warn(
+        "Meta token appears expired (send-message) for tenant:",
+        tenantId,
+        "alias:",
+        alias,
+      );
+    }
+  }
+
+  return data.access_token as string;
 }
 
-// 👉 Tipos esperados del body (solo a nivel comentario/ayuda)
 // type TemplateVariables = {
 //   header?: string[];
 //   body?: string[];
@@ -54,16 +89,12 @@ serve(async (req) => {
   const authHeader = req.headers.get("Authorization") ?? "";
   const hasUserAuth = !!authHeader;
 
-  // 🧠 Cliente supabase con service role.
-  // Si viene desde el frontend → forwardeamos Authorization del user
-  // Si viene desde otra función (auto-close) → sin Authorization = modo system
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
     global: {
       headers: hasUserAuth ? { Authorization: authHeader } : {},
     },
   });
 
-  // 📦 Parseo body
   let body: {
     conversationId?: string;
     text?: string;
@@ -96,7 +127,6 @@ serve(async (req) => {
   const isTemplateMode = !!templateId;
   const isTextMode = !!messageText;
 
-  // ✅ Reglas de validación del contrato
   if (!conversationId) {
     return new Response(
       JSON.stringify({ error: "conversationId is required" }),
@@ -119,7 +149,7 @@ serve(async (req) => {
     );
   }
 
-  // 🔐 Usuario (solo si viene con Authorization)
+  // Usuario (solo si viene con Authorization)
   let user: { id: string } | null = null;
 
   if (hasUserAuth) {
@@ -223,9 +253,12 @@ serve(async (req) => {
       }
     }
 
-    // 3) Resolver token de Meta
-    const tokenAlias = channel.token_alias ?? "";
-    const metaToken = resolveMetaToken(tokenAlias);
+    // 3) Resolver token de Meta desde meta_tokens
+    const metaToken = await getMetaTokenForChannel(
+      supabase,
+      conv.tenant_id,
+      channel.token_alias ?? null,
+    );
 
     if (!metaToken) {
       return new Response(
@@ -250,8 +283,7 @@ serve(async (req) => {
     let templateMeta: Record<string, unknown> | null = null;
 
     if (isTemplateMode) {
-      // 🧱 MODO TEMPLATE
-      // 4.1) Buscar template en la DB
+      // MODO TEMPLATE
       const { data: template, error: tplError } = await supabase
         .from("templates")
         .select(
@@ -288,7 +320,6 @@ serve(async (req) => {
         );
       }
 
-      // Seguridad multi-tenant
       if (template.tenant_id !== conv.tenant_id) {
         return new Response(
           JSON.stringify({ error: "Template does not belong to this tenant" }),
@@ -299,7 +330,6 @@ serve(async (req) => {
         );
       }
 
-      // Solo permitimos templates aprobados por Meta
       const status = (template.status ?? "").toUpperCase();
       if (status && status !== "APPROVED") {
         return new Response(
@@ -317,7 +347,6 @@ serve(async (req) => {
       const vars = templateVariables ?? {};
       const components: any[] = [];
 
-      // Solo soportamos variables de HEADER/BODY por ahora (80% de los casos)
       if (vars.header && vars.header.length > 0) {
         components.push({
           type: "header",
@@ -365,7 +394,7 @@ serve(async (req) => {
         variables: vars,
       };
     } else {
-      // 🧱 MODO TEXTO
+      // MODO TEXTO
       waPayload = {
         ...waPayload,
         type: "text",
@@ -420,7 +449,7 @@ serve(async (req) => {
         conversation_id: conv.id,
         tenant_id: conv.tenant_id,
         channel_id: conv.channel_id,
-        direction: "out", // 👈 consistente con whatsapp-webhook
+        direction: "out",
         sender: user ? user.id : "system",
         body: dbBody,
         meta: metaPayload,
@@ -439,11 +468,9 @@ serve(async (req) => {
       );
     }
 
-    // 7) Actualizar conversación (last_message_at, status, assigned_agent)
+    // 7) Actualizar conversación
     const nowIso = new Date().toISOString();
 
-    // Si viene de agente → aseguramos assigned_agent
-    // Si viene de sistema → NO tocamos assigned_agent
     const nextAssignedAgent = user
       ? conv.assigned_agent ?? user.id
       : conv.assigned_agent ?? null;

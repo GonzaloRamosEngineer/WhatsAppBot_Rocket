@@ -27,18 +27,56 @@ type RulesDefinitionV1 = {
   rules: UiFlowRule[];
 };
 
-// Resuelve el token real de Meta a partir del alias guardado en la tabla channels
-function resolveMetaToken(alias: string): string | null {
-  const map: Record<string, string> = {
-    meta_token_dm: Deno.env.get("META_TOKEN_DM") ?? "",
-    meta_token_fea: Deno.env.get("META_TOKEN_FEA") ?? "",
-  };
-  if (map[alias]) return map[alias];
+// ----------------------------------------------
+// Helper: obtener token de Meta desde meta_tokens
+// ----------------------------------------------
+async function getMetaTokenForChannel(
+  supabase: any,
+  tenantId: string,
+  tokenAlias: string | null | undefined,
+): Promise<string | null> {
+  const alias =
+    tokenAlias && tokenAlias.trim() !== "" ? tokenAlias.trim() : "default";
 
-  const envKey =
-    "META_TOKEN__" + alias.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-  const val = Deno.env.get(envKey);
-  return val ?? null;
+  const { data, error } = await supabase
+    .from("meta_tokens")
+    .select("access_token, expires_at")
+    .eq("tenant_id", tenantId)
+    .eq("provider", "facebook")
+    .eq("alias", alias)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getMetaTokenForChannel error:", error);
+    return null;
+  }
+
+  if (!data?.access_token) {
+    console.warn(
+      "No meta_tokens row found for tenant:",
+      tenantId,
+      "alias:",
+      alias,
+    );
+    return null;
+  }
+
+  // (Opcional) chequeo de expiración
+  if (data.expires_at) {
+    const exp = new Date(data.expires_at).getTime();
+    if (!isNaN(exp) && exp < Date.now()) {
+      console.warn(
+        "Meta token appears to be expired for tenant:",
+        tenantId,
+        "alias:",
+        alias,
+      );
+    }
+  }
+
+  return data.access_token as string;
 }
 
 // ----------------------------------------------
@@ -116,9 +154,16 @@ async function runRulesEngine(options: {
 
   if (!selected) return null;
 
-  const token = resolveMetaToken(channel.token_alias ?? "");
+  const token = await getMetaTokenForChannel(
+    supabase,
+    tenantId,
+    channel.token_alias ?? null,
+  );
   if (!token) {
-    console.error("No Meta token for channel token_alias:", channel.token_alias);
+    console.error(
+      "No Meta token for channel token_alias (rules_v1):",
+      channel.token_alias,
+    );
     return null;
   }
 
@@ -352,7 +397,11 @@ serve(async (req) => {
         );
         if (salute?.text) reply = salute.text;
 
-        const token = resolveMetaToken(channel.token_alias ?? "");
+        const token = await getMetaTokenForChannel(
+          supabase,
+          channel.tenant_id,
+          channel.token_alias ?? null,
+        );
         if (token && reply) {
           try {
             await fetch(

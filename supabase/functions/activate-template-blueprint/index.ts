@@ -12,9 +12,7 @@ const corsHeaders: Record<string, string> = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// ----------------------------------------------
-// Tipos auxiliares (solo para claridad mental)
-// ----------------------------------------------
+// Tipos auxiliares (solo para claridad)
 type TemplateBlueprint = {
   id: string;
   sector: string;
@@ -26,6 +24,53 @@ type TemplateBlueprint = {
   components: any | null;
   variables: any | null;
 };
+
+// Reutilizamos la misma idea de alias -> token (env + DB)
+function resolveMetaToken(alias: string): string | null {
+  const map: Record<string, string> = {
+    meta_token_dm: Deno.env.get("META_TOKEN_DM") ?? "",
+    meta_token_fea: Deno.env.get("META_TOKEN_FEA") ?? "",
+  };
+  if (map[alias]) return map[alias];
+
+  const envKey =
+    "META_TOKEN__" + alias.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  const val = Deno.env.get(envKey);
+  return val ?? null;
+}
+
+async function getMetaAccessToken(opts: {
+  supabase: any;
+  tenantId: string;
+  tokenAlias?: string | null;
+}): Promise<string | null> {
+  const { supabase, tenantId } = opts;
+  const alias = (opts.tokenAlias || "default").trim();
+
+  // 1) Intentar env
+  const envToken = resolveMetaToken(alias);
+  if (envToken) return envToken;
+
+  // 2) Buscar en meta_tokens por tenant + provider + alias
+  const { data, error } = await supabase
+    .from("meta_tokens")
+    .select("access_token")
+    .eq("tenant_id", tenantId)
+    .eq("provider", "facebook")
+    .eq("alias", alias)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "[activate-template-blueprint] getMetaAccessToken meta_tokens error:",
+      error,
+      { tenantId, alias },
+    );
+    return null;
+  }
+
+  return data?.access_token ?? null;
+}
 
 serve(async (req: Request): Promise<Response> => {
   // CORS preflight
@@ -40,8 +85,36 @@ serve(async (req: Request): Promise<Response> => {
     });
   }
 
-  // Cliente Supabase con service_role (igual que en whatsapp-send-message)
-  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const hasUserAuth = !!authHeader;
+
+  // Cliente Supabase con service_role
+  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    global: {
+      headers: hasUserAuth ? { Authorization: authHeader } : {},
+    },
+  });
+
+  let user: { id: string } | null = null;
+
+  if (hasUserAuth) {
+    const {
+      data: { user: supaUser },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !supaUser) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    user = { id: supaUser.id };
+  }
 
   // -------------------------
   // 1) Parseo de body
@@ -88,7 +161,10 @@ serve(async (req: Request): Promise<Response> => {
       .maybeSingle();
 
     if (channelError) {
-      console.error("[activate-template-blueprint] channel error:", channelError);
+      console.error(
+        "[activate-template-blueprint] channel error:",
+        channelError,
+      );
       return new Response(
         JSON.stringify({ error: "Failed to load channel" }),
         {
@@ -118,6 +194,42 @@ serve(async (req: Request): Promise<Response> => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
+    }
+
+    // -------------------------
+    // 2.1) Verificar membership (si viene de usuario real)
+    // -------------------------
+    if (user) {
+      const { data: membership, error: memberError } = await supabase
+        .from("tenant_members")
+        .select("tenant_id, role")
+        .eq("tenant_id", channel.tenant_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (memberError) {
+        console.error(
+          "[activate-template-blueprint] error checking membership:",
+          memberError,
+        );
+        return new Response(
+          JSON.stringify({ error: "Failed to check membership" }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (!membership) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden for this tenant" }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
     }
 
     // -------------------------
@@ -154,34 +266,19 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // -------------------------
-    // 4) Resolver access_token de Meta (OAuth tabla meta_tokens)
+    // 4) Resolver access_token de Meta
     // -------------------------
-    const { data: tokenRow, error: tokenError } = await supabase
-      .from("meta_tokens")
-      .select("access_token")
-      .eq("tenant_id", channel.tenant_id)
-      .eq("provider", "facebook")
-      .maybeSingle();
+    const accessToken = await getMetaAccessToken({
+      supabase,
+      tenantId: channel.tenant_id,
+      tokenAlias: channel.token_alias ?? null,
+    });
 
-    if (tokenError) {
-      console.error(
-        "[activate-template-blueprint] meta_tokens error:",
-        tokenError,
-      );
-      return new Response(
-        JSON.stringify({ error: "Failed to load Meta token" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    if (!tokenRow?.access_token) {
+    if (!accessToken) {
       return new Response(
         JSON.stringify({
           error:
-            "No Meta access_token found for this tenant in meta_tokens",
+            "No Meta access_token configured for this tenant/alias (env o meta_tokens)",
         }),
         {
           status: 400,
@@ -189,8 +286,6 @@ serve(async (req: Request): Promise<Response> => {
         },
       );
     }
-
-    const accessToken = tokenRow.access_token;
 
     // -------------------------
     // 5) Armar payload para crear template en Meta
@@ -271,7 +366,7 @@ serve(async (req: Request): Promise<Response> => {
         language,
         category,
         body: bp.body,
-        status: "PENDING", // cuando Meta la apruebe, whatsapp-sync-templates la actualizará a APPROVED
+        status: "PENDING", // whatsapp-sync-templates la actualizará a APPROVED
         definition: metaPayload,
         external_id: externalId,
         last_synced_at: new Date().toISOString(),

@@ -42,7 +42,6 @@ function json(
 serve(async (req: Request): Promise<Response> => {
   const corsHeaders = buildCorsHeaders(req);
 
-  // 1) Preflight CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", {
       status: 200,
@@ -50,7 +49,6 @@ serve(async (req: Request): Promise<Response> => {
     });
   }
 
-  // 2) Solo aceptamos POST real
   if (req.method !== "POST") {
     return new Response("Method not allowed", {
       status: 405,
@@ -139,11 +137,12 @@ serve(async (req: Request): Promise<Response> => {
 
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-    // 4) Guardar en meta_tokens
+    // 4) Guardar en meta_tokens con alias 'default'
     const { error: insertError } = await supabase.from("meta_tokens").insert({
       tenant_id: oauthState.tenant_id,
       user_id: oauthState.user_id,
       provider: "facebook",
+      alias: "default",
       access_token: accessToken,
       expires_at: expiresAt,
     });

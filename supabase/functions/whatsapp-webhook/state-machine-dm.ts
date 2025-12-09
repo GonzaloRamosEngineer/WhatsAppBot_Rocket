@@ -32,9 +32,7 @@ export type StateMachineOptions = {
 };
 
 // --- Palabras globales / comandos ---
-// Comando de menú
 const menuWords = ["menu", "menú"];
-// Palabras “amables” tipo gracias / ok (opcional)
 const politeWords = [
   "gracias",
   "ok",
@@ -47,7 +45,7 @@ const politeWords = [
   "perfecto",
 ];
 
-// Mapas de contexto (siguen siendo útiles)
+// Mapas de contexto
 const areaMap: Record<string, string> = {
   "1": "1️⃣ Ventas",
   "2": "2️⃣ Marketing",
@@ -62,25 +60,58 @@ const automationTypeMap: Record<string, string> = {
   "3": "📈 Análisis de datos",
 };
 
-// Resolver token real de Meta a partir del alias guardado en channels.token_alias
-function resolveMetaToken(alias: string | null | undefined): string | null {
-  if (!alias) return null;
+// ----------------------------------------------
+// Helper: obtener token de Meta desde meta_tokens
+// ----------------------------------------------
+async function getMetaTokenForChannel(
+  supabase: any,
+  tenantId: string,
+  tokenAlias: string | null | undefined,
+): Promise<string | null> {
+  const alias =
+    tokenAlias && tokenAlias.trim() !== "" ? tokenAlias.trim() : "default";
 
-  const map: Record<string, string> = {
-    meta_token_dm: Deno.env.get("META_TOKEN_DM") ?? "",
-    meta_token_fea: Deno.env.get("META_TOKEN_FEA") ?? "",
-  };
+  const { data, error } = await supabase
+    .from("meta_tokens")
+    .select("access_token, expires_at")
+    .eq("tenant_id", tenantId)
+    .eq("provider", "facebook")
+    .eq("alias", alias)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  if (map[alias]) return map[alias];
+  if (error) {
+    console.error("getMetaTokenForChannel (state-machine) error:", error);
+    return null;
+  }
 
-  const envKey =
-    "META_TOKEN__" + alias.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-  const val = Deno.env.get(envKey);
-  return val ?? null;
+  if (!data?.access_token) {
+    console.warn(
+      "No meta_tokens row found (state-machine) for tenant:",
+      tenantId,
+      "alias:",
+      alias,
+    );
+    return null;
+  }
+
+  if (data.expires_at) {
+    const exp = new Date(data.expires_at).getTime();
+    if (!isNaN(exp) && exp < Date.now()) {
+      console.warn(
+        "Meta token appears expired (state-machine) for tenant:",
+        tenantId,
+        "alias:",
+        alias,
+      );
+    }
+  }
+
+  return data.access_token as string;
 }
 
-// 🧾 MENSAJE DE MENÚ PRINCIPAL (solo lo usamos en casos especiales como SALIR)
-// El texto “normal” del menú viene desde Flow Builder (rules_v1).
+// 🧾 MENSAJE DE MENÚ PRINCIPAL
 function buildMainMenuMessage() {
   return (
     "¡Hola de nuevo! Soy el asistente virtual de DigitalMatchGlobal 🚀\n\n" +
@@ -96,21 +127,6 @@ function buildMainMenuMessage() {
 
 /**
  * 🧠 STATE MACHINE “LIVIANA” PARA DIGITALMATCH
- *
- * Objetivo:
- * - Manejar únicamente cosas que requieren MEMORIA/ESTADO:
- *   - Menú numérico (1, 2, 3)
- *   - Subopciones de contacto
- *   - Captura de email
- *   - Flujos de automatizar procesos (área + tipo)
- *
- * - Dejar todo lo demás (precios, países, soporte, fallback, cierre amistoso, etc.)
- *   en manos del motor de reglas (rules_v1) del Flow Builder.
- *
- * Convención:
- * - Si la state machine genera respuestas → devuelve true (whatsapp-webhook NO llama a rules_v1)
- * - Si la state machine SOLO actualiza contexto o no hace nada → devuelve false
- *   (whatsapp-webhook llama a rules_v1 y usa el contenido del flow configurado).
  */
 export async function runStateMachineForTenant(
   options: StateMachineOptions,
@@ -124,42 +140,37 @@ export async function runStateMachineForTenant(
   let ctxData: any = conv.context_data ?? {};
   const replies: string[] = [];
 
-  // 0) Comando global: SALIR → resetea todo y muestra menú (texto desde acá)
+  // 0) Comando global: SALIR
   if (normalized === "salir") {
     state = "menu_principal";
     ctxData = {};
     replies.push("🔄 Conversación reiniciada.\n\n" + buildMainMenuMessage());
   }
-  // 1) Comando global: MENU (no respondo yo → dejo que rules_v1 muestre el menú)
+  // 1) Comando global: MENU (no respondo, dejo a rules_v1)
   else if (menuWords.includes(normalized)) {
     state = "menu_principal";
     ctxData = {
       ...ctxData,
       last_command: "menu",
     };
-    // 👇 NO pusheo ningún reply: dejo que rules_v1 responda
   }
-  // 2) Palabras “amables” cuando HAY un estado activo → respondo algo corto
+  // 2) Palabras “amables” cuando hay estado activo
   else if (state && politeWords.includes(normalized)) {
     replies.push(
       "¡Genial! 😊 Si necesitás más ayuda, podés volver a escribir \"menu\" o contarme qué necesitás.",
     );
   }
-  // 3) Conversación nueva o user dice "hola" sin estado:
-  //    - Solo actualizo contexto a menu_principal.
-  //    - El texto de bienvenida/menú viene de rules_v1 (welcome / Menú principal).
+  // 3) Conversación nueva o "hola" sin estado
   else if (!state && (isNewConversation || normalized === "hola")) {
     state = "menu_principal";
     ctxData = {
       ...ctxData,
       started_at: new Date().toISOString(),
     };
-    // Sin replies: dejo todo el copy al Flow Builder
   } else {
-    // 4) Si hay un estado vigente, proceso flujo numérico
+    // 4) Flujo según estado
     switch (state) {
       case "menu_principal": {
-        // 1 → Automatizar procesos
         if (normalized === "1") {
           state = "esperando_area";
           ctxData.menu_opcion = "automatizar_procesos";
@@ -173,9 +184,7 @@ export async function runStateMachineForTenant(
               "5️⃣ Atención al cliente\n" +
               "6️⃣ Otros",
           );
-        }
-        // 2 → Info sobre servicios
-        else if (normalized === "2") {
+        } else if (normalized === "2") {
           state = "info_servicios";
           ctxData.menu_opcion = "info_servicios";
           replies.push(
@@ -184,9 +193,7 @@ export async function runStateMachineForTenant(
               "https://digitalmatchglobal.com\n\n" +
               "Si querés, decime en qué área puntual estás pensando.",
           );
-        }
-        // 3 → Contactar con un asesor
-        else if (normalized === "3") {
+        } else if (normalized === "3") {
           state = "esperando_contacto";
           ctxData.menu_opcion = "contactar_asesor";
 
@@ -207,8 +214,7 @@ export async function runStateMachineForTenant(
 
       case "esperando_contacto": {
         if (normalized === "1") {
-          // Videollamada
-          state = null; // flujo cerrado
+          state = null;
           ctxData.modo_contacto = "videollamada";
           replies.push(
             "📅 Podés agendar una consulta directamente acá:\n" +
@@ -216,14 +222,12 @@ export async function runStateMachineForTenant(
               "¡Espero tu reserva! 😊",
           );
         } else if (normalized === "2") {
-          // Contacto por WhatsApp
           state = null;
           ctxData.modo_contacto = "whatsapp";
           replies.push(
             "Perfecto 🙌 Un asesor se va a poner en contacto con vos por WhatsApp.",
           );
         } else if (normalized === "3") {
-          // Pedir email
           state = "esperando_email";
           ctxData.modo_contacto = "email";
           replies.push(
@@ -356,7 +360,6 @@ export async function runStateMachineForTenant(
             "¡De nada! 😊 Si querés más detalles, podés preguntarme por precios, integraciones, duración o seguridad.",
           );
         } else if (normalized) {
-          // Te vuelvo a encarrilar al menú
           state = "menu_principal";
           replies.push(
             "No terminé de entender tu mensaje 🤔\n\n" +
@@ -367,7 +370,6 @@ export async function runStateMachineForTenant(
       }
 
       default: {
-        // Estado desconocido → reset a menú
         if (state) {
           state = "menu_principal";
           replies.push(buildMainMenuMessage());
@@ -377,27 +379,7 @@ export async function runStateMachineForTenant(
     }
   }
 
-  // Si NO hay replies, esta función no se hace cargo → que responda rules_v1
-  if (replies.length === 0) {
-    // Igual actualizo contexto si cambió algo
-    const nowIso = new Date().toISOString();
-    try {
-      await supabase
-        .from("conversations")
-        .update({
-          context_state: state,
-          context_data: ctxData,
-          last_message_at: nowIso,
-        })
-        .eq("id", conv.id);
-    } catch (e) {
-      console.error("Error updating conversation context_state/context_data:", e);
-    }
-
-    return false;
-  }
-
-  // Si llegamos acá, la state machine SÍ respondió algo → enviamos por WhatsApp
+  // Si NO hay replies, esta función no se hace cargo → responde rules_v1
   const nowIso = new Date().toISOString();
 
   try {
@@ -413,7 +395,16 @@ export async function runStateMachineForTenant(
     console.error("Error updating conversation context_state/context_data:", e);
   }
 
-  const token = resolveMetaToken(channel.token_alias ?? null);
+  if (replies.length === 0) {
+    return false;
+  }
+
+  // Si llegamos acá, la state machine SÍ respondió algo
+  const token = await getMetaTokenForChannel(
+    supabase,
+    tenantId,
+    channel.token_alias ?? null,
+  );
   if (!token) {
     console.error(
       "No Meta token for channel token_alias (state machine):",
