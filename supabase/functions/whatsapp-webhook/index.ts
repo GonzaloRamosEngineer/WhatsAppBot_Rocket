@@ -3,6 +3,8 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { runStateMachineForTenant } from "./state-machine-dm.ts";
+import { resolveMetaToken } from "../_shared/metaToken.ts";
+
 
 const SUPABASE_URL = Deno.env.get("PROJECT_URL")!;
 const SERVICE_ROLE = Deno.env.get("SERVICE_ROLE_KEY")!;
@@ -27,57 +29,7 @@ type RulesDefinitionV1 = {
   rules: UiFlowRule[];
 };
 
-// ----------------------------------------------
-// Helper: obtener token de Meta desde meta_tokens
-// ----------------------------------------------
-async function getMetaTokenForChannel(
-  supabase: any,
-  tenantId: string,
-  tokenAlias: string | null | undefined,
-): Promise<string | null> {
-  const alias =
-    tokenAlias && tokenAlias.trim() !== "" ? tokenAlias.trim() : "default";
 
-  const { data, error } = await supabase
-    .from("meta_tokens")
-    .select("access_token, expires_at")
-    .eq("tenant_id", tenantId)
-    .eq("provider", "facebook")
-    .eq("alias", alias)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.error("getMetaTokenForChannel error:", error);
-    return null;
-  }
-
-  if (!data?.access_token) {
-    console.warn(
-      "No meta_tokens row found for tenant:",
-      tenantId,
-      "alias:",
-      alias,
-    );
-    return null;
-  }
-
-  // (Opcional) chequeo de expiración
-  if (data.expires_at) {
-    const exp = new Date(data.expires_at).getTime();
-    if (!isNaN(exp) && exp < Date.now()) {
-      console.warn(
-        "Meta token appears to be expired for tenant:",
-        tenantId,
-        "alias:",
-        alias,
-      );
-    }
-  }
-
-  return data.access_token as string;
-}
 
 // ----------------------------------------------
 // Motor de reglas v1 (flows.key = 'rules_v1')
@@ -154,18 +106,21 @@ async function runRulesEngine(options: {
 
   if (!selected) return null;
 
-  const token = await getMetaTokenForChannel(
+  const token = await resolveMetaToken(
     supabase,
     tenantId,
-    channel.token_alias ?? null,
+    channel.token_alias ?? "default",
   );
   if (!token) {
     console.error(
-      "No Meta token for channel token_alias (rules_v1):",
+      "[whatsapp-webhook][rules_v1] No Meta token for channel token_alias:",
       channel.token_alias,
     );
+    // No devolvemos null "duro" si solo queremos evitar responder,
+    // pero como el motor de reglas se basa en enviar msg, tiene sentido cortar acá.
     return null;
   }
+
 
   // 5) Enviar respuestas al usuario
   for (const resp of selected.responses || []) {
@@ -397,11 +352,12 @@ serve(async (req) => {
         );
         if (salute?.text) reply = salute.text;
 
-        const token = await getMetaTokenForChannel(
+        const token = await resolveMetaToken(
           supabase,
           channel.tenant_id,
-          channel.token_alias ?? null,
+          channel.token_alias ?? "default",
         );
+
         if (token && reply) {
           try {
             await fetch(

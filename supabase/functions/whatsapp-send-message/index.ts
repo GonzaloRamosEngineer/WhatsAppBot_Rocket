@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveMetaToken } from "../_shared/metaToken.ts";
+
 
 const SUPABASE_URL = Deno.env.get("PROJECT_URL")!;
 const SERVICE_ROLE = Deno.env.get("SERVICE_ROLE_KEY")!;
@@ -10,56 +12,6 @@ const corsHeaders: Record<string, string> = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// ----------------------------------------------
-// Helper: obtener token de Meta desde meta_tokens
-// ----------------------------------------------
-async function getMetaTokenForChannel(
-  supabase: any,
-  tenantId: string,
-  tokenAlias: string | null | undefined,
-): Promise<string | null> {
-  const alias =
-    tokenAlias && tokenAlias.trim() !== "" ? tokenAlias.trim() : "default";
-
-  const { data, error } = await supabase
-    .from("meta_tokens")
-    .select("access_token, expires_at")
-    .eq("tenant_id", tenantId)
-    .eq("provider", "facebook")
-    .eq("alias", alias)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.error("getMetaTokenForChannel (send-message) error:", error);
-    return null;
-  }
-
-  if (!data?.access_token) {
-    console.warn(
-      "No meta_tokens row found (send-message) for tenant:",
-      tenantId,
-      "alias:",
-      alias,
-    );
-    return null;
-  }
-
-  if (data.expires_at) {
-    const exp = new Date(data.expires_at).getTime();
-    if (!isNaN(exp) && exp < Date.now()) {
-      console.warn(
-        "Meta token appears expired (send-message) for tenant:",
-        tenantId,
-        "alias:",
-        alias,
-      );
-    }
-  }
-
-  return data.access_token as string;
-}
 
 // type TemplateVariables = {
 //   header?: string[];
@@ -253,12 +205,13 @@ serve(async (req) => {
       }
     }
 
-    // 3) Resolver token de Meta desde meta_tokens
-    const metaToken = await getMetaTokenForChannel(
+    // 3) Resolver token de Meta (env + meta_tokens, alias o id)
+    const metaToken = await resolveMetaToken(
       supabase,
       conv.tenant_id,
-      channel.token_alias ?? null,
+      channel.token_alias ?? "default",
     );
+
 
     if (!metaToken) {
       return new Response(
