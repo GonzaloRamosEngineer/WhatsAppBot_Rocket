@@ -3,6 +3,9 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { resolveMetaToken } from "../_shared/metaToken.ts";
+import { subscribeWaba } from "../_shared/subscribeWaba.ts";
+
 const SUPABASE_URL = Deno.env.get("PROJECT_URL")!;
 const SERVICE_ROLE = Deno.env.get("SERVICE_ROLE_KEY")!;
 
@@ -46,7 +49,7 @@ serve(async (req) => {
     wabaId?: string;
     phoneId?: string;
     displayPhoneNumber?: string;
-    tokenAlias?: string; // ahora es opcional
+    tokenAlias?: string; // opcional
     channelName?: string;
   };
 
@@ -68,7 +71,6 @@ serve(async (req) => {
     channelName,
   } = body;
 
-  // Log para debug fino (no incluye tokens ni cosas sensibles)
   console.log("[whatsapp-connect] body recibido:", {
     tenantId,
     wabaId,
@@ -78,7 +80,6 @@ serve(async (req) => {
     channelName,
   });
 
-  // ➜ Solo validamos estos cuatro campos. El token lo buscamos si falta.
   if (!tenantId || !wabaId || !phoneId || !displayPhoneNumber) {
     return new Response(
       JSON.stringify({
@@ -124,8 +125,6 @@ serve(async (req) => {
     }
 
     // 2) Resolver tokenAlias:
-    //    - Si vino en el body, usarlo directamente
-    //    - Si NO, buscamos el último meta_tokens del tenant/provider='facebook'
     let finalTokenAlias = tokenAlias ?? null;
 
     if (!finalTokenAlias) {
@@ -164,7 +163,7 @@ serve(async (req) => {
         );
       }
 
-      finalTokenAlias = latestToken.alias; // usamos el alias real
+      finalTokenAlias = latestToken.alias;
     }
 
     // 3) Normalizar teléfono
@@ -200,6 +199,37 @@ serve(async (req) => {
       );
     }
 
+    // 4.bis) SUSCRIBIR el WABA a tu app (para webhooks)
+    try {
+      const accessToken = await resolveMetaToken(
+        supabase,
+        tenantId,
+        finalTokenAlias!,
+      );
+
+      if (!accessToken) {
+        console.error(
+          "[whatsapp-connect] no accessToken found for tenant",
+          tenantId,
+          "alias",
+          finalTokenAlias,
+        );
+      } else if (!channelData.meta_waba_id) {
+        console.error(
+          "[whatsapp-connect] channel sin meta_waba_id",
+          channelData,
+        );
+      } else {
+        await subscribeWaba({
+          accessToken,
+          wabaId: channelData.meta_waba_id,
+        });
+      }
+    } catch (e) {
+      console.error("[whatsapp-connect] subscribeWaba error", e);
+      // no cortamos el flujo si falla
+    }
+
     // 5) Bot default
     let bot: any = null;
     {
@@ -229,7 +259,7 @@ serve(async (req) => {
       }
     }
 
-    // 6) Flows default + rules_v1 (igual que antes)
+    // 6) Flows default + rules_v1
     if (bot?.id) {
       const { data: existingFlow } = await supabase
         .from("flows")
