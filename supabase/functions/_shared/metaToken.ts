@@ -1,83 +1,113 @@
 // supabase/functions/_shared/metaToken.ts
 
-/**
- * Tipo genérico súper simple para no pelear con tipos de supabase-js.
- * Cualquier cliente que tenga .from() nos sirve.
- */
-export type GenericSupabaseClient = {
-  from: (table: string) => {
-    select: (...args: any[]) => any;
-    eq: (...args: any[]) => any;
-    or: (...args: any[]) => any;
-    order: (...args: any[]) => any;
-    limit: (...args: any[]) => any;
-    maybeSingle: () => Promise<{ data: any | null; error: any | null }>;
-  };
-};
+// Helper centralizado para resolver el access_token de Meta
+// Soporta:
+//  - Tokens legacy por ENV (DigitalMatch / FEA)
+//  - Tokens guardados en tabla meta_tokens (por tenant + alias o por id)
 
-/**
- * Mapa de aliases legacy que leen directamente variables de entorno.
- * Lo usamos para no romper la compatibilidad con META_TOKEN_DM, META_TOKEN_FEA, etc.
- */
-const LEGACY_ALIAS_MAP: Record<string, string> = {
-  meta_token_dm: Deno.env.get("META_TOKEN_DM") ?? "",
-  meta_token_fea: Deno.env.get("META_TOKEN_FEA") ?? "",
-};
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/**
- * Resolver el access_token de Meta combinando:
- *
- * 1) Variables de entorno legacy:
- *    - META_TOKEN_DM, META_TOKEN_FEA
- *    - META_TOKEN__ALIAS_NORMALIZADO
- *
- * 2) Tabla meta_tokens:
- *    - primero por alias
- *    - fallback: por id (porque en algunos lugares usamos id como alias)
- */
-export async function resolveMetaToken(
-  supabase: GenericSupabaseClient | null,
-  tenantId: string | null | undefined,
-  rawAlias: string | null | undefined,
-): Promise<string | null> {
-  const alias = (rawAlias ?? "default").trim();
+// 🔐 Mapeos legacy / por ENV
+function resolveEnvMetaToken(
+  aliasOrId: string,
+  tenantId?: string | null,
+): string | null {
+  const key = (aliasOrId || "").trim().toLowerCase();
 
-  if (!alias && !tenantId) return null;
-
-  // 1) Modo legacy: alias -> variables fijas
-  if (LEGACY_ALIAS_MAP[alias]) {
-    const val = LEGACY_ALIAS_MAP[alias];
+  // 1) Aliases explícitos (por si algún canal usa estos)
+  if (key === "meta_token_dm") {
+    const val = Deno.env.get("META_TOKEN_DM");
+    if (val) return val;
+  }
+  if (key === "meta_token_fea") {
+    const val = Deno.env.get("META_TOKEN_FEA");
     if (val) return val;
   }
 
-  // 2) Modo env dinámico: META_TOKEN__ALIAS_NORMALIZADO
-  const envKey =
-    "META_TOKEN__" + alias.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-  const envVal = Deno.env.get(envKey);
-  if (envVal) return envVal;
+  // 2) Tenant-based legacy (hardcoded, para que DigitalMatch/FEA sigan funcionando)
+  //    DigitalMatch
+  if (tenantId === "2c46428a-ea58-4e70-87f5-bae9542becc1") {
+    const val = Deno.env.get("META_TOKEN_DM");
+    if (val) return val;
+  }
+  //    Fundación Evolución Antoniana (por si tuvieras también token por ENV)
+  if (tenantId === "4c7afec9-2338-4bd4-baac-eee45827ebf5") {
+    const val = Deno.env.get("META_TOKEN_FEA");
+    if (val) return val;
+  }
 
-  // 3) Si no tenemos supabase o tenant, hasta acá llegamos
-  if (!supabase || !tenantId) return null;
+  // 3) Alias genérico → ENV del tipo META_TOKEN__ALIAS_NORMALIZADO
+  //    ej: alias "default" → META_TOKEN__DEFAULT
+  const envFromAlias =
+    "META_TOKEN__" + key.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  const valFromAlias = Deno.env.get(envFromAlias);
+  if (valFromAlias) return valFromAlias;
 
+  // 4) Tenant genérico → ENV del tipo META_TOKEN_TENANT__<TENANT_NORMALIZADO>
+  if (tenantId) {
+    const tenantKey =
+      "META_TOKEN_TENANT__" +
+      tenantId.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+    const valFromTenant = Deno.env.get(tenantKey);
+    if (valFromTenant) return valFromTenant;
+  }
+
+  return null;
+}
+
+// 🔐 Resolver access_token combinando ENV + tabla meta_tokens
+export async function resolveMetaToken(
+  supabase: any,
+  tenantId: string,
+  aliasOrId: string,
+): Promise<string | null> {
+  const key = (aliasOrId || "").trim() || "default";
+
+  // 1) Primero intentamos por ENV (legacy / configuraciones manuales)
+  const envToken = resolveEnvMetaToken(key, tenantId);
+  if (envToken) {
+    return envToken;
+  }
+
+  // 2) Si no hay ENV, buscamos en meta_tokens
   try {
-    // 4) Buscar en meta_tokens (por alias o por id) para ese tenant
-    const { data, error } = await supabase
-      .from("meta_tokens")
-      .select("access_token")
-      .eq("tenant_id", tenantId)
-      .or(`alias.eq.${alias},id.eq.${alias}`)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    let query = supabase.from("meta_tokens").select("access_token");
+
+    if (UUID_REGEX.test(key)) {
+      // Si parece UUID → buscar por id
+      query = query.eq("id", key);
+    } else {
+      // Si NO es UUID → buscar por alias + tenant + provider
+      query = query
+        .eq("tenant_id", tenantId)
+        .eq("provider", "facebook")
+        .eq("alias", key)
+        .order("created_at", { ascending: false })
+        .limit(1);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
       console.error("[metaToken] error leyendo meta_tokens:", error);
       return null;
     }
 
-    return data?.access_token ?? null;
+    if (!data?.access_token) {
+      console.warn(
+        "[metaToken] no se encontró access_token en meta_tokens",
+        {
+          tenantId,
+          key,
+        },
+      );
+      return null;
+    }
+
+    return data.access_token as string;
   } catch (e) {
-    console.error("[metaToken] excepción leyendo meta_tokens:", e);
+    console.error("[metaToken] excepción al leer meta_tokens:", e);
     return null;
   }
 }
