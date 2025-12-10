@@ -1,17 +1,21 @@
+// supabase/functions/whatsapp-send-message/index.ts
+
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveMetaToken } from "../_shared/metaToken.ts";
 
-
-const SUPABASE_URL = Deno.env.get("PROJECT_URL")!;
-const SERVICE_ROLE = Deno.env.get("SERVICE_ROLE_KEY")!;
+// Intentamos ser flexibles con los nombres de env (igual que en otras functions)
+const SUPABASE_URL =
+  Deno.env.get("PROJECT_URL") ?? Deno.env.get("SUPABASE_URL")!;
+const SERVICE_ROLE =
+  Deno.env.get("SERVICE_ROLE_KEY") ??
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
-
 
 // type TemplateVariables = {
 //   header?: string[];
@@ -111,6 +115,7 @@ serve(async (req) => {
     } = await supabase.auth.getUser();
 
     if (userError || !supaUser) {
+      console.error("whatsapp-send-message: getUser error", userError);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -143,7 +148,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (convError) {
-      console.error("Error fetching conversation:", convError);
+      console.error("whatsapp-send-message: error fetching conversation:", convError);
       return new Response(
         JSON.stringify({ error: "Failed to load conversation" }),
         {
@@ -184,7 +189,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (memberError) {
-        console.error("Error checking membership:", memberError);
+        console.error("whatsapp-send-message: error checking membership:", memberError);
         return new Response(
           JSON.stringify({ error: "Failed to check membership" }),
           {
@@ -206,14 +211,21 @@ serve(async (req) => {
     }
 
     // 3) Resolver token de Meta (env + meta_tokens, alias o id)
+    const aliasOrId = channel.token_alias ?? "default";
+
     const metaToken = await resolveMetaToken(
       supabase,
       conv.tenant_id,
-      channel.token_alias ?? "default",
+      aliasOrId,
     );
 
-
     if (!metaToken) {
+      console.error(
+        "whatsapp-send-message: Meta token not found for tenant",
+        conv.tenant_id,
+        "aliasOrId",
+        aliasOrId,
+      );
       return new Response(
         JSON.stringify({
           error: "Meta token not configured for this channel",
@@ -253,7 +265,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (tplError) {
-        console.error("Error fetching template:", tplError);
+        console.error("whatsapp-send-message: error fetching template:", tplError);
         return new Response(
           JSON.stringify({ error: "Failed to load template" }),
           {
@@ -283,8 +295,8 @@ serve(async (req) => {
         );
       }
 
-      const status = (template.status ?? "").toUpperCase();
-      if (status && status !== "APPROVED") {
+      const tplStatus = (template.status ?? "").toUpperCase();
+      if (tplStatus && tplStatus !== "APPROVED") {
         return new Response(
           JSON.stringify({
             error: "Template is not approved",
@@ -371,7 +383,7 @@ serve(async (req) => {
     const waJson = await waRes.json();
 
     if (!waRes.ok) {
-      console.error("WhatsApp API error:", waRes.status, waJson);
+      console.error("whatsapp-send-message: WhatsApp API error:", waRes.status, waJson);
       return new Response(
         JSON.stringify({
           error: "WhatsApp API error",
@@ -411,7 +423,7 @@ serve(async (req) => {
       .single();
 
     if (msgError) {
-      console.error("Error inserting message:", msgError);
+      console.error("whatsapp-send-message: error inserting message:", msgError);
       return new Response(
         JSON.stringify({ error: "Failed to insert message" }),
         {
