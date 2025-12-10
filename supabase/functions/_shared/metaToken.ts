@@ -1,22 +1,11 @@
 // supabase/functions/_shared/metaToken.ts
-
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-function resolveEnvMetaToken(aliasOrId: string): string | null {
-  const fixedMap: Record<string, string | undefined> = {
-    meta_token_dm: Deno.env.get("META_TOKEN_DM"),
-    meta_token_fea: Deno.env.get("META_TOKEN_FEA"),
-    default: Deno.env.get("META_TOKEN_DM"), // si querés mapear "default" a DM
-  };
-
-  if (fixedMap[aliasOrId]) return fixedMap[aliasOrId] || null;
-
-  const envKey =
-    "META_TOKEN__" + aliasOrId.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-  const val = Deno.env.get(envKey);
-  return val ?? null;
-}
-
+/**
+ * Resuelve el token de Meta con esta prioridad:
+ * 1) DB: meta_tokens (tenant_id + alias)
+ * 2) ENV: claves fijas o META_TOKEN__ALIAS
+ */
 export async function resolveMetaToken(
   supabase: SupabaseClient,
   tenantId: string,
@@ -24,11 +13,7 @@ export async function resolveMetaToken(
 ): Promise<string | null> {
   const aliasTrimmed = aliasOrId.trim();
 
-  // 1) Primero: variables de entorno (legacy / overrides)
-  const envToken = resolveEnvMetaToken(aliasTrimmed);
-  if (envToken) return envToken;
-
-  // 2) meta_tokens por alias (NO asumas que es UUID)
+  // 1️⃣ PRIMERO: buscar en meta_tokens del tenant
   const { data, error } = await supabase
     .from("meta_tokens")
     .select("access_token")
@@ -37,20 +22,40 @@ export async function resolveMetaToken(
     .eq("alias", aliasTrimmed)
     .maybeSingle();
 
-  if (error) {
-    console.error("[metaToken] error leyendo meta_tokens:", error);
-    return null;
+  if (!error && data?.access_token) {
+    return data.access_token;
   }
 
-  if (!data?.access_token) {
-    console.error(
-      "[metaToken] Meta token not found for tenant",
-      tenantId,
-      "aliasOrId",
-      aliasTrimmed,
+  // 2️⃣ FALLBACK: variables de entorno (solo para casos especiales / dev)
+  const fixedMap: Record<string, string | undefined> = {
+    meta_token_dm: Deno.env.get("META_TOKEN_DM") ?? undefined,
+    meta_token_fea: Deno.env.get("META_TOKEN_FEA") ?? undefined,
+    // ❌ OJO: NO poner "default": META_TOKEN_DM acá
+    // default: Deno.env.get("META_TOKEN_DM"),
+  };
+
+  if (fixedMap[aliasTrimmed]) {
+    return fixedMap[aliasTrimmed] || null;
+  }
+
+  // 3️⃣ Alias como nombre de env dinámico
+  const envKey =
+    "META_TOKEN__" + aliasTrimmed.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  const val = Deno.env.get(envKey);
+  if (val) return val;
+
+  // 4️⃣ Log de ayuda si es "default" y no encontramos nada
+  if (aliasTrimmed === "default") {
+    console.warn(
+      `[metaToken] Warning: Alias 'default' no encontrado en DB para tenant ${tenantId}.`,
     );
-    return null;
   }
 
-  return data.access_token;
+  console.error(
+    "[metaToken] Token no encontrado. Tenant:",
+    tenantId,
+    "Alias:",
+    aliasTrimmed,
+  );
+  return null;
 }
