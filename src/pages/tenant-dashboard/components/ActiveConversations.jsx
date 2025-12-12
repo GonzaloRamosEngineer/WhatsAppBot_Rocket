@@ -28,7 +28,7 @@ const ActiveConversations = ({ conversations = [], isLoading = false }) => {
 
   if (isLoading) {
     return (
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm h-full"> {/* h-full agregado */}
         <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Active Conversations</h3>
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
@@ -46,22 +46,25 @@ const ActiveConversations = ({ conversations = [], isLoading = false }) => {
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
+    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm h-full flex flex-col"> {/* h-full y flex-col */}
+      
+      {/* Header Fijo */}
+      <div className="flex items-center justify-between mb-6 shrink-0">
         <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Active Conversations</h3>
         <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs font-bold">
           {conversations.length}
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar max-h-[300px]">
+      {/* Lista Scrolleable (ocupa el espacio restante) */}
+      <div className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar min-h-[300px]">
         {conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center opacity-60">
+          <div className="flex flex-col items-center justify-center py-10 text-center opacity-60 h-full">
             <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
                <Icon name="MessageSquareOff" size={20} className="text-slate-400" />
             </div>
             <p className="text-sm font-medium text-slate-600">No active threads</p>
-            <p className="text-xs text-slate-400 max-w-[180px]">New messages will appear here automatically.</p>
+            <p className="text-xs text-slate-400 max-w-[180px] mt-1">New messages will appear here automatically.</p>
           </div>
         ) : (
           conversations.map((conv) => {
@@ -71,7 +74,7 @@ const ActiveConversations = ({ conversations = [], isLoading = false }) => {
              return (
               <div
                 key={conv.id}
-                className="group flex items-start gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-slate-100"
+                className="group flex items-start gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-slate-100 relative"
               >
                 <div className="relative shrink-0">
                   <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold shadow-sm">
@@ -84,7 +87,7 @@ const ActiveConversations = ({ conversations = [], isLoading = false }) => {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-0.5">
                     <span className="text-sm font-bold text-slate-700 truncate">{conv.name}</span>
-                    <span className="text-[10px] text-slate-400 whitespace-nowrap">{formatLastSeen(conv.lastSeen)}</span>
+                    <span className="text-[10px] text-slate-400 whitespace-nowrap ml-2">{formatLastSeen(conv.lastSeen)}</span>
                   </div>
                   
                   <p className="text-xs text-slate-500 truncate group-hover:text-slate-700 transition-colors">
@@ -102,14 +105,20 @@ const ActiveConversations = ({ conversations = [], isLoading = false }) => {
                      )}
                   </div>
                 </div>
+                
+                {/* Arrow Icon on Hover (Desktop) */}
+                <div className="hidden md:block opacity-0 group-hover:opacity-100 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-opacity">
+                   <Icon name="ChevronRight" size={16} />
+                </div>
               </div>
             );
           })
         )}
       </div>
 
+      {/* Footer Fijo (Si hay datos) */}
       {conversations.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-slate-100 text-center">
+        <div className="mt-4 pt-4 border-t border-slate-100 text-center shrink-0">
           <button className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors flex items-center justify-center gap-1 mx-auto">
              View All Messages <Icon name="ArrowRight" size={12} />
           </button>
