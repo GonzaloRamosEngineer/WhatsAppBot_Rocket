@@ -1,6 +1,6 @@
 // C:\Projects\WhatsAppBot_Rocket\src\components\ui\NavigationSidebar.jsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Icon from "../AppIcon";
 import { useAuth } from "../../lib/AuthProvider";
@@ -15,22 +15,24 @@ const NavigationSidebar = ({
   const navigate = useNavigate();
   const { logout } = useAuth();
   
-  // Estado local para controlar el Drawer móvil independientemente del Desktop
-  const [showMobileDrawer, setShowMobileDrawer] = useState(false);
+  // Control interno para el menú móvil
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  
+  // Referencia para evitar que el menú se abra solo al cargar la página
+  const isFirstRender = useRef(true);
 
-  // Sincronizar: Cuando el padre cambia isCollapsed (botón del Header), abrimos/cerramos móvil
-  // Pero SOLO si el cambio fue intencional (evitamos abrirlo al cargar la página si el default es false)
+  // Sincronización Inteligente: 
+  // Si el padre cambia isCollapsed (click en Header) y estamos en móvil, abrimos/cerramos el drawer.
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    
     const isMobile = window.innerWidth < 768;
     if (isMobile) {
-        // En móvil, interpretamos el cambio de "isCollapsed" como un toggle de visibilidad
-        // Si isCollapsed cambia, invertimos la visibilidad actual
-        // (Esto asume que el botón del header llama a onToggle o setCollapsed)
-        if (!isCollapsed) {
-            setShowMobileDrawer(true);
-        } else {
-            setShowMobileDrawer(false);
-        }
+      // Si cambia el estado desde afuera (Header button), invertimos la visibilidad móvil
+      setIsMobileOpen(prev => !prev);
     }
   }, [isCollapsed]);
 
@@ -45,11 +47,7 @@ const NavigationSidebar = ({
 
   const handleNavigation = (path) => {
     navigate(path);
-    setShowMobileDrawer(false); // Cerrar al navegar en móvil
-    // Si estamos en móvil y navegamos, también colapsamos el estado del padre para resetear
-    if (window.innerWidth < 768 && onToggle && !isCollapsed) {
-        onToggle(); 
-    }
+    setIsMobileOpen(false); // Cerrar siempre al navegar
   };
 
   const handleLogout = async () => {
@@ -59,11 +57,11 @@ const NavigationSidebar = ({
 
   const isActivePath = (path) => location?.pathname === path;
 
-  // Renderizado del contenido interno (Reutilizable)
-  const SidebarInner = () => (
-    <div className="flex flex-col h-full bg-slate-900 text-slate-300 border-r border-slate-800 shadow-2xl transition-all duration-300 relative group/sidebar">
+  // --- CONTENIDO INTERNO DEL SIDEBAR (Reutilizable) ---
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full bg-slate-900 text-slate-300 border-r border-slate-800 shadow-2xl">
       
-      {/* 1. Logo Section */}
+      {/* 1. Header / Logo */}
       <div className={`flex items-center h-16 border-b border-slate-800 transition-all shrink-0 ${isCollapsed ? 'justify-center px-0' : 'px-6'}`}>
         <div className="flex items-center gap-3">
           <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30 shrink-0">
@@ -83,8 +81,8 @@ const NavigationSidebar = ({
         </div>
       </div>
 
-      {/* 2. Navigation Items */}
-      <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto custom-scrollbar">
+      {/* 2. Lista de Navegación */}
+      <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto custom-scrollbar overflow-x-hidden">
         {navigationItems.map((item) => {
           const isActive = isActivePath(item.path);
           const isHighlight = item.highlight;
@@ -122,7 +120,7 @@ const NavigationSidebar = ({
                 </span>
               )}
 
-              {/* Tooltip (Solo colapsado desktop) */}
+              {/* Tooltip Hover (Solo Desktop Colapsado) */}
               {isCollapsed && (
                 <div className="hidden md:block absolute left-14 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-medium rounded-md shadow-xl border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                   {item.label}
@@ -152,52 +150,44 @@ const NavigationSidebar = ({
            )}
         </button>
       </div>
-
-      {/* 4. BOTÓN OREJUELA (DESKTOP) */}
-      {/* Posicionado en el borde derecho, centrado verticalmente. Solo visible en desktop. */}
-      {onToggle && (
-        <button
-          onClick={onToggle}
-          className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-slate-200 rounded-full items-center justify-center text-slate-400 shadow-md hover:text-indigo-600 hover:border-indigo-200 hover:scale-110 transition-all z-50 cursor-pointer opacity-0 group-hover/sidebar:opacity-100 focus:opacity-100"
-          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-        >
-          <Icon name={isCollapsed ? "ChevronRight" : "ChevronLeft"} size={14} />
-        </button>
-      )}
     </div>
   );
 
   return (
     <>
-      {/* --- DESKTOP SIDEBAR (Fijo) --- */}
+      {/* --- DESKTOP SIDEBAR --- */}
       <aside
         className={`
-          hidden md:block fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-in-out
+          hidden md:block fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-in-out border-r border-slate-800
           ${isCollapsed ? "w-16" : "w-60"}
           ${className}
         `}
       >
-        <SidebarInner />
+        <SidebarContent />
+
+        {/* 4. BOTÓN "OREJUELA" (Solo Desktop - Fuera del contenido, pegado al borde) */}
+        {onToggle && (
+          <button
+            onClick={onToggle}
+            className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 shadow-md hover:text-indigo-600 hover:border-indigo-200 hover:scale-110 transition-all z-50 cursor-pointer"
+            title={isCollapsed ? "Expand" : "Collapse"}
+          >
+            <Icon name={isCollapsed ? "ChevronRight" : "ChevronLeft"} size={14} />
+          </button>
+        )}
       </aside>
 
-      {/* --- MOBILE DRAWER (Superpuesto) --- */}
-      {/* Usamos showMobileDrawer en lugar de isMobileOpen directo para controlar la lógica */}
-      {/* Nota: En móvil siempre mostramos la versión "expandida" del contenido (isCollapsed falso visualmente) */}
-      {showMobileDrawer && (
+      {/* --- MOBILE DRAWER --- */}
+      {isMobileOpen && (
         <div className="md:hidden fixed inset-0 z-50">
-          {/* Backdrop Blur - Al hacer click cierra y notifica al padre */}
           <div
             className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
-            onClick={() => {
-                setShowMobileDrawer(false);
-                if (onToggle) onToggle(); // Sincronizar estado del padre
-            }}
+            onClick={() => setIsMobileOpen(false)}
           />
           
-          {/* Drawer Slide-in */}
           <aside className="absolute left-0 top-0 h-full w-64 animate-in slide-in-from-left duration-300 shadow-2xl">
-             {/* Forzamos isCollapsed=false para que en móvil se vea completo el menú */}
-             {React.cloneElement(<SidebarInner />, { isCollapsed: false })} 
+             {/* Forzamos isCollapsed=false en móvil para ver textos */}
+             {React.cloneElement(<SidebarContent />, { isCollapsed: false })}
           </aside>
         </div>
       )}
