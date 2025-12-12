@@ -4,15 +4,15 @@ import React, { useState, useEffect, useCallback } from "react";
 import NavigationSidebar from "../../components/ui/NavigationSidebar";
 import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
 import Icon from "../../components/AppIcon";
+import Button from "../../components/ui/Button";
 
 // Componentes internos
 import CredentialsForm from "./components/CredentialsForm";
 import ConnectionTestCard from "./components/ConnectionTestCard";
 import WebhookConfigCard from "./components/WebhookConfigCard";
 import ChannelStatusCard from "./components/ChannelStatusCard";
-import TroubleshootingCard from "./components/TroubleshootingCard";
 import ChannelSelector from "./components/ChannelSelector";
-import TemplatesListCard from "./components/TemplatesListCard"; // El componente Pro que hicimos antes
+import TemplatesListCard from "./components/TemplatesListCard";
 
 // Libs
 import { useAuth } from "@/lib/AuthProvider";
@@ -22,15 +22,16 @@ const ChannelSetup = () => {
   const { profile, tenant, supabase, logout } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // --- STATE ---
-  // 🔌 OAuth State
-  const [connectingOAuth, setConnectingOAuth] = useState(false);
+  // --- STATE UI ---
+  // El famoso "Acordeón Inteligente"
+  const [isConfigExpanded, setIsConfigExpanded] = useState(true);
 
-  // 📺 Channels State
+  // --- STATE LOGIC ---
+  const [connectingOAuth, setConnectingOAuth] = useState(false);
   const [channels, setChannels] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState(null);
 
-  // 🔐 Credentials (Manual Mode)
+  // Manual Credentials State
   const [credentials, setCredentials] = useState({
     phoneNumberId: "",
     wabaId: "",
@@ -38,27 +39,23 @@ const ChannelSetup = () => {
     businessName: "",
   });
 
-  // 🚦 Connection Status
+  // Status State
   const [isConnected, setIsConnected] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [channelData, setChannelData] = useState(null);
   const [loadError, setLoadError] = useState(null);
 
-  // 📄 Templates State
+  // Templates State
   const [templates, setTemplates] = useState([]);
-  const {
-    loading: syncingTemplates,
-    result: syncResult,
-    sync,
-  } = useSyncTemplates();
+  const { loading: syncingTemplates, sync } = useSyncTemplates();
 
-  // 🌐 Meta Discovery State
+  // Meta Discovery State
   const [discovering, setDiscovering] = useState(false);
   const [discoverError, setDiscoverError] = useState(null);
   const [wabas, setWabas] = useState([]); 
   const [connectingNumberId, setConnectingNumberId] = useState(null);
 
-  // --- LOGIC HELPERS ---
+  // --- HELPERS ---
 
   const loadLocalCredentials = () => {
     const saved = localStorage.getItem("whatsapp_credentials");
@@ -69,7 +66,7 @@ const ChannelSetup = () => {
     localStorage.setItem("whatsapp_credentials", JSON.stringify(credentialsData));
   };
 
-  // 🧾 Load Templates
+  // Carga Templates desde DB
   const loadTemplatesForChannel = useCallback(
     async (channelId) => {
       if (!supabase || !channelId) {
@@ -81,23 +78,21 @@ const ChannelSetup = () => {
           .from("templates")
           .select("id, name, language, category, status, body, last_synced_at")
           .eq("channel_id", channelId)
-          .order("last_synced_at", { ascending: false });
+          // Ordenamos por status para que los APPROVED salgan primero
+          .order("status", { ascending: true }) 
+          .order("name", { ascending: true });
 
-        if (error) {
-          console.error("[ChannelSetup] error loading templates", error);
-          setTemplates([]);
-          return;
-        }
+        if (error) throw error;
         setTemplates(data || []);
       } catch (e) {
-        console.error("[ChannelSetup] unexpected error loading templates", e);
+        console.error("[ChannelSetup] error loading templates", e);
         setTemplates([]);
       }
     },
     [supabase]
   );
 
-  // 🧠 Refresh Channels Logic
+  // REFRESH CHANNELS (El corazón de tu lógica)
   const refreshChannels = useCallback(async () => {
     if (!supabase || !tenant?.id) return;
 
@@ -110,18 +105,16 @@ const ChannelSetup = () => {
         .eq("type", "whatsapp")
         .order("created_at", { ascending: true });
 
-      if (error) {
-        console.error("[ChannelSetup] error loading channels", error);
-        setLoadError(error.message);
-        setChannels([]);
-        return;
-      }
+      if (error) throw error;
 
       const list = data || [];
       setChannels(list);
       const savedCreds = loadLocalCredentials();
 
       if (list.length > 0) {
+        // --- LOGICA DE ACORDEÓN: Si hay canales, cerramos el setup ---
+        setIsConfigExpanded(false); 
+
         const active = list.find((c) => c.status === "active") || list[0];
         setSelectedChannelId(active.id);
         localStorage.setItem("activeChannel", active.id);
@@ -147,6 +140,9 @@ const ChannelSetup = () => {
         setIsConnected(!!active.status && active.status !== "disconnected");
         await loadTemplatesForChannel(active.id);
       } else {
+        // --- LOGICA DE ACORDEÓN: Si NO hay canales, abrimos el setup ---
+        setIsConfigExpanded(true);
+
         setSelectedChannelId(null);
         localStorage.removeItem("activeChannel");
         setCredentials({
@@ -160,7 +156,7 @@ const ChannelSetup = () => {
         setTemplates([]);
       }
     } catch (e) {
-      console.error("[ChannelSetup] unexpected error channels", e);
+      console.error("[ChannelSetup] error channels", e);
       setLoadError(e.message);
     }
   }, [supabase, tenant?.id, tenant?.name, loadTemplatesForChannel]);
@@ -170,7 +166,7 @@ const ChannelSetup = () => {
     refreshChannels();
   }, [refreshChannels]);
 
-  // 📨 OAuth Popup Listener
+  // OAuth Listener
   useEffect(() => {
     const handler = (event) => {
       if (event.origin !== window.location.origin) return;
@@ -186,42 +182,20 @@ const ChannelSetup = () => {
   // Handlers
   const handleSelectChannel = (channelId) => {
     setSelectedChannelId(channelId);
-    const savedCreds = loadLocalCredentials();
-
     if (channelId) localStorage.setItem("activeChannel", channelId);
-    else localStorage.removeItem("activeChannel");
-
-    if (!channelId) {
-        // Reset Logic
-       setChannelData(null);
-       setIsConnected(false);
-       setTemplates([]);
-       return;
-    }
-
+    
     const channel = channels.find((c) => c.id === channelId);
     if (!channel) return;
 
-    // Update Credentials State based on selection
-    setCredentials({
-        phoneNumberId: channel.phone_id || savedCreds.phoneNumberId || "",
-        wabaId: channel.meta_waba_id || savedCreds.wabaId || "",
-        accessToken: savedCreds.accessToken || "",
-        businessName: channel.display_name || savedCreds.businessName || tenant?.name || "My Business",
-    });
-
-    setChannelData({
+    // Actualizamos datos visuales basados en selección
+    setChannelData(prev => ({
+        ...prev,
         channelId: channel.id,
-        businessName: channel.display_name || savedCreds.businessName || tenant?.name || "My Business",
-        phoneNumber: channel.phone || null,
-        phoneNumberId: channel.phone_id || null,
-        wabaId: channel.meta_waba_id || null,
-        isActive: channel.status === "active",
-        lastSync: channel.created_at || new Date().toISOString(),
-        stats: { messagesToday: 0, messagesThisMonth: 0, activeChats: 0 },
-    });
-
-    setIsConnected(!!channel.status && channel.status !== "disconnected");
+        businessName: channel.display_name || prev?.businessName,
+        phoneNumber: channel.phone,
+        isActive: channel.status === "active"
+    }));
+    
     loadTemplatesForChannel(channelId);
   };
 
@@ -238,24 +212,16 @@ const ChannelSetup = () => {
         meta_waba_id: credentialsData.wabaId,
       };
 
-      let resultChannel = null;
       if (selectedChannelId) {
-        const { data, error } = await supabase.from("channels").update(payload).eq("id", selectedChannelId).select().single();
-        if (!error) resultChannel = data;
+        await supabase.from("channels").update(payload).eq("id", selectedChannelId);
       } else {
-        const { data, error } = await supabase.from("channels").insert({
+        const { data } = await supabase.from("channels").insert({
             tenant_id: tenant.id, type: "whatsapp", status: "inactive", phone: null, token_alias: null, ...payload
         }).select().single();
-        if (!error) {
-            resultChannel = data;
-            setSelectedChannelId(data.id);
-        }
+        if (data) setSelectedChannelId(data.id);
       }
-
-      if (resultChannel) {
-        await refreshChannels(); // Easy way to sync state
-      }
-      console.log("Credentials saved");
+      await refreshChannels();
+      alert("Credentials saved manually.");
     } catch (error) {
       console.error(error);
     } finally {
@@ -266,9 +232,6 @@ const ChannelSetup = () => {
   const handleConnectionTest = (result) => {
     if (!result) return;
     setIsConnected(!!result.success);
-    if(result.success) {
-        setChannelData(prev => ({...prev, lastSync: new Date().toISOString()}));
-    }
   };
 
   const handleToggleChannel = async (isActive) => {
@@ -284,7 +247,6 @@ const ChannelSetup = () => {
   };
 
   // --- META ACTIONS ---
-
   const handleConnectWithMeta = async () => {
     try {
       if (!supabase || !tenant?.id) return alert("Missing tenant info");
@@ -392,7 +354,6 @@ const ChannelSetup = () => {
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Channel Settings</h1>
               <p className="text-slate-500 text-sm mt-1">Manage your WhatsApp Business connection and templates.</p>
             </div>
-
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-2 px-3 py-1 bg-slate-100 rounded-full border border-slate-200">
                 <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-slate-400"}`} />
@@ -405,7 +366,7 @@ const ChannelSetup = () => {
           </div>
         </header>
 
-        <main className="p-8 max-w-7xl mx-auto space-y-8">
+        <main className="p-8 max-w-[1400px] mx-auto space-y-8">
           
           {/* ERROR ALERT */}
           {loadError && (
@@ -415,81 +376,123 @@ const ChannelSetup = () => {
             </div>
           )}
 
-          {/* 1. CONNECTION HUB (Meta OAuth + Discover) */}
-          <section className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-               <Icon name="Facebook" size={20} className="text-blue-600" />
-               Meta Connection Hub
-            </h2>
+          {/* 1. CONNECTION HUB (Collapsible Accordion) */}
+          <div className={`bg-white border transition-all duration-300 rounded-xl overflow-hidden ${isConfigExpanded ? 'border-indigo-200 shadow-md ring-1 ring-indigo-50' : 'border-slate-200 shadow-sm'}`}>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Connect Action */}
-                <div className="p-5 bg-blue-50/50 rounded-lg border border-blue-100">
-                    <h3 className="font-semibold text-slate-800 mb-1">1. Connect Account</h3>
-                    <p className="text-xs text-slate-500 mb-4">Log in with Facebook to authorize permissions.</p>
-                    <button
-                        onClick={handleConnectWithMeta}
-                        disabled={connectingOAuth}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-lg font-medium transition-all shadow-sm disabled:opacity-70"
-                    >
-                        {connectingOAuth ? <span className="animate-pulse">Connecting...</span> : "Connect with Facebook"}
-                    </button>
+            {/* Header del Acordeón (Clickable) */}
+            <div 
+              onClick={() => setIsConfigExpanded(!isConfigExpanded)}
+              className="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors bg-white"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${channels.length > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                  <Icon name="Facebook" size={20} />
                 </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Meta Connection Hub</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {channels.length > 0 ? (
+                      <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                        <Icon name="CheckCircle" size={12} /> Connected ({channels.length} assets active)
+                      </span>
+                    ) : (
+                      <span className="text-xs text-orange-500 font-medium flex items-center gap-1">
+                         Setup Required
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-                {/* Discover Action */}
-                <div className="p-5 bg-slate-50 rounded-lg border border-slate-100">
-                     <h3 className="font-semibold text-slate-800 mb-1">2. Select Assets</h3>
-                     <p className="text-xs text-slate-500 mb-4">Find your WABA and Phone Numbers.</p>
-                     <button
-                        onClick={handleDiscoverFromMeta}
-                        disabled={discovering}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg font-medium transition-all shadow-sm"
-                     >
-                        <Icon name="Search" size={16} />
-                        {discovering ? "Searching..." : "Discover Accounts"}
-                     </button>
-                     {discoverError && <p className="text-xs text-red-500 mt-2">{discoverError}</p>}
-                </div>
+              <div className="flex items-center gap-3">
+                 <span className="text-xs font-semibold text-indigo-600 hover:underline">
+                   {isConfigExpanded ? "Hide Setup" : "Manage Connection"}
+                 </span>
+                 <Icon name={isConfigExpanded ? "ChevronUp" : "ChevronDown"} size={18} className="text-slate-400" />
+              </div>
             </div>
 
-            {/* Discovered Accounts List */}
-            {wabas.length > 0 && (
-                <div className="mt-6 border-t border-slate-100 pt-6 animate-in fade-in slide-in-from-top-2">
-                    <h4 className="text-sm font-bold text-slate-700 mb-3">Discovered Accounts</h4>
-                    <div className="grid gap-3">
-                        {wabas.map((waba) => (
-                             <div key={waba.id} className="border border-slate-200 rounded-lg p-4">
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="font-semibold text-slate-800">{waba.name}</span>
-                                    <span className="text-xs font-mono text-slate-400">ID: {waba.id}</span>
-                                </div>
-                                {waba.phone_numbers?.map((p) => (
-                                    <div key={p.id} className="flex justify-between items-center p-2 bg-slate-50 rounded mt-2">
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-700">{p.display_phone_number}</p>
-                                            <p className="text-[10px] text-slate-400">{p.verified_name}</p>
-                                        </div>
-                                        <button 
-                                            onClick={() => handleConnectFromMeta(waba, p)}
-                                            disabled={connectingNumberId === p.id}
-                                            className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-700 disabled:opacity-50"
-                                        >
-                                            {connectingNumberId === p.id ? "Linking..." : "Connect Number"}
-                                        </button>
-                                    </div>
-                                ))}
-                             </div>
-                        ))}
+            {/* Contenido Desplegable (WIZARD) */}
+            {isConfigExpanded && (
+              <div className="border-t border-slate-100 bg-slate-50/50 p-6 animate-in slide-in-from-top-2">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+                    {/* Connect Action */}
+                    <div className="p-5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                        <h3 className="font-semibold text-slate-800 mb-1 flex items-center gap-2">
+                            <span className="bg-indigo-100 text-indigo-700 w-5 h-5 rounded-full flex items-center justify-center text-xs">1</span> 
+                            Connect Account
+                        </h3>
+                        <p className="text-xs text-slate-500 mb-4 ml-7">Authorize permissions via Facebook.</p>
+                        <button
+                            onClick={handleConnectWithMeta}
+                            disabled={connectingOAuth}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-lg font-medium transition-all shadow-sm text-sm"
+                        >
+                            {connectingOAuth ? "Connecting..." : "Log in with Facebook"}
+                        </button>
                     </div>
-                </div>
-            )}
-          </section>
 
-          {/* 2. ACTIVE CHANNEL & TEMPLATES (The Core) */}
+                    {/* Discover Action */}
+                    <div className="p-5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                          <h3 className="font-semibold text-slate-800 mb-1 flex items-center gap-2">
+                            <span className="bg-indigo-100 text-indigo-700 w-5 h-5 rounded-full flex items-center justify-center text-xs">2</span>
+                            Select Assets
+                          </h3>
+                          <p className="text-xs text-slate-500 mb-4 ml-7">Find your WABA and Phone Numbers.</p>
+                          <button
+                            onClick={handleDiscoverFromMeta}
+                            disabled={discovering}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg font-medium transition-all shadow-sm text-sm"
+                          >
+                            <Icon name="Search" size={14} />
+                            {discovering ? "Searching..." : "Discover Accounts"}
+                          </button>
+                          {discoverError && <p className="text-xs text-red-500 mt-2">{discoverError}</p>}
+                    </div>
+                 </div>
+
+                 {/* Discovered List */}
+                 {wabas.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-slate-200 max-w-5xl mx-auto animate-in fade-in">
+                        <h4 className="text-sm font-bold text-slate-700 mb-3">Available Accounts</h4>
+                        <div className="grid gap-3">
+                            {wabas.map((waba) => (
+                                <div key={waba.id} className="border border-slate-200 bg-white rounded-lg p-4 shadow-sm">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="font-bold text-slate-800 text-sm">{waba.name}</span>
+                                        <span className="text-xs font-mono text-slate-400">ID: {waba.id}</span>
+                                    </div>
+                                    {waba.phone_numbers?.map((p) => (
+                                        <div key={p.id} className="flex justify-between items-center p-2 bg-slate-50 rounded mt-2 border border-slate-100">
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-700">{p.display_phone_number}</p>
+                                                <p className="text-[10px] text-slate-400">{p.verified_name}</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleConnectFromMeta(waba, p)}
+                                                disabled={connectingNumberId === p.id}
+                                                className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-700 disabled:opacity-50 font-medium"
+                                            >
+                                                {connectingNumberId === p.id ? "Linking..." : "Connect"}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                 )}
+              </div>
+            )}
+          </div>
+
+          {/* 2. ACTIVE CHANNEL & TEMPLATES (Visible always if active) */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             
-            {/* Left Col: Channel Selector & Status */}
+            {/* Columna Izquierda: Status & Config */}
             <div className="xl:col-span-1 space-y-6">
+                
+                {/* Channel Selector */}
                 <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block">
                         Active Channel
@@ -501,75 +504,79 @@ const ChannelSetup = () => {
                     />
                 </div>
 
+                {/* Status Card (Tu componente existente) */}
                 {selectedChannelId && (
-                     <ChannelStatusCard
+                      <ChannelStatusCard
                         isConnected={isConnected}
                         channelData={channelData}
                         onToggleChannel={handleToggleChannel}
-                     />
+                      />
                 )}
+
+                {/* Manual Config (Collapsible) - MANTENIDA PERO OCULTA POR DEFECTO */}
+                <div className="pt-4 border-t border-slate-200">
+                   <details className="group">
+                      <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider">
+                          <Icon name="Settings" size={14} />
+                          <span>Advanced / Manual Config</span>
+                          <Icon name="ChevronDown" size={12} className="group-open:rotate-180 transition-transform ml-auto" />
+                      </summary>
+                      
+                      <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+                          <CredentialsForm
+                              credentials={credentials}
+                              onCredentialsChange={handleCredentialsChange}
+                              onSave={handleSaveCredentials}
+                              isLoading={isSaving}
+                          />
+                          <div className="space-y-4">
+                              <ConnectionTestCard
+                                  credentials={credentials}
+                                  onTestConnection={handleConnectionTest}
+                                  isConnected={isConnected}
+                              />
+                              <WebhookConfigCard />
+                          </div>
+                      </div>
+                   </details>
+                </div>
             </div>
 
-            {/* Right Col: Templates Manager (The MAIN thing for Meta) */}
+            {/* Columna Derecha: Templates (Protagonista) */}
             <div className="xl:col-span-2">
                 {selectedChannelId ? (
                     <div className="space-y-4">
                         <div className="flex justify-between items-center">
-                            <h2 className="text-lg font-bold text-slate-800">WhatsApp Templates</h2>
-                             <button
+                            <h2 className="text-lg font-bold text-slate-800">Message Templates</h2>
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={async () => {
                                     await sync(selectedChannelId);
                                     await loadTemplatesForChannel(selectedChannelId);
                                 }}
                                 disabled={syncingTemplates}
-                                className="flex items-center gap-2 text-sm text-indigo-600 font-medium hover:text-indigo-800"
-                             >
-                                <Icon name="RefreshCw" size={14} className={syncingTemplates ? "animate-spin" : ""} />
+                                iconName="RefreshCw"
+                                className={syncingTemplates ? "opacity-70" : ""}
+                            >
                                 {syncingTemplates ? "Syncing..." : "Sync from Meta"}
-                             </button>
+                            </Button>
                         </div>
                         
+                        {/* Tu componente Pro */}
                         <TemplatesListCard
                             templates={templates}
                             channelId={selectedChannelId}
                         />
                     </div>
                 ) : (
-                    <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400">
+                    <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 bg-slate-50/50">
                         <Icon name="MessageSquare" size={32} className="mb-2 opacity-50" />
                         <p>Select a channel to view templates</p>
                     </div>
                 )}
             </div>
           </div>
-
-          {/* 3. ADVANCED SETTINGS (Manual Config) */}
-          {/* <div className="pt-8 border-t border-slate-200">
-             <details className="group">
-                <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
-                    <Icon name="Settings" size={16} />
-                    <span>Advanced Configuration (Manual API Keys & Webhooks)</span>
-                    <Icon name="ChevronDown" size={14} className="group-open:rotate-180 transition-transform" />
-                </summary>
-                
-                <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2">
-                    <CredentialsForm
-                        credentials={credentials}
-                        onCredentialsChange={handleCredentialsChange}
-                        onSave={handleSaveCredentials}
-                        isLoading={isSaving}
-                    />
-                    <div className="space-y-6">
-                        <ConnectionTestCard
-                            credentials={credentials}
-                            onTestConnection={handleConnectionTest}
-                            isConnected={isConnected}
-                        />
-                        <WebhookConfigCard />
-                    </div>
-                </div>
-             </details>
-          </div> */}
 
         </main>
       </div>
