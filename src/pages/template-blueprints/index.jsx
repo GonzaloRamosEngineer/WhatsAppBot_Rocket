@@ -10,9 +10,6 @@ import NavigationSidebar from "../../components/ui/NavigationSidebar";
 import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
 import { useAuth } from "../../lib/AuthProvider";
 
-// Componentes UI simples para los filtros
-import Input from "../../components/ui/Input"; 
-
 // Constantes para filtros visuales
 const CATEGORIES = [
   { id: "ALL", label: "All Templates" },
@@ -33,6 +30,7 @@ const SECTORS = [
 
 export default function TemplateBlueprintsPage() {
   const { tenant, profile, logout } = useAuth();
+  // Estado inicial del sidebar colapsado en móvil por defecto, expandido en desktop
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
   // Data State
@@ -90,40 +88,57 @@ export default function TemplateBlueprintsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      {/* 1. SIDEBAR */}
+      
+      {/* 1. SIDEBAR (Con lógica responsiva interna) */}
       <NavigationSidebar
         isCollapsed={isSidebarCollapsed}
         onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         userRole="tenant"
       />
 
-      {/* 2. MAIN CONTENT WRAPPER */}
-      <div className={`flex-1 transition-all duration-200 ${isSidebarCollapsed ? "ml-16" : "ml-60"}`}>
+      {/* 2. MAIN CONTENT WRAPPER (Ajuste de margen dinámico) */}
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
         
-        {/* HEADER */}
-        <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-20 shadow-sm">
+        {/* HEADER (Estilo Unificado & Responsive) */}
+        <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-3 md:py-4 sticky top-0 z-20 shadow-sm transition-all">
           <div className="flex items-center justify-between">
+            
+            {/* IZQUIERDA: Menú + Icono + Título */}
             <div className="flex items-center gap-3">
-               <div className="bg-indigo-600 p-2 rounded-lg text-white">
+               
+               {/* Botón Menú (Solo Móvil - Estilo Violáceo) */}
+               <button 
+                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                 className="md:hidden p-2 mr-1 text-indigo-600 bg-white border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-md transition-all active:scale-95"
+                 title="Toggle Menu"
+               >
+                 <Icon name="Menu" size={20} />
+               </button>
+
+               <div className="hidden md:block bg-indigo-600 p-2 rounded-lg text-white shadow-sm shadow-indigo-200">
                   <Icon name="LayoutTemplate" size={20} />
                </div>
                <div>
-                  <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Meta Template Library</h1>
-                  <p className="text-slate-500 text-xs font-medium">
-                    Official WhatsApp Blueprints • <span className="text-emerald-600">{blueprints.length} available</span>
+                  <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight">
+                    Template Library
+                  </h1>
+                  <p className="text-slate-500 text-xs font-medium hidden md:block">
+                    Official WhatsApp Blueprints • <span className="text-emerald-600 font-semibold">{blueprints.length} ready</span>
                   </p>
                </div>
             </div>
+
+            {/* DERECHA: Perfil */}
             <UserProfileDropdown user={currentUser} onLogout={handleLogout} />
           </div>
         </header>
 
-        <main className="p-8 max-w-[1600px] mx-auto">
+        <main className="p-4 md:p-8 max-w-[1600px] mx-auto w-full">
           
-          {/* 🔍 FILTERS BAR (La parte "Pro") */}
+          {/* 🔍 FILTERS BAR (Ajustada para móvil) */}
           <div className="mb-8 space-y-4">
             
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-end md:items-center">
+            <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
                 {/* Search */}
                 <div className="w-full md:w-96 relative group">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
@@ -131,7 +146,7 @@ export default function TemplateBlueprintsPage() {
                     </div>
                     <input 
                         type="text"
-                        placeholder="Search templates (e.g. 'welcome', 'offer')..."
+                        placeholder="Search templates..."
                         className="pl-10 pr-4 py-2.5 w-full border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -139,11 +154,10 @@ export default function TemplateBlueprintsPage() {
                 </div>
 
                 {/* Sector Dropdown */}
-                <div className="relative min-w-[200px]">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Filter by Industry</label>
+                <div className="relative w-full md:w-auto min-w-[200px]">
                     <div className="relative">
                         <select 
-                            className="w-full appearance-none bg-white border border-slate-200 hover:border-slate-300 text-slate-700 py-2.5 pl-4 pr-8 rounded-lg leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium shadow-sm transition-all cursor-pointer"
+                            className="w-full appearance-none bg-white border border-slate-200 hover:border-slate-300 text-slate-700 py-2.5 pl-4 pr-10 rounded-lg leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium shadow-sm transition-all cursor-pointer"
                             value={selectedSector}
                             onChange={(e) => setSelectedSector(e.target.value)}
                         >
@@ -151,24 +165,24 @@ export default function TemplateBlueprintsPage() {
                                 <option key={s.id} value={s.id}>{s.label}</option>
                             ))}
                         </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                            <Icon name="ChevronDown" size={14} />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+                            <Icon name="ChevronDown" size={16} />
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Category Tabs (Pills) */}
-            <div className="flex flex-wrap gap-2 pb-2 border-b border-slate-200">
+            {/* Category Tabs (Pills - Scrollable en móvil) */}
+            <div className="flex overflow-x-auto pb-2 border-b border-slate-200 gap-2 custom-scrollbar no-scrollbar">
                 {CATEGORIES.map(cat => {
                     const isActive = selectedCategory === cat.id;
                     return (
                         <button
                             key={cat.id}
                             onClick={() => setSelectedCategory(cat.id)}
-                            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 border
+                            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 border whitespace-nowrap
                                 ${isActive 
-                                    ? "bg-slate-800 text-white border-slate-800 shadow-md transform scale-105" 
+                                    ? "bg-slate-800 text-white border-slate-800 shadow-md" 
                                     : "bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                                 }
                             `}
@@ -201,12 +215,12 @@ export default function TemplateBlueprintsPage() {
                     ))
                 ) : (
                     <div className="col-span-full py-20 text-center">
-                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-200">
                             <Icon name="SearchX" size={32} className="text-slate-400 opacity-50"/>
                         </div>
                         <h3 className="text-lg font-medium text-slate-800">No templates found</h3>
-                        <p className="text-slate-500 max-w-xs mx-auto mt-1">
-                            We couldn't find any templates matching your filters. Try selecting "All Industries" or a different category.
+                        <p className="text-slate-500 max-w-xs mx-auto mt-1 text-sm">
+                            Try selecting "All Industries" or a different category.
                         </p>
                         <button 
                             onClick={() => {setSearchTerm(""); setSelectedCategory("ALL"); setSelectedSector("ALL")}}
