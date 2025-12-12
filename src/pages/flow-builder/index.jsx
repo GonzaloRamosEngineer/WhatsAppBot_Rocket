@@ -315,31 +315,47 @@ const FlowBuilder = () => {
 
       <div className={`transition-all duration-300 ${isSidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
         
-        {/* Header - Flow Builder (Estilo Unificado) */}
-        <header className="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-20 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+{/* Header - Flow Builder (Estilo Unificado & Responsive Pro) */}
+        <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 sticky top-0 z-20 shadow-sm transition-all">
+          <div className="flex items-center justify-between">
+            
+            {/* IZQUIERDA: Menú + Icono + Título */}
             <div className="flex items-center gap-3">
-               <div className="bg-purple-600 p-2 rounded-lg text-white shadow-sm shrink-0">
+               
+               {/* Botón Menú (Solo Móvil - Estilo Violáceo) */}
+               <button 
+                 onClick={handleToggleSidebar}
+                 className="md:hidden p-2 mr-1 text-indigo-600 bg-white border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-md transition-all active:scale-95"
+                 title="Toggle Menu"
+               >
+                 <Icon name="Menu" size={20} />
+               </button>
+
+               <div className="hidden md:block bg-purple-600 p-2 rounded-lg text-white shadow-sm shrink-0">
                   <Icon name="GitBranch" size={20} />
                </div>
+               
                <div>
-                  <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Flow Builder</h1>
-                  <p className="text-slate-500 text-xs font-medium">
+                  <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight">Flow Builder</h1>
+                  <p className="text-slate-500 text-xs font-medium hidden md:block">
                     Design and manage automated bot responses
                   </p>
                </div>
             </div>
 
-            <div className="flex items-center gap-4 self-end md:self-auto">
-              {/* Botón de Guardar Crítico */}
+            {/* DERECHA: Acciones + Perfil */}
+            <div className="flex items-center gap-3 md:gap-4">
+              
+              {/* Botón Guardar (Compacto en móvil) */}
               <Button
                 variant="outline"
                 iconName="Save"
-                onClick={handlePersistRules}
+                onClick={handlePersistRules} // Asumiendo que esta función está definida arriba
                 disabled={isSaving || isLoading}
-                className={`border-slate-300 hover:border-purple-500 hover:text-purple-600 ${isSaving ? 'opacity-70' : ''}`}
+                className={`border-slate-300 hover:border-purple-500 hover:text-purple-600 h-9 text-xs md:text-sm ${isSaving ? 'opacity-70' : ''}`}
               >
-                {isSaving ? "Saving..." : "Save Rules"}
+                {isSaving ? "Saving..." : <span className="hidden md:inline">Save Rules</span>}
+                {!isSaving && <span className="md:hidden">Save</span>}
               </Button>
 
               <UserProfileDropdown
