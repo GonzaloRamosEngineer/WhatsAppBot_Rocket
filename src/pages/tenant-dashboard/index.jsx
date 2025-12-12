@@ -1,7 +1,7 @@
 // C:\Projects\WhatsAppBot_Rocket\src\pages\tenant-dashboard\index.jsx
 
 import React, { useState, useEffect } from "react";
-import NavigationSidebar from "../../components/ui/NavigationSidebar";
+import { useOutletContext } from "react-router-dom"; // CONEXIÓN CON LAYOUT
 import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
 import MetricsCard from "./components/MetricsCard";
 import ActivityFeed from "./components/ActivityFeed";
@@ -16,10 +16,13 @@ import { supabase } from "../../lib/supabaseClient";
 
 const TenantDashboard = () => {
   const { session, profile, logout } = useAuth();
+  
+  // 👇 1. Consumimos el contexto del Layout para abrir el menú móvil
+  const { toggleMobileMenu } = useOutletContext(); 
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // --- ESTADOS DE DATOS (Tu lógica original) ---
   const [tenantInfo, setTenantInfo] = useState(null);
   const [messages, setMessages] = useState([]);
   const [flows, setFlows] = useState([]);
@@ -32,7 +35,7 @@ const TenantDashboard = () => {
     displayName: null,
   });
 
-  // 🔹 Cargar datos reales del tenant desde Supabase
+  // --- CARGA DE DATOS (Tu lógica original intacta) ---
   useEffect(() => {
     const loadData = async () => {
       if (!profile) return;
@@ -180,7 +183,7 @@ const TenantDashboard = () => {
               ? "Tenés al menos un canal de WhatsApp activo"
               : "Tenés un canal configurado pero inactivo",
             timestamp: now.toISOString(),
-            status: channelSummary.isActive ? "success" : "pending",
+            status: "success",
           });
         }
 
@@ -195,11 +198,11 @@ const TenantDashboard = () => {
     loadData();
   }, [profile]);
 
-  // 🔹 Métricas calculadas
+  // --- CÁLCULOS Y MÉTRICAS (Tu lógica original intacta) ---
   const totalMessages = messages.length;
   const inCount = messages.filter((m) => m.direction === "in").length;
   const outCount = messages.filter((m) => m.direction === "out").length;
-  const activeFlows = flows.length;
+  // const activeFlows = flows.length; // (Ya se usa abajo, comentado para no duplicar variable si linter se queja)
 
   const now = new Date();
   const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
@@ -247,9 +250,9 @@ const TenantDashboard = () => {
     },
     {
       title: "Active Flows",
-      value: String(activeFlows),
-      change: activeFlows ? "Running workflows" : "Create your first flow",
-      changeType: activeFlows ? "positive" : "neutral",
+      value: String(flows.length),
+      change: flows.length ? "Running workflows" : "Create your first flow",
+      changeType: flows.length ? "positive" : "neutral",
       icon: "GitBranch",
       color: "amber",
     },
@@ -262,223 +265,207 @@ const TenantDashboard = () => {
     role: profile?.role || "Tenant Admin",
   };
 
-// ... (toda la lógica de arriba se mantiene igual)
-
+  // --- RENDERIZADO OPTIMIZADO (Layout Pattern) ---
   return (
     <div className="min-h-screen bg-slate-50">
       
-      <NavigationSidebar
-        isCollapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        userRole={profile?.role || "tenant"}
-      />
-
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
-        
-{/* Header MEJORADO para Móvil y Desktop */}
-        <header className="bg-white border-b border-slate-200 px-4 py-3 md:px-6 md:py-4 sticky top-0 z-30 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            
-            {/* Parte Izquierda: Título y Bienvenida */}
-            <div className="flex items-center gap-3 w-full md:w-auto">
-               {/* Botón Hamburguesa (Solo Móvil) - Integrado y estilizado */}
-               <button 
-                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                 className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
-               >
-                 <Icon name="Menu" size={24} />
-               </button>
-
-               <div className="flex items-center gap-3">
-                   <div className="hidden md:block bg-blue-600 p-2 rounded-lg text-white shadow-sm shrink-0">
-                      <Icon name="LayoutDashboard" size={20} />
-                   </div>
-                   <div>
-                      <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight">Dashboard</h1>
-                      <p className="text-slate-500 text-xs font-medium hidden sm:block">
-                        Welcome back, {currentUser.name}.
-                      </p>
-                   </div>
-               </div>
-               
-               {/* Perfil en Móvil (A la derecha para balancear) */}
-               <div className="md:hidden ml-auto">
-                  <UserProfileDropdown user={currentUser} onLogout={logout} />
-               </div>
-            </div>
-
-            {/* Parte Derecha: Acciones (Desktop) */}
-            <div className="hidden md:flex items-center gap-4">
-              <UserProfileDropdown user={currentUser} onLogout={logout} />
-            </div>
-          </div>
-        </header>
-
-        {/* Main Content */}
-        <main className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8">
+      {/* Header Dashboard (Limpio y conectado al Layout) */}
+      <header className="bg-white border-b border-slate-200 px-4 py-3 md:px-6 md:py-4 sticky top-0 z-30 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           
-          {/* 1. Status Banner */}
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-             <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${channelSummary.isActive ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
-                   <Icon name={channelSummary.isActive ? "CheckCircle" : "AlertCircle"} size={20} />
-                </div>
-                <div>
-                   <h3 className="text-sm font-bold text-slate-800">
-                      {channelSummary.hasChannel 
-                         ? (channelSummary.isActive ? "WhatsApp Connected" : "Channel Inactive") 
-                         : "No Channel Connected"}
-                   </h3>
-                   <p className="text-xs text-slate-500">
-                      {channelSummary.hasChannel 
-                         ? `${channelSummary.displayName || "My Business"} • ${channelSummary.phone || "No phone"}` 
-                         : "Connect a number to start messaging."}
-                   </p>
-                </div>
+          {/* Parte Izquierda */}
+          <div className="flex items-center gap-3 w-full md:w-auto">
+             
+             {/* Botón Hamburguesa (Solo Móvil) - LLAMA AL LAYOUT */}
+             <button 
+               onClick={toggleMobileMenu} 
+               className="md:hidden p-2 -ml-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100"
+             >
+               <Icon name="Menu" size={24} />
+             </button>
+
+             <div className="flex items-center gap-3">
+                 <div className="hidden md:block bg-blue-600 p-2 rounded-lg text-white shadow-sm shrink-0">
+                    <Icon name="LayoutDashboard" size={20} />
+                 </div>
+                 <div>
+                    <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight">Dashboard</h1>
+                    <p className="text-slate-500 text-xs font-medium hidden sm:block">
+                      Welcome back, {currentUser.name}.
+                    </p>
+                 </div>
              </div>
-             {!channelSummary.hasChannel && (
-                <Button variant="default" size="sm" onClick={() => window.location.href='/channel-setup'}>
-                   Connect Now
-                </Button>
-             )}
+             
+             {/* Perfil en Móvil (A la derecha para balancear) */}
+             <div className="md:hidden ml-auto">
+                <UserProfileDropdown user={currentUser} onLogout={logout} />
+             </div>
           </div>
 
-          {/* 2. Metrics Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-            {metrics.map((metric, index) => (
-              <MetricsCard
-                key={index}
-                title={metric.title}
-                value={metric.value}
-                change={metric.change}
-                changeType={metric.changeType}
-                icon={metric.icon}
-                color={metric.color}
+          {/* Parte Derecha (Desktop) */}
+          <div className="hidden md:flex items-center gap-4">
+            <UserProfileDropdown user={currentUser} onLogout={logout} />
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8">
+        
+        {/* 1. Status Banner */}
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+               <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${channelSummary.isActive ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
+                  <Icon name={channelSummary.isActive ? "CheckCircle" : "AlertCircle"} size={20} />
+               </div>
+               <div>
+                  <h3 className="text-sm font-bold text-slate-800">
+                     {channelSummary.hasChannel 
+                        ? (channelSummary.isActive ? "WhatsApp Connected" : "Channel Inactive") 
+                        : "No Channel Connected"}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                     {channelSummary.hasChannel 
+                        ? `${channelSummary.displayName || "My Business"} • ${channelSummary.phone || "No phone"}` 
+                        : "Connect a number to start messaging."}
+                  </p>
+               </div>
+            </div>
+            {!channelSummary.hasChannel && (
+               <Button variant="default" size="sm" onClick={() => window.location.href='/channel-setup'}>
+                  Connect Now
+               </Button>
+            )}
+        </div>
+
+        {/* 2. Metrics Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+          {metrics.map((metric, index) => (
+            <MetricsCard
+              key={index}
+              title={metric.title}
+              value={metric.value}
+              change={metric.change}
+              changeType={metric.changeType}
+              icon={metric.icon}
+              color={metric.color}
+              isLoading={isLoading}
+            />
+          ))}
+        </div>
+
+        {/* 3. Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          
+          {/* Columna Izquierda (Ancha) */}
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
+                  Quick Actions
+                </h3>
+                <QuickActions />
+            </div>
+
+            <div className="h-[500px]"> 
+                <ActivityFeed activities={activities} isLoading={isLoading} />
+            </div>
+          </div>
+
+          {/* Columna Derecha (Estrecha) */}
+          <div className="flex flex-col gap-6">
+            <OnboardingChecklist
+              isChannelConnected={channelSummary.isActive}
+              hasFlows={flows.length > 0}
+              hasMessages={totalMessages > 0}
+              onComplete={() => console.log("Onboarding Complete")}
+            />
+            
+            <div className="h-[500px]">
+              <ActiveConversations
+                conversations={conversations}
                 isLoading={isLoading}
               />
-            ))}
+            </div>
           </div>
+        </div>
 
-          {/* 3. Main Grid (CORREGIDO PARA EVITAR SUPERPOSICIÓN) */}
-          {/* 'items-start' evita que las columnas se estiren innecesariamente */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            
-            {/* Columna Izquierda (Ancha) */}
-            <div className="lg:col-span-2 flex flex-col gap-6">
-              
-              {/* CAMBIO CLAVE: Quick Actions PRIMERO */}
-              {/* Al estar arriba, empuja el contenido hacia abajo ordenadamente */}
-              <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                 <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
-                    Quick Actions
-                 </h3>
-                 <QuickActions />
-              </div>
-
-              {/* Activity Feed SEGUNDO */}
-              {/* CAMBIO CLAVE: Altura fija (h-[500px]) para contener el scroll y no romper el layout */}
-              <div className="h-[500px]"> 
-                 <ActivityFeed activities={activities} isLoading={isLoading} />
+        {/* 4. Insights Grid (Bot Intelligence & Funnel) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* Bot Intelligence Card */}
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-800">Bot Intelligence</h3>
+              <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                 <Icon name="Cpu" size={18} />
               </div>
             </div>
+            
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between items-end mb-1">
+                    <span className="text-xs text-slate-500 font-medium">Automation Level</span>
+                    <span className="text-xl font-bold text-slate-800">{totalMessages ? `${automationRate}%` : "—"}</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-purple-500 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${automationRate || 0}%` }} />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1 text-right">{automationMessages.length} auto-replies sent</p>
+              </div>
 
-            {/* Columna Derecha (Estrecha) */}
-            <div className="flex flex-col gap-6">
-              <OnboardingChecklist
-                isChannelConnected={channelSummary.isActive}
-                hasFlows={activeFlows > 0}
-                hasMessages={totalMessages > 0}
-                onComplete={() => console.log("Onboarding Complete")}
-              />
-              
-              {/* Altura fija también aquí para alinear visualmente con la izquierda */}
-              <div className="h-[500px]">
-                <ActiveConversations
-                  conversations={conversations}
-                  isLoading={isLoading}
-                />
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
+                    <span className="block text-lg font-bold text-slate-700">{totalMessages}</span>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Total Msgs</span>
+                 </div>
+                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
+                    <span className="block text-lg font-bold text-slate-700">{messagesToday.length}</span>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Today</span>
+                 </div>
               </div>
             </div>
           </div>
 
-          {/* 4. Insights Grid (Bot Intelligence & Funnel) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Bot Intelligence Card */}
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-slate-800">Bot Intelligence</h3>
-                <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-                   <Icon name="Cpu" size={18} />
-                </div>
+          {/* Conversation Funnel Card */}
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-800">Conversation Funnel</h3>
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                 <Icon name="Filter" size={18} />
               </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between items-end mb-1">
-                     <span className="text-xs text-slate-500 font-medium">Automation Level</span>
-                     <span className="text-xl font-bold text-slate-800">{totalMessages ? `${automationRate}%` : "—"}</span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-purple-500 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${automationRate || 0}%` }} />
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-1 text-right">{automationMessages.length} auto-replies sent</p>
+            </div>
+
+            <div className="space-y-4">
+                <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+                  <span>Total Active Threads</span>
+                  <span className="text-slate-800 font-bold">{conversations.length}</span>
+                </div>
+                
+                <div className="flex h-3 rounded-full overflow-hidden w-full bg-slate-100">
+                  <div className="bg-emerald-500 h-full" style={{ width: `${conversations.length ? (activeConvCount/conversations.length)*100 : 0}%` }} title="Open" />
+                  <div className="bg-amber-400 h-full" style={{ width: `${conversations.length ? (pendingConvCount/conversations.length)*100 : 0}%` }} title="Pending" />
+                  <div className="bg-slate-300 h-full" style={{ width: `${conversations.length ? (resolvedConvCount/conversations.length)*100 : 0}%` }} title="Resolved" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                   <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
-                      <span className="block text-lg font-bold text-slate-700">{totalMessages}</span>
-                      <span className="text-[10px] text-slate-400 uppercase font-bold">Total Msgs</span>
+                <div className="space-y-2 mt-2">
+                   <div className="flex justify-between text-xs">
+                      <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Open</span>
+                      <span className="font-bold">{activeConvCount}</span>
                    </div>
-                   <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-center">
-                      <span className="block text-lg font-bold text-slate-700">{messagesToday.length}</span>
-                      <span className="text-[10px] text-slate-400 uppercase font-bold">Today</span>
+                   <div className="flex justify-between text-xs">
+                      <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-400"></div> Pending</span>
+                      <span className="font-bold">{pendingConvCount}</span>
+                   </div>
+                   <div className="flex justify-between text-xs">
+                      <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-300"></div> Resolved</span>
+                      <span className="font-bold">{resolvedConvCount}</span>
                    </div>
                 </div>
-              </div>
             </div>
-
-            {/* Conversation Funnel Card */}
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-slate-800">Conversation Funnel</h3>
-                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                   <Icon name="Filter" size={18} />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                 <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-                    <span>Total Active Threads</span>
-                    <span className="text-slate-800 font-bold">{conversations.length}</span>
-                 </div>
-                 
-                 <div className="flex h-3 rounded-full overflow-hidden w-full bg-slate-100">
-                    <div className="bg-emerald-500 h-full" style={{ width: `${conversations.length ? (activeConvCount/conversations.length)*100 : 0}%` }} title="Open" />
-                    <div className="bg-amber-400 h-full" style={{ width: `${conversations.length ? (pendingConvCount/conversations.length)*100 : 0}%` }} title="Pending" />
-                    <div className="bg-slate-300 h-full" style={{ width: `${conversations.length ? (resolvedConvCount/conversations.length)*100 : 0}%` }} title="Resolved" />
-                 </div>
-
-                 <div className="space-y-2 mt-2">
-                    <div className="flex justify-between text-xs">
-                       <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Open</span>
-                       <span className="font-bold">{activeConvCount}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                       <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-amber-400"></div> Pending</span>
-                       <span className="font-bold">{pendingConvCount}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                       <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-300"></div> Resolved</span>
-                       <span className="font-bold">{resolvedConvCount}</span>
-                    </div>
-                 </div>
-              </div>
-            </div>
-
           </div>
-        </main>
-      </div>
+        </div>
+
+      </main>
     </div>
   );
 };

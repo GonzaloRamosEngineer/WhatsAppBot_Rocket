@@ -1,26 +1,29 @@
 // C:\Projects\WhatsAppBot_Rocket\src\Routes.jsx
 
 import React from "react";
-import { BrowserRouter, Routes as RouterRoutes, Route } from "react-router-dom";
+import { BrowserRouter, Routes as RouterRoutes, Route, Navigate } from "react-router-dom";
 
 import ScrollToTop from "components/ScrollToTop";
 import ErrorBoundary from "components/ErrorBoundary";
 
-import NotFound from "pages/NotFound";
-import FlowBuilder from "./pages/flow-builder";
-import TenantRegistration from "./pages/tenant-registration";
-import LoginPage from "./pages/login";
-import ChannelSetup from "./pages/channel-setup";
-import MessagesLog from "./pages/messages-log";
-import TenantDashboard from "./pages/tenant-dashboard";
-import AgentInboxPage from "./pages/agent-inbox";
-
-// 👇 1. IMPORTAMOS LA NUEVA PÁGINA
-import TemplateBlueprintsPage from "./pages/template-blueprints";
-
+// Componentes de Layout y Auth
 import ProtectedRoute from "./lib/ProtectedRoute";
+import TenantLayout from "./components/layouts/TenantLayout";
+
+// Páginas Públicas
+import LoginPage from "./pages/login";
+import TenantRegistration from "./pages/tenant-registration";
 import PasswordResetPage from "./pages/password-reset";
 import FacebookCallback from "./pages/oauth/FacebookCallback";
+import NotFound from "pages/NotFound";
+
+// Páginas del Sistema (Protegidas)
+import TenantDashboard from "./pages/tenant-dashboard";
+import ChannelSetup from "./pages/channel-setup";
+import FlowBuilder from "./pages/flow-builder";
+import TemplateBlueprintsPage from "./pages/template-blueprints";
+import MessagesLog from "./pages/messages-log";
+import AgentInboxPage from "./pages/agent-inbox";
 
 const Routes = () => {
   return (
@@ -28,70 +31,44 @@ const Routes = () => {
       <ErrorBoundary>
         <ScrollToTop />
         <RouterRoutes>
-          {/* ... rutas públicas (login, etc) igual que antes ... */}
+          
+          {/* --- RUTAS PÚBLICAS --- */}
           <Route path="/" element={<LoginPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/auth/reset-password" element={<PasswordResetPage />} />
           <Route path="/tenant-registration" element={<TenantRegistration />} />
+          <Route path="/auth/reset-password" element={<PasswordResetPage />} />
           <Route path="/oauth/facebook/callback" element={<FacebookCallback />} />
 
-          {/* Protected routes */}
+          {/* --- RUTAS PROTEGIDAS (LAYOUT MAESTRO) --- */}
+          {/* 1. ProtectedRoute verifica autenticación.
+             2. TenantLayout renderiza el Sidebar y el contenedor principal.
+             3. Las rutas anidadas se renderizan dentro del Outlet del Layout.
+          */}
           <Route
-            path="/tenant-dashboard"
             element={
               <ProtectedRoute>
-                <TenantDashboard />
+                <TenantLayout />
               </ProtectedRoute>
             }
-          />
+          >
+            {/* Dashboard */}
+            <Route path="/tenant-dashboard" element={<TenantDashboard />} />
+            
+            {/* Configuración */}
+            <Route path="/channel-setup" element={<ChannelSetup />} />
+            
+            {/* Automatización */}
+            <Route path="/templates" element={<TemplateBlueprintsPage />} />
+            <Route path="/flow-builder" element={<FlowBuilder />} />
+            
+            {/* Mensajería */}
+            <Route path="/messages-log" element={<MessagesLog />} />
+            <Route path="/agent-inbox" element={<AgentInboxPage />} />
+          </Route>
 
-          <Route
-            path="/flow-builder"
-            element={
-              <ProtectedRoute>
-                <FlowBuilder />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* 👇 2. AGREGAMOS LA NUEVA RUTA AQUÍ */}
-          <Route
-            path="/templates"
-            element={
-              <ProtectedRoute>
-                <TemplateBlueprintsPage />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/channel-setup"
-            element={
-              <ProtectedRoute>
-                <ChannelSetup />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/messages-log"
-            element={
-              <ProtectedRoute>
-                <MessagesLog />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/agent-inbox"
-            element={
-              <ProtectedRoute>
-                <AgentInboxPage />
-              </ProtectedRoute>
-            }
-          />
-
+          {/* Fallback 404 */}
           <Route path="*" element={<NotFound />} />
+          
         </RouterRoutes>
       </ErrorBoundary>
     </BrowserRouter>
