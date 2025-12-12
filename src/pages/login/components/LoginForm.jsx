@@ -13,6 +13,7 @@ const LoginForm = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
+  // --- ESTADOS Y LÓGICA (100% ORIGINAL) ---
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -39,26 +40,22 @@ const LoginForm = () => {
 
   const validateForm = () => {
     const newErrors = {};
-
     if (!formData?.email) {
-      newErrors.email = "El email es obligatorio.";
+      newErrors.email = "Email is required.";
     } else if (!/\S+@\S+\.\S+/.test(formData?.email)) {
-      newErrors.email = "Ingresá un email válido.";
+      newErrors.email = "Please enter a valid email.";
     }
-
     if (!formData?.password) {
-      newErrors.password = "La contraseña es obligatoria.";
+      newErrors.password = "Password is required.";
     } else if (formData?.password?.length < 6) {
-      newErrors.password = "La contraseña debe tener al menos 6 caracteres.";
+      newErrors.password = "Password must be at least 6 chars.";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
-
     if (!validateForm()) return;
 
     setIsLoading(true);
@@ -72,13 +69,11 @@ const LoginForm = () => {
     if (!result.ok) {
       setErrors((prev) => ({
         ...prev,
-        general:
-          result.error?.message || "Credenciales inválidas. Probá de nuevo.",
+        general: result.error?.message || "Invalid credentials. Please try again.",
       }));
       return;
     }
 
-    // Login OK → dashboard del tenant
     navigate("/tenant-dashboard");
   };
 
@@ -87,30 +82,22 @@ const LoginForm = () => {
     setForgotMessage("");
 
     if (!formData?.email) {
-      setForgotError("Ingresá tu email para enviarte el enlace de reinicio.");
+      setForgotError("Enter your email to receive the reset link.");
       return;
     }
 
     try {
       setForgotLoading(true);
-
       const { error } = await supabase.auth.resetPasswordForEmail(
         formData.email,
-        {
-          redirectTo: `${window.location.origin}/auth/reset-password`,
-        }
+        { redirectTo: `${window.location.origin}/auth/reset-password` }
       );
 
       if (error) {
         console.error(error);
-        setForgotError(
-          error.message ||
-            "No pudimos enviar el email de reinicio. Intentá nuevamente."
-        );
+        setForgotError(error.message || "Could not send reset email. Try again.");
       } else {
-        setForgotMessage(
-          "Si el email existe, te enviamos un enlace para restablecer la contraseña."
-        );
+        setForgotMessage("If the email exists, a reset link has been sent.");
       }
     } finally {
       setForgotLoading(false);
@@ -121,106 +108,110 @@ const LoginForm = () => {
     navigate("/tenant-registration");
   };
 
+  // --- RENDERIZADO VISUAL PRO ---
   return (
-    <div className="w-full max-w-md mx-auto">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Error general */}
+    <div className="w-full">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        
+        {/* Alertas de Error Global */}
         {errors?.general && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-            <div className="flex items-center space-x-2">
-              <Icon name="AlertCircle" size={16} className="text-red-600" />
-              <p className="text-sm text-red-700">{errors?.general}</p>
-            </div>
+          <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex items-center gap-2 animate-in fade-in">
+            <Icon name="AlertTriangle" size={18} className="text-red-600" />
+            <p className="text-sm text-red-700 font-medium">{errors.general}</p>
           </div>
         )}
 
+        {/* Alertas de Forgot Password */}
         {forgotError && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700 font-medium">
             {forgotError}
           </div>
         )}
-
         {forgotMessage && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md text-sm text-emerald-700">
-            {forgotMessage}
+          <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-sm text-emerald-700 font-medium flex items-center gap-2">
+            <Icon name="CheckCircle" size={16} /> {forgotMessage}
           </div>
         )}
 
-        {/* Email */}
+        {/* Inputs */}
         <Input
-          label="Email"
+          label="Email Address"
           type="email"
           name="email"
-          placeholder="Ingresá tu email"
+          placeholder="name@company.com"
           value={formData?.email}
           onChange={handleInputChange}
           error={errors?.email}
           required
           disabled={isLoading || forgotLoading}
+          className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-all"
         />
 
-        {/* Password */}
-        <Input
-          label="Contraseña"
-          type="password"
-          name="password"
-          placeholder="Ingresá tu contraseña"
-          value={formData?.password}
-          onChange={handleInputChange}
-          error={errors?.password}
-          required
-          disabled={isLoading || forgotLoading}
-        />
+        <div>
+           <Input
+             label="Password"
+             type="password"
+             name="password"
+             placeholder="••••••••••"
+             value={formData?.password}
+             onChange={handleInputChange}
+             error={errors?.password}
+             required
+             disabled={isLoading || forgotLoading}
+             className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-all"
+           />
+           <div className="flex justify-end mt-1">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+                disabled={isLoading || forgotLoading}
+              >
+                {forgotLoading ? "Sending link..." : "Forgot password?"}
+              </button>
+           </div>
+        </div>
 
-        {/* Remember me */}
-        <Checkbox
-          label="Recordarme por 30 días"
-          name="rememberMe"
-          checked={formData?.rememberMe}
-          onChange={handleInputChange}
-          disabled={isLoading || forgotLoading}
-        />
+        {/* Remember Me */}
+        <div className="flex items-center">
+           <Checkbox
+             label="Remember me for 30 days"
+             name="rememberMe"
+             checked={formData?.rememberMe}
+             onChange={handleInputChange}
+             disabled={isLoading || forgotLoading}
+           />
+        </div>
 
-        {/* Botón login */}
+        {/* Botón Principal */}
         <Button
           type="submit"
           variant="default"
           size="lg"
           fullWidth
           loading={isLoading}
-          iconName="LogIn"
-          iconPosition="right"
+          disabled={isLoading || forgotLoading}
+          className="bg-indigo-600 hover:bg-indigo-700 h-12 text-base shadow-md shadow-indigo-100 transition-all"
         >
-          Iniciar sesión
+          {isLoading ? "Signing in..." : "Sign In"}
+          {!isLoading && <Icon name="ArrowRight" size={18} className="ml-2" />}
         </Button>
 
-        {/* Links extra */}
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={handleForgotPassword}
-            className="w-full text-center text-sm text-primary hover:text-primary/80 micro-animation"
-            disabled={isLoading || forgotLoading}
-          >
-            {forgotLoading
-              ? "Enviando enlace de reinicio…"
-              : "¿Olvidaste tu contraseña?"}
-          </button>
-
-          <div className="text-center">
-            <span className="text-sm text-muted-foreground">
-              ¿No tenés cuenta aún?{" "}
-            </span>
+        {/* Footer: Crear Cuenta */}
+        <div className="mt-6 pt-6 border-t border-slate-100 text-center">
+          <p className="text-sm text-slate-500">
+            Don't have an account?{" "}
             <button
               type="button"
               onClick={handleCreateAccount}
-              className="text-sm text-primary hover:text-primary/80 font-medium micro-animation"
+              className="font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
               disabled={isLoading || forgotLoading}
             >
-              Crear cuenta
+              Create Workspace
             </button>
-          </div>
+          </p>
         </div>
+
       </form>
     </div>
   );
