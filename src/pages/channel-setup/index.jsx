@@ -347,31 +347,65 @@ const ChannelSetup = () => {
 
       <div className={`transition-all duration-200 ${sidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
         
-{/* Header - Channel Setup */}
-        <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-20 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-               <div className="bg-emerald-600 p-2 rounded-lg text-white shadow-sm">
-                  <Icon name="MessageSquare" size={20} />
-               </div>
-               <div>
-                  <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Channel Settings</h1>
-                  <p className="text-slate-500 text-xs font-medium">
-                    Manage your WhatsApp Business connection & assets
-                  </p>
-               </div>
-            </div>
-            
-            <div className="flex items-center space-x-6">
-              {/* Status Pill Mejorado */}
-              <div className={`flex items-center space-x-2 px-3 py-1 rounded-full border ${isConnected ? "bg-emerald-50 border-emerald-200" : "bg-slate-100 border-slate-200"}`}>
-                <div className={`w-2 h-2 rounded-full animate-pulse ${isConnected ? "bg-emerald-500" : "bg-slate-400"}`} />
-                <span className={`text-xs font-bold ${isConnected ? "text-emerald-700" : "text-slate-500"}`}>
-                  {isConnected ? "SYSTEM ONLINE" : "OFFLINE"}
-                </span>
+{/* Header - Channel Setup (Responsive Pro) */}
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm transition-all">
+          <div className="px-4 py-3 md:px-8 md:py-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              
+              {/* IZQUIERDA: Título + Menú */}
+              <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+                 <div className="flex items-center gap-3">
+                    {/* Botón Menú (Solo Móvil) */}
+                    <button 
+                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                      className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      <Icon name="Menu" size={24} />
+                    </button>
+
+                    {/* Icono + Títulos */}
+                    <div className="flex items-center gap-3">
+                       <div className="hidden md:block bg-emerald-600 p-2 rounded-lg text-white shadow-sm shrink-0">
+                          <Icon name="MessageSquare" size={20} />
+                       </div>
+                       <div>
+                          <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight">
+                             Channel Settings
+                          </h1>
+                          <p className="text-slate-500 text-xs font-medium hidden sm:block">
+                             Manage your WhatsApp Business connection
+                          </p>
+                       </div>
+                    </div>
+                 </div>
+
+                 {/* Perfil (Solo Móvil - A la derecha para equilibrio) */}
+                 <div className="md:hidden">
+                    <UserProfileDropdown user={currentUser} onLogout={handleLogout} />
+                 </div>
               </div>
               
-              <UserProfileDropdown user={currentUser} onLogout={handleLogout} />
+              {/* DERECHA: Estado + Perfil (Desktop) */}
+              <div className="hidden md:flex items-center gap-6">
+                {/* Status Pill (Visible solo en desktop o tablet) */}
+                <div className={`flex items-center space-x-2 px-3 py-1 rounded-full border transition-colors ${isConnected ? "bg-emerald-50 border-emerald-200" : "bg-slate-100 border-slate-200"}`}>
+                  <div className={`w-2 h-2 rounded-full animate-pulse ${isConnected ? "bg-emerald-500" : "bg-slate-400"}`} />
+                  <span className={`text-xs font-bold ${isConnected ? "text-emerald-700" : "text-slate-500"}`}>
+                    {isConnected ? "SYSTEM ONLINE" : "OFFLINE"}
+                  </span>
+                </div>
+                
+                <UserProfileDropdown user={currentUser} onLogout={handleLogout} />
+              </div>
+
+              {/* Status Bar Móvil (Opcional - Debajo del título si es crítico) */}
+              {/* Si quieres mostrar el estado en móvil, descomenta esto: */}
+              {/* <div className="md:hidden flex items-center gap-2 text-xs font-medium text-slate-500 border-t border-slate-100 pt-2 mt-1 w-full">
+                 <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-emerald-500" : "bg-slate-400"}`} />
+                 <span>Status: {isConnected ? "Online" : "Offline"}</span>
+              </div> 
+              */}
+
             </div>
           </div>
         </header>
