@@ -262,10 +262,11 @@ const TenantDashboard = () => {
     role: profile?.role || "Tenant Admin",
   };
 
+// ... (toda la lógica de arriba se mantiene igual)
+
   return (
     <div className="min-h-screen bg-slate-50">
       
-      {/* Sidebar Responsivo */}
       <NavigationSidebar
         isCollapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -274,7 +275,7 @@ const TenantDashboard = () => {
 
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
         
-        {/* Header - Dashboard (Estilo Unificado) */}
+        {/* Header */}
         <header className="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-30 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -288,29 +289,16 @@ const TenantDashboard = () => {
                   </p>
                </div>
             </div>
-
             <div className="flex items-center gap-4 self-end md:self-auto">
-              <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all relative">
-                <Icon name="Bell" size={20} />
-                <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-              </button>
               <UserProfileDropdown user={currentUser} onLogout={logout} />
             </div>
           </div>
-          
-          {/* Alerta de Tenant Faltante (Integrada) */}
-          {profile && !profile.tenant_id && (
-             <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3 text-sm text-amber-800 animate-in fade-in slide-in-from-top-2">
-                <Icon name="AlertTriangle" size={18} />
-                <span><strong>Action Required:</strong> Your user is not linked to any workspace. Please contact support or create a tenant.</span>
-             </div>
-          )}
         </header>
 
-        {/* Contenido Principal */}
+        {/* Main Content */}
         <main className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8">
           
-          {/* Barra de Estado del Canal (Estilo Banner Moderno) */}
+          {/* 1. Status Banner */}
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
              <div className="flex items-center gap-4">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${channelSummary.isActive ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
@@ -325,18 +313,10 @@ const TenantDashboard = () => {
                    <p className="text-xs text-slate-500">
                       {channelSummary.hasChannel 
                          ? `${channelSummary.displayName || "My Business"} • ${channelSummary.phone || "No phone"}` 
-                         : "Connect a number in Channel Settings to start."}
+                         : "Connect a number to start messaging."}
                    </p>
                 </div>
              </div>
-             
-             {channelSummary.hasChannel && (
-                <div className="flex items-center gap-2 px-3 py-1 bg-slate-50 rounded-full border border-slate-100 text-xs font-mono text-slate-500">
-                   <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                   Webhook Active
-                </div>
-             )}
-             
              {!channelSummary.hasChannel && (
                 <Button variant="default" size="sm" onClick={() => window.location.href='/channel-setup'}>
                    Connect Now
@@ -344,7 +324,7 @@ const TenantDashboard = () => {
              )}
           </div>
 
-          {/* Grid de Métricas (Responsivo: 1 col móvil -> 2 col tablet -> 4 col desktop) */}
+          {/* 2. Metrics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
             {metrics.map((metric, index) => (
               <MetricsCard
@@ -360,35 +340,50 @@ const TenantDashboard = () => {
             ))}
           </div>
 
-          {/* Sección Central (2 Columnas asimétricas) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* 3. Main Grid (CORREGIDO PARA EVITAR SUPERPOSICIÓN) */}
+          {/* 'items-start' evita que las columnas se estiren innecesariamente */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             
-            {/* Columna Izquierda (Ancha): Actividad + Acciones */}
-            <div className="lg:col-span-2 space-y-8">
-              <ActivityFeed activities={activities} isLoading={isLoading} />
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                 <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">Quick Actions</h3>
+            {/* Columna Izquierda (Ancha) */}
+            <div className="lg:col-span-2 flex flex-col gap-6">
+              
+              {/* CAMBIO CLAVE: Quick Actions PRIMERO */}
+              {/* Al estar arriba, empuja el contenido hacia abajo ordenadamente */}
+              <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                 <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
+                    Quick Actions
+                 </h3>
                  <QuickActions />
+              </div>
+
+              {/* Activity Feed SEGUNDO */}
+              {/* CAMBIO CLAVE: Altura fija (h-[500px]) para contener el scroll y no romper el layout */}
+              <div className="h-[500px]"> 
+                 <ActivityFeed activities={activities} isLoading={isLoading} />
               </div>
             </div>
 
-            {/* Columna Derecha (Estrecha): Checklist + Conversaciones */}
-            <div className="space-y-8">
+            {/* Columna Derecha (Estrecha) */}
+            <div className="flex flex-col gap-6">
               <OnboardingChecklist
                 isChannelConnected={channelSummary.isActive}
                 hasFlows={activeFlows > 0}
                 hasMessages={totalMessages > 0}
                 onComplete={() => console.log("Onboarding Complete")}
               />
-              <ActiveConversations
-                conversations={conversations}
-                isLoading={isLoading}
-              />
+              
+              {/* Altura fija también aquí para alinear visualmente con la izquierda */}
+              <div className="h-[500px]">
+                <ActiveConversations
+                  conversations={conversations}
+                  isLoading={isLoading}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Sección Inferior: Insights (Grid de 3) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* 4. Insights Grid (Bot Intelligence & Funnel) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             {/* Bot Intelligence Card */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -439,7 +434,6 @@ const TenantDashboard = () => {
                     <span className="text-slate-800 font-bold">{conversations.length}</span>
                  </div>
                  
-                 {/* Visual Bar Funnel */}
                  <div className="flex h-3 rounded-full overflow-hidden w-full bg-slate-100">
                     <div className="bg-emerald-500 h-full" style={{ width: `${conversations.length ? (activeConvCount/conversations.length)*100 : 0}%` }} title="Open" />
                     <div className="bg-amber-400 h-full" style={{ width: `${conversations.length ? (pendingConvCount/conversations.length)*100 : 0}%` }} title="Pending" />
@@ -459,31 +453,6 @@ const TenantDashboard = () => {
                        <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-300"></div> Resolved</span>
                        <span className="font-bold">{resolvedConvCount}</span>
                     </div>
-                 </div>
-              </div>
-            </div>
-
-            {/* Health Score Card */}
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-slate-800">Workspace Health</h3>
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-                   <Icon name="HeartPulse" size={18} />
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <span className="text-xs font-medium text-slate-600">Active Workflows</span>
-                    <span className="text-lg font-bold text-indigo-600">{activeFlows}</span>
-                 </div>
-                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg opacity-60">
-                    <span className="text-xs font-medium text-slate-600">Response Time</span>
-                    <span className="text-xs font-mono text-slate-400">-- ms</span>
-                 </div>
-                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg opacity-60">
-                    <span className="text-xs font-medium text-slate-600">Cust. Satisfaction</span>
-                    <span className="text-xs font-mono text-slate-400">-- / 5.0</span>
                  </div>
               </div>
             </div>
