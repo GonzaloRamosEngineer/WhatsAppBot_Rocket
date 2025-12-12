@@ -3,29 +3,17 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Usamos tus variables de entorno estándar
 const SUPABASE_URL = Deno.env.get("PROJECT_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SERVICE_ROLE_KEY")!;
+const SERVICE_ROLE = Deno.env.get("SERVICE_ROLE_KEY")!;
 
-const corsHeaders: Record<string, string> = {
+const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Tipos auxiliares (solo para claridad)
-type TemplateBlueprint = {
-  id: string;
-  sector: string;
-  use_case: string;
-  name: string;
-  category: string;
-  language: string;
-  body: string;
-  components: any | null;
-  variables: any | null;
-};
-
-// Reutilizamos la misma idea de alias -> token (env + DB)
+// --- HELPER DE TOKEN (Copiado de tu whatsapp-sync-templates para consistencia) ---
 function resolveMetaToken(alias: string): string | null {
   const map: Record<string, string> = {
     meta_token_dm: Deno.env.get("META_TOKEN_DM") ?? "",
@@ -64,16 +52,17 @@ async function getMetaAccessToken(opts: {
     console.error(
       "[activate-template-blueprint] getMetaAccessToken meta_tokens error:",
       error,
-      { tenantId, alias },
+      { tenantId, alias }
     );
     return null;
   }
 
   return data?.access_token ?? null;
 }
+// -----------------------------------------------------------------------------
 
-serve(async (req: Request): Promise<Response> => {
-  // CORS preflight
+serve(async (req) => {
+  // 1. CORS Preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -86,188 +75,111 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   const authHeader = req.headers.get("Authorization") ?? "";
-  const hasUserAuth = !!authHeader;
-
-  // Cliente Supabase con service_role
-  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  
+  // Cliente Supabase con Service Role
+  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
     global: {
-      headers: hasUserAuth ? { Authorization: authHeader } : {},
+      headers: authHeader ? { Authorization: authHeader } : {},
     },
   });
 
-  let user: { id: string } | null = null;
+  // 2. Verificar Usuario (Auth)
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
 
-  if (hasUserAuth) {
-    const {
-      data: { user: supaUser },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !supaUser) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    user = { id: supaUser.id };
+  if (userError || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
-  // -------------------------
-  // 1) Parseo de body
-  // -------------------------
-  let body: {
-    blueprintId?: string;
-    channelId?: string;
-  };
-
+  // 3. Parse Body
+  let body: { blueprintId?: string; channelId?: string };
   try {
     body = await req.json();
   } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid JSON body" }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const { blueprintId, channelId } = body;
 
   if (!blueprintId || !channelId) {
     return new Response(
-      JSON.stringify({
-        error: "blueprintId and channelId are required",
-      }),
+      JSON.stringify({ error: "blueprintId and channelId are required" }),
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      }
     );
   }
 
   try {
-    // -------------------------
-    // 2) Cargar canal
-    // -------------------------
-    const { data: channel, error: channelError } = await supabase
+    // --------------------------------------------------
+    // A. Cargar Canal
+    // --------------------------------------------------
+    const { data: channel, error: chError } = await supabase
       .from("channels")
       .select("id, tenant_id, meta_waba_id, token_alias")
       .eq("id", channelId)
       .maybeSingle();
 
-    if (channelError) {
-      console.error(
-        "[activate-template-blueprint] channel error:",
-        channelError,
-      );
+    if (chError || !channel) {
       return new Response(
-        JSON.stringify({ error: "Failed to load channel" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        JSON.stringify({ error: "Channel not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (!channel) {
-      return new Response(
-        JSON.stringify({ error: "Channel not found" }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+    // --------------------------------------------------
+    // B. Verificar Membership (Seguridad Crítica)
+    // --------------------------------------------------
+    const { data: membership, error: memberError } = await supabase
+      .from("tenant_members")
+      .select("tenant_id, role")
+      .eq("tenant_id", channel.tenant_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (memberError || !membership) {
+        console.error("Membership check failed:", memberError);
+        return new Response(JSON.stringify({ error: "Forbidden: You do not belong to this tenant" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
     }
 
     if (!channel.meta_waba_id) {
-      return new Response(
-        JSON.stringify({
-          error: "Channel has no meta_waba_id configured",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+        return new Response(JSON.stringify({ error: "Channel has no WABA ID configured" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
     }
 
-    // -------------------------
-    // 2.1) Verificar membership (si viene de usuario real)
-    // -------------------------
-    if (user) {
-      const { data: membership, error: memberError } = await supabase
-        .from("tenant_members")
-        .select("tenant_id, role")
-        .eq("tenant_id", channel.tenant_id)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (memberError) {
-        console.error(
-          "[activate-template-blueprint] error checking membership:",
-          memberError,
-        );
-        return new Response(
-          JSON.stringify({ error: "Failed to check membership" }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      if (!membership) {
-        return new Response(
-          JSON.stringify({ error: "Forbidden for this tenant" }),
-          {
-            status: 403,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
-    }
-
-    // -------------------------
-    // 3) Cargar blueprint
-    // -------------------------
+    // --------------------------------------------------
+    // C. Cargar Blueprint
+    // --------------------------------------------------
     const { data: bp, error: bpError } = await supabase
       .from("template_blueprints")
       .select("*")
       .eq("id", blueprintId)
-      .maybeSingle<TemplateBlueprint>();
+      .maybeSingle();
 
-    if (bpError) {
-      console.error(
-        "[activate-template-blueprint] blueprint error:",
-        bpError,
-      );
-      return new Response(
-        JSON.stringify({ error: "Failed to load template blueprint" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+    if (bpError || !bp) {
+      return new Response(JSON.stringify({ error: "Blueprint not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    if (!bp) {
-      return new Response(
-        JSON.stringify({ error: "Template blueprint not found" }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // -------------------------
-    // 4) Resolver access_token de Meta
-    // -------------------------
+    // --------------------------------------------------
+    // D. Obtener Token Meta
+    // --------------------------------------------------
     const accessToken = await getMetaAccessToken({
       supabase,
       tenantId: channel.tenant_id,
@@ -276,50 +188,46 @@ serve(async (req: Request): Promise<Response> => {
 
     if (!accessToken) {
       return new Response(
-        JSON.stringify({
-          error:
-            "No Meta access_token configured for this tenant/alias (env o meta_tokens)",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        JSON.stringify({ error: "Meta access_token not found for this channel" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // -------------------------
-    // 5) Armar payload para crear template en Meta
-    // -------------------------
-
-    // name: en snake_case, minúsculas, sin espacios
+    // --------------------------------------------------
+    // E. Preparar Payload y Enviar a Meta
+    // --------------------------------------------------
+    
+    // Sanitizar nombre (solo minúsculas y guiones bajos)
     const safeName = bp.name
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "");
+      .trim()
+      .replace(/[^a-z0-9_]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 50);
 
-    const category = (bp.category || "MARKETING").toUpperCase();
-    const language = bp.language || "es";
-
-    // Si el blueprint trae components, los usamos; si no, creamos uno básico de BODY
-    const components = bp.components && Array.isArray(bp.components)
-      ? bp.components
-      : [
-          {
+    // Construir componentes
+    let metaComponents: any[] = [];
+    if (bp.components && Array.isArray(bp.components) && bp.components.length > 0) {
+        metaComponents = bp.components;
+    } else if (bp.body) {
+        metaComponents.push({
             type: "BODY",
-            text: bp.body,
-          },
-        ];
+            text: bp.body
+        });
+    } else {
+        throw new Error("Blueprint invalid: missing body or components");
+    }
 
     const metaPayload = {
       name: safeName,
-      category,
-      language,
-      components,
+      category: (bp.category || "MARKETING").toUpperCase(),
+      language: bp.language || "es_AR",
+      components: metaComponents,
+      allow_category_change: true
     };
 
-    // -------------------------
-    // 6) POST a Graph API
-    // -------------------------
+    console.log("[activate-template] Sending to Meta:", metaPayload);
+
     const waRes = await fetch(
       `https://graph.facebook.com/v20.0/${channel.meta_waba_id}/message_templates`,
       {
@@ -329,98 +237,63 @@ serve(async (req: Request): Promise<Response> => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(metaPayload),
-      },
+      }
     );
 
     const waJson = await waRes.json();
 
     if (!waRes.ok) {
-      console.error(
-        "[activate-template-blueprint] Meta error:",
-        waRes.status,
-        waJson,
-      );
+      console.error("[activate-template] Meta Error:", waJson);
+      // Devolvemos 400 para que el front muestre el mensaje de error de Meta
       return new Response(
         JSON.stringify({
-          error: "Meta API error creating template",
-          details: waJson,
+          error: "Meta API Error",
+          details: waJson.error?.message || waJson,
         }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const externalId = waJson.id ?? null;
-
-    // -------------------------
-    // 7) Insertar en tabla templates
-    // -------------------------
+    // --------------------------------------------------
+    // F. Guardar en DB Local (templates)
+    // --------------------------------------------------
     const { data: inserted, error: insertError } = await supabase
       .from("templates")
       .insert({
         tenant_id: channel.tenant_id,
         channel_id: channelId,
         name: safeName,
-        language,
-        category,
+        language: metaPayload.language,
+        category: metaPayload.category,
         body: bp.body,
-        status: "PENDING", // whatsapp-sync-templates la actualizará a APPROVED
-        definition: metaPayload,
-        external_id: externalId,
+        status: "APPROVED", // Asumimos aprobado inicial, el sync luego lo corrige si cambia
+        definition: waJson,
+        components: metaComponents,
+        external_id: waJson.id,
         last_synced_at: new Date().toISOString(),
       })
       .select()
       .maybeSingle();
 
     if (insertError) {
-      console.error(
-        "[activate-template-blueprint] insert templates error:",
-        insertError,
-      );
-      // Aunque falle el insert, devolvemos el resultado de Meta para debug
-      return new Response(
-        JSON.stringify({
-          error: "Template created in Meta but failed to save in DB",
-          details: insertError,
-          meta: waJson,
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      console.error("[activate-template] DB Insert Error:", insertError);
+      // No fallamos la request porque en Meta ya se creó
     }
 
-    // -------------------------
-    // 8) OK
-    // -------------------------
     return new Response(
       JSON.stringify({
         ok: true,
         template: inserted,
         meta: waJson,
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (e) {
-    console.error(
-      "[activate-template-blueprint] Unexpected error:",
-      e,
-    );
+
+  } catch (e: any) {
+    console.error("[activate-template] Unexpected Error:", e);
     return new Response(
-      JSON.stringify({
-        error: "Unexpected error",
-        details: String(e),
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      JSON.stringify({ error: "Internal Server Error", details: e.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
