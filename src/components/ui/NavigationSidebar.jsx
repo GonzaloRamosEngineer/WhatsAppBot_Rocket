@@ -193,14 +193,13 @@ const NavigationSidebar = ({
     <>
       {/* Mobile Hamburger Button (Floating) - Ahora oculto porque lo pusimos en el Header principal */}
       {/* Si decides mantenerlo aquí, descomenta: */}
-      {/* <button
+      <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
         className="md:hidden fixed top-4 left-4 z-50 p-2.5 bg-white text-slate-700 border border-slate-200 rounded-lg shadow-lg active:scale-95 transition-transform"
       >
         <Icon name="Menu" size={20} />
       </button> 
-      */}
-
+      
       {/* Desktop Sidebar (Fixed) */}
       <aside
         className={`
