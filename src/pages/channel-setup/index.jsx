@@ -325,7 +325,8 @@ const ChannelSetup = () => {
 
   const currentUser = {
     name: tenant?.name || "Tenant",
-    email: profile?.role === "tenant" ? "tenant@business.com" : "admin@whatsappbot.com",
+    // 🛑 TRUCO: Email nulo para ocultarlo en el header
+    email: null,
     avatar: null,
     role: profile?.role || "tenant",
   };
