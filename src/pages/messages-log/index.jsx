@@ -1,7 +1,7 @@
 // C:\Projects\WhatsAppBot_Rocket\src\pages\messages-log\index.jsx
 
 import React, { useMemo, useState, useEffect } from "react";
-import NavigationSidebar from "../../components/ui/NavigationSidebar";
+import { useOutletContext } from "react-router-dom"; // CONEXIÓN CON LAYOUT
 import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
 import MessageFilters from "./components/MessageFilters";
 import MessageTable from "./components/MessageTable";
@@ -13,7 +13,9 @@ import Icon from "../../components/AppIcon";
 
 const MessagesLog = () => {
   const { profile, tenant, supabase, logout } = useAuth();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
+  // 👇 1. Contexto del Layout
+  const { toggleMobileMenu } = useOutletContext();
   
   // Estado de Datos (Lógica Intacta)
   const [localMessages, setLocalMessages] = useState([]);
@@ -148,97 +150,91 @@ const MessagesLog = () => {
 
   const handleLogout = async () => { await logout(); };
 
+  // --- RENDER REFACTORIZADO (Layout Pattern) ---
   return (
     <div className="min-h-screen bg-slate-50">
-      <NavigationSidebar
-        isCollapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        userRole="tenant"
-      />
+      
+      {/* Header Unificado & Responsive */}
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-3 md:py-4 sticky top-0 z-20 shadow-sm transition-all">
+        <div className="flex items-center justify-between">
+          
+          {/* IZQUIERDA: Menú + Título */}
+          <div className="flex items-center gap-3">
+             {/* Botón Menú (Solo Móvil - Estilo Violáceo) */}
+             <button 
+               onClick={toggleMobileMenu}
+               className="md:hidden p-2 mr-1 text-indigo-600 bg-white border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-md transition-all active:scale-95"
+             >
+               <Icon name="Menu" size={20} />
+             </button>
 
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
-        
-        {/* Header - Messages Log (Estilo Unificado & Responsive) */}
-        <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-3 md:py-4 sticky top-0 z-20 shadow-sm transition-all">
-          <div className="flex items-center justify-between">
+             <div className="hidden md:block bg-slate-700 p-2 rounded-lg text-white shadow-sm">
+                <Icon name="List" size={20} />
+             </div>
+             <div>
+                <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight">Messages Logs</h1>
+                <p className="text-slate-500 text-xs font-medium hidden md:block">
+                  Audit trail of all communication history
+                </p>
+             </div>
+          </div>
+
+          {/* DERECHA: Acciones + Perfil */}
+          <div className="flex items-center gap-3">
+             {/* Botón Refresh (Icono solo en móvil) */}
+             <Button 
+               variant="outline" 
+               size="sm" 
+               onClick={() => window.location.reload()} 
+               className="text-slate-500 border-slate-200 hover:bg-slate-50"
+               title="Refresh Data"
+             >
+               <Icon name="RefreshCw" size={16} className={loadingMessages ? "animate-spin" : ""} />
+               <span className="hidden md:inline ml-2">Refresh</span>
+             </Button>
+             
+             <UserProfileDropdown user={{ name: tenant?.name || "User", role: profile?.role }} onLogout={handleLogout} />
+          </div>
+        </div>
+      </header>
+
+      {/* Contenido Principal (Sin márgenes extra) */}
+      <main className="p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+        {/* Stats Cards */}
+        <MessageStats stats={stats} />
+
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+          {/* Main Content */}
+          <div className="xl:col-span-3 space-y-6">
+            <MessageFilters onFilterChange={setActiveFilters} onExport={() => console.log("Export triggered")} />
             
-            {/* IZQUIERDA: Menú + Título */}
-            <div className="flex items-center gap-3">
-               {/* Botón Menú (Solo Móvil - Estilo Violáceo) */}
-               <button 
-                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                 className="md:hidden p-2 mr-1 text-indigo-600 bg-white border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-md transition-all active:scale-95"
-               >
-                 <Icon name="Menu" size={20} />
-               </button>
-
-               <div className="hidden md:block bg-slate-700 p-2 rounded-lg text-white shadow-sm">
-                  <Icon name="List" size={20} />
-               </div>
-               <div>
-                  <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight">Messages Logs</h1>
-                  <p className="text-slate-500 text-xs font-medium hidden md:block">
-                    Audit trail of all communication history
-                  </p>
-               </div>
-            </div>
-
-            {/* DERECHA: Acciones + Perfil */}
-            <div className="flex items-center gap-3">
-               {/* Botón Refresh (Icono solo en móvil) */}
-               <Button 
-                 variant="outline" 
-                 size="sm" 
-                 onClick={() => window.location.reload()} 
-                 className="text-slate-500 border-slate-200 hover:bg-slate-50"
-                 title="Refresh Data"
-               >
-                 <Icon name="RefreshCw" size={16} className={loadingMessages ? "animate-spin" : ""} />
-                 <span className="hidden md:inline ml-2">Refresh</span>
-               </Button>
-               
-               <UserProfileDropdown user={{ name: tenant?.name || "User", role: profile?.role }} onLogout={handleLogout} />
-            </div>
+            {loadError ? (
+              <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-200 flex items-center gap-2">
+                 <Icon name="AlertTriangle" /> Error loading data: {loadError}
+              </div>
+            ) : (
+              <MessageTable 
+                 messages={filteredMessages} 
+                 loading={loadingMessages}
+                 onBulkAction={(action, ids) => console.log(action, ids)} 
+              />
+            )}
           </div>
-        </header>
 
-        <main className="p-4 md:p-8 max-w-[1600px] mx-auto">
-          {/* Stats Cards */}
-          <MessageStats stats={stats} />
-
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-            {/* Main Content */}
-            <div className="xl:col-span-3 space-y-6">
-              <MessageFilters onFilterChange={setActiveFilters} onExport={() => console.log("Export triggered")} />
-              
-              {loadError ? (
-                <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-200 flex items-center gap-2">
-                   <Icon name="AlertTriangle" /> Error loading data: {loadError}
+          {/* Sidebar Resumen */}
+          <div className="xl:col-span-1">
+             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden sticky top-28">
+                <div className="p-4 border-b border-slate-100 bg-slate-50 font-semibold text-slate-700">
+                  Active Conversations
                 </div>
-              ) : (
-                <MessageTable 
-                   messages={filteredMessages} 
-                   loading={loadingMessages}
-                   onBulkAction={(action, ids) => console.log(action, ids)} 
+                <ConversationSummary 
+                  conversations={conversations} 
+                  onSelectConversation={setSelectedConversation} 
                 />
-              )}
-            </div>
-
-            {/* Sidebar Resumen */}
-            <div className="xl:col-span-1">
-               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden sticky top-28">
-                  <div className="p-4 border-b border-slate-100 bg-slate-50 font-semibold text-slate-700">
-                    Active Conversations
-                  </div>
-                  <ConversationSummary 
-                    conversations={conversations} 
-                    onSelectConversation={setSelectedConversation} 
-                  />
-               </div>
-            </div>
+             </div>
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 };
