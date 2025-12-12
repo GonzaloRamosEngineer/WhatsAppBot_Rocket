@@ -54,19 +54,30 @@ const FeatureHighlights = () => {
         ))}
       </div>
 
-      {/* Trust Indicators */}
-      <div className="mt-12 pt-8 border-t border-white/10 flex flex-wrap gap-6 text-sm text-slate-400">
-        <div className="flex items-center gap-2">
-          <Icon name="Shield" size={16} className="text-emerald-400" />
-          <span>SOC2 Compliant</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Icon name="Lock" size={16} className="text-emerald-400" />
-          <span>End-to-End Encrypted</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Icon name="CheckCircle" size={16} className="text-emerald-400" />
-          <span>99.9% Uptime</span>
+      {/* Trust Indicators & Certifications */}
+      <div className="mt-12 pt-8 border-t border-white/10">
+        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-4">
+          Official Certifications & Security
+        </p>
+        
+        <div className="flex flex-wrap gap-4 text-sm text-slate-300 items-center">
+          
+          {/* EL BADGE ESTRELLA: Meta Tech Provider */}
+          <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full border border-white/10 shadow-sm backdrop-blur-md transition-transform hover:scale-105 cursor-default">
+            <Icon name="BadgeCheck" size={18} className="text-[#3897f0]" /> {/* Azul Meta */}
+            <span className="font-semibold text-white">Meta Tech Provider</span>
+          </div>
+
+          {/* Otros indicadores más sutiles */}
+          <div className="flex items-center gap-2 px-2">
+            <Icon name="Lock" size={16} className="text-emerald-400" />
+            <span>E2E Encrypted</span>
+          </div>
+          
+          <div className="flex items-center gap-2 px-2">
+            <Icon name="Server" size={16} className="text-purple-400" />
+            <span>99.9% Uptime</span>
+          </div>
         </div>
       </div>
     </div>
