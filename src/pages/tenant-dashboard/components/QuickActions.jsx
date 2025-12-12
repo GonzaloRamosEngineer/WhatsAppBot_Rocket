@@ -2,79 +2,66 @@
 
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import Button from "../../../components/ui/Button";
+import Icon from "../../../components/AppIcon";
 
 const QuickActions = () => {
   const navigate = useNavigate();
 
   const actions = [
     {
-      title: "Crear nuevo flujo",
-      description: "Diseñá conversaciones automatizadas para tu bot.",
+      title: "New Automation Flow",
+      description: "Design automated conversation paths.",
       icon: "GitBranch",
-      variant: "default",
-      onClick: () => navigate("/flow-builder"),
+      color: "text-purple-600",
+      bg: "bg-purple-50",
+      path: "/flow-builder",
     },
     {
-      title: "Configurar canal",
-      description: "Conectá tu número de WhatsApp Business.",
+      title: "Connect Channel",
+      description: "Link a new WhatsApp number.",
       icon: "MessageSquare",
-      variant: "outline",
-      onClick: () => navigate("/channel-setup"),
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+      path: "/channel-setup",
     },
     {
-      title: "Ver mensajes",
-      description: "Revisá el historial y los logs de conversación.",
-      icon: "MessageCircle",
-      variant: "outline",
-      onClick: () => navigate("/messages-log"),
+      title: "View Message Logs",
+      description: "Audit communication history.",
+      icon: "List",
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+      path: "/messages-log",
     },
   ];
 
   return (
-    <div className="bg-card border border-border rounded-lg p-6">
-      <h3 className="text-lg font-semibold text-foreground mb-4">
-        Acciones rápidas
-      </h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {actions.map((action, index) => (
-          <button
-            key={index}
-            onClick={action.onClick}
-            className="p-4 border border-border rounded-lg hover:shadow-md micro-animation text-left bg-background/40"
-          >
-            <div className="flex flex-col items-center text-center space-y-3">
-              <div className="p-3 bg-primary/10 text-primary rounded-lg">
-                <Button
-                  variant="ghost"
-                  iconName={action.icon}
-                  iconSize={24}
-                  onClick={action.onClick}
-                  className="p-0 h-auto hover:bg-transparent"
-                />
-              </div>
+    <div className="grid grid-cols-1 gap-4">
+      {actions.map((action, index) => (
+        <button
+          key={index}
+          onClick={() => navigate(action.path)}
+          className="group flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition-all text-left w-full relative overflow-hidden"
+        >
+          {/* Icono con fondo de color */}
+          <div className={`p-3 rounded-lg ${action.bg} ${action.color} group-hover:scale-110 transition-transform`}>
+             <Icon name={action.icon} size={24} />
+          </div>
 
-              <div className="space-y-1">
-                <h4 className="font-medium text-foreground">
-                  {action.title}
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  {action.description}
-                </p>
-              </div>
+          <div className="flex-1">
+             <h4 className="font-bold text-slate-800 text-sm group-hover:text-indigo-700 transition-colors">
+               {action.title}
+             </h4>
+             <p className="text-xs text-slate-500 mt-0.5">
+               {action.description}
+             </p>
+          </div>
 
-              <Button
-                variant={action.variant}
-                size="sm"
-                onClick={action.onClick}
-                fullWidth
-              >
-                Ir
-              </Button>
-            </div>
-          </button>
-        ))}
-      </div>
+          {/* Flecha indicadora (aparece en hover) */}
+          <div className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-slate-400">
+             <Icon name="ArrowRight" size={18} />
+          </div>
+        </button>
+      ))}
     </div>
   );
 };
