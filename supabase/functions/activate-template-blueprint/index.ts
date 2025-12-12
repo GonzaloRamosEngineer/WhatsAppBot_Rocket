@@ -184,18 +184,23 @@ serve(async (req) => {
     }
 
     // =====================================================================
-    // E. Preparar Payload y Enviar a Meta (AQUÍ ESTABA EL PROBLEMA)
+    // E. Preparar Payload y Enviar a Meta (CON SUFIJO ALEATORIO)
     // =====================================================================
     
-    // 1. Sanitizar nombre (solo minúsculas y guiones bajos)
-    const safeName = bp.name
+    // 1. Sanitizar nombre y AGREGAR SUFIJO RANDOM
+    // Esto evita el error "Name already used with different category"
+    const randomSuffix = Math.floor(Math.random() * 10000).toString();
+    
+    let safeName = bp.name
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9_]+/g, "_")
       .replace(/^_+|_+$/g, "")
-      .slice(0, 50);
+      .slice(0, 45); // Cortamos un poco para dejar espacio al sufijo
+    
+    safeName = `${safeName}_${randomSuffix}`; // Ej: bienvenida_socio_4821
 
-    // 2. Corregir Categoría (SERVICE ya no existe en Meta API v18+)
+    // 2. Corregir Categoría
     let safeCategory = (bp.category || "MARKETING").toUpperCase();
     if (safeCategory === "SERVICE") safeCategory = "UTILITY";
 
@@ -210,15 +215,10 @@ serve(async (req) => {
             text: bp.body
         };
 
-        // -> Detectar variables {{1}}, {{2}}
-        // Meta rechaza el template si tiene variables pero no tiene campo 'example'
         const variableMatches = bp.body.match(/\{\{\d+\}\}/g);
         
         if (variableMatches && variableMatches.length > 0) {
-            // Generar ejemplos genéricos: ["opcion_1", "opcion_2", ...]
             const exampleValues = variableMatches.map((_: any, i: number) => `opcion_${i + 1}`);
-            
-            // Estructura obligatoria de Meta para ejemplos del body
             bodyComponent.example = {
                 body_text: [ exampleValues ]
             };
@@ -232,7 +232,7 @@ serve(async (req) => {
     const metaPayload = {
       name: safeName,
       category: safeCategory,
-      language: bp.language || "es", // es_AR es mejor si puedes cambiarlo en BD
+      language: bp.language || "es",
       components: metaComponents,
       allow_category_change: true
     };
@@ -260,7 +260,7 @@ serve(async (req) => {
         JSON.stringify({
           error: "Meta API Error",
           details: waJson.error?.message || waJson,
-          metaPayload // Devolvemos el payload para debug si falla
+          metaPayload 
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
