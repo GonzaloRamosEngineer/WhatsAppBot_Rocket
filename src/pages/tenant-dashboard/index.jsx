@@ -275,21 +275,40 @@ const TenantDashboard = () => {
 
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
         
-        {/* Header */}
-        <header className="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-30 shadow-sm">
+{/* Header MEJORADO para Móvil y Desktop */}
+        <header className="bg-white border-b border-slate-200 px-4 py-3 md:px-6 md:py-4 sticky top-0 z-30 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-               <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm shrink-0">
-                  <Icon name="LayoutDashboard" size={20} />
+            
+            {/* Parte Izquierda: Título y Bienvenida */}
+            <div className="flex items-center gap-3 w-full md:w-auto">
+               {/* Botón Hamburguesa (Solo Móvil) - Integrado y estilizado */}
+               <button 
+                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                 className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+               >
+                 <Icon name="Menu" size={24} />
+               </button>
+
+               <div className="flex items-center gap-3">
+                   <div className="hidden md:block bg-blue-600 p-2 rounded-lg text-white shadow-sm shrink-0">
+                      <Icon name="LayoutDashboard" size={20} />
+                   </div>
+                   <div>
+                      <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight">Dashboard</h1>
+                      <p className="text-slate-500 text-xs font-medium hidden sm:block">
+                        Welcome back, {currentUser.name}.
+                      </p>
+                   </div>
                </div>
-               <div>
-                  <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Dashboard</h1>
-                  <p className="text-slate-500 text-xs font-medium">
-                    Welcome back, {currentUser.name}. Overview of your bot performance.
-                  </p>
+               
+               {/* Perfil en Móvil (A la derecha para balancear) */}
+               <div className="md:hidden ml-auto">
+                  <UserProfileDropdown user={currentUser} onLogout={logout} />
                </div>
             </div>
-            <div className="flex items-center gap-4 self-end md:self-auto">
+
+            {/* Parte Derecha: Acciones (Desktop) */}
+            <div className="hidden md:flex items-center gap-4">
               <UserProfileDropdown user={currentUser} onLogout={logout} />
             </div>
           </div>
