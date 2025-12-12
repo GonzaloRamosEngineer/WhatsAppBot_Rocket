@@ -544,7 +544,7 @@ const ChannelSetup = () => {
           </div>
 
           {/* 3. ADVANCED SETTINGS (Manual Config) */}
-          <div className="pt-8 border-t border-slate-200">
+          {/* <div className="pt-8 border-t border-slate-200">
              <details className="group">
                 <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
                     <Icon name="Settings" size={16} />
@@ -569,7 +569,7 @@ const ChannelSetup = () => {
                     </div>
                 </div>
              </details>
-          </div>
+          </div> */}
 
         </main>
       </div>
