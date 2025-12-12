@@ -35,7 +35,7 @@ const LoginPage = () => {
     setError("");
 
     if (!form.email || !form.password) {
-      setError("Ingresá tu email y contraseña.");
+      setError("Please enter your email and password.");
       return;
     }
 
@@ -45,7 +45,7 @@ const LoginPage = () => {
       console.error("[LoginPage] login error", error);
       setError(
         error?.message ||
-          "No pudimos iniciar sesión. Verificá los datos e intentá nuevamente."
+          "Unable to sign in. Please check your credentials."
       );
       return;
     }
@@ -53,87 +53,133 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-lg p-8">
-        {/* Header */}
-        <div className="flex items-center justify-center mb-6">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center mr-3">
-            <Icon name="MessageSquare" size={22} color="white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">
-              DigitalMatch – MatchBot
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Iniciá sesión para administrar tu workspace de WhatsApp.
-            </p>
-          </div>
+    <div className="min-h-screen w-full flex bg-slate-50">
+      
+      {/* Columna Izquierda: Formulario */}
+      <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-12 lg:px-24 py-12 bg-white relative z-10 shadow-xl lg:shadow-none">
+        <div className="max-w-md w-full mx-auto">
+           
+           {/* Logo Header */}
+           <div className="flex items-center gap-3 mb-10">
+              <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                 <Icon name="MessageCircle" size={24} className="text-white" />
+              </div>
+              <span className="text-xl font-bold text-slate-800 tracking-tight">RocketBot</span>
+           </div>
+
+           <div className="mb-8">
+              <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome back</h1>
+              <p className="text-slate-500">
+                 Sign in to manage your WhatsApp workspace and automation flows.
+              </p>
+           </div>
+
+           {/* Error Alert */}
+           {error && (
+              <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-100 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+                 <Icon name="AlertTriangle" size={20} className="text-red-500 mt-0.5 shrink-0" />
+                 <p className="text-sm text-red-600 font-medium">{error}</p>
+              </div>
+           )}
+
+           {/* Formulario */}
+           <form onSubmit={handleSubmit} className="space-y-5">
+              <Input
+                 label="Email Address"
+                 type="email"
+                 name="email"
+                 placeholder="name@company.com"
+                 value={form.email}
+                 onChange={handleChange}
+                 required
+                 className="bg-slate-50 border-slate-200 focus:bg-white transition-all h-11"
+              />
+
+              <div>
+                 <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-sm font-medium text-slate-700">Password</label>
+                    <Link
+                       to="/auth/reset-password"
+                       className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"
+                    >
+                       Forgot password?
+                    </Link>
+                 </div>
+                 <Input
+                    type="password"
+                    name="password"
+                    placeholder="••••••••••"
+                    value={form.password}
+                    onChange={handleChange}
+                    required
+                    className="bg-slate-50 border-slate-200 focus:bg-white transition-all h-11"
+                 />
+              </div>
+
+              <Button
+                 type="submit"
+                 variant="default"
+                 fullWidth
+                 loading={loading}
+                 disabled={loading}
+                 className="h-12 text-base bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all mt-2"
+              >
+                 {loading ? "Signing in..." : "Sign in to Dashboard"}
+                 {!loading && <Icon name="ArrowRight" size={18} className="ml-2" />}
+              </Button>
+           </form>
+
+           {/* Footer Link */}
+           <p className="mt-8 text-center text-sm text-slate-500">
+              Don't have an account yet?{" "}
+              <Link
+                 to="/tenant-registration"
+                 className="font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+              >
+                 Create Workspace
+              </Link>
+           </p>
         </div>
-
-        {/* Error global */}
-        {error && (
-          <div className="mb-4 p-3 rounded-md border border-destructive/30 bg-destructive/10 text-sm text-destructive flex items-center space-x-2">
-            <Icon name="AlertCircle" size={16} className="text-destructive" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Formulario */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Email"
-            type="email"
-            name="email"
-            placeholder="tu@empresa.com"
-            value={form.email}
-            onChange={handleChange}
-            required
-          />
-
-          <Input
-            label="Contraseña"
-            type="password"
-            name="password"
-            placeholder="••••••••••"
-            value={form.password}
-            onChange={handleChange}
-            required
-          />
-
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span></span>
-            <Link
-              to="/auth/reset-password"
-              className="text-primary hover:text-primary/80 font-medium"
-            >
-              ¿Olvidaste tu contraseña?
-            </Link>
-          </div>
-
-          <Button
-            type="submit"
-            variant="default"
-            fullWidth
-            loading={loading}
-            disabled={loading}
-            iconName="LogIn"
-            iconPosition="left"
-          >
-            {loading ? "Ingresando..." : "Iniciar sesión"}
-          </Button>
-        </form>
-
-        {/* Footer */}
-        <div className="mt-6 text-center text-xs text-muted-foreground">
-          <span>¿Todavía no tenés cuenta? </span>
-          <Link
-            to="/tenant-registration"
-            className="text-primary hover:text-primary/80 font-medium"
-          >
-            Crear workspace
-          </Link>
+        
+        {/* Footer Legal (Opcional) */}
+        <div className="mt-12 pt-6 border-t border-slate-100 text-center lg:text-left">
+           <p className="text-xs text-slate-400">
+              &copy; {new Date().getFullYear()} DigitalMatch. Secure & Encrypted.
+           </p>
         </div>
       </div>
+
+      {/* Columna Derecha: Visual / Branding (Oculta en móvil) */}
+      <div className="hidden lg:flex w-1/2 bg-slate-900 relative overflow-hidden items-center justify-center">
+         
+         {/* Fondo Abstracto Animado */}
+         <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 to-slate-900 opacity-90 z-10" />
+         <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+         <div className="absolute -bottom-32 -left-32 w-[600px] h-[600px] bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+
+         <div className="relative z-20 text-center px-12 max-w-lg">
+            <div className="mb-8 inline-flex p-3 bg-white/10 rounded-2xl backdrop-blur-md border border-white/10 shadow-2xl">
+               <Icon name="Zap" size={48} className="text-indigo-300" />
+            </div>
+            <h2 className="text-4xl font-bold text-white mb-6 leading-tight">
+               Automate your growth with <span className="text-indigo-400">RocketBot</span>
+            </h2>
+            <p className="text-lg text-slate-300 leading-relaxed">
+               Connect with customers on WhatsApp, build powerful flows, and scale your support without adding headcount.
+            </p>
+            
+            {/* Social Proof (Falso para demo) */}
+            <div className="mt-12 flex items-center justify-center gap-4 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+               {/* Aquí podrías poner logos de clientes, por ahora usamos texto estilizado */}
+               <span className="text-white font-bold text-xl tracking-widest">META</span>
+               <span className="text-white font-bold text-xl tracking-widest mx-4">•</span>
+               <span className="text-white font-bold text-xl tracking-widest">STRIPE</span>
+               <span className="text-white font-bold text-xl tracking-widest mx-4">•</span>
+               <span className="text-white font-bold text-xl tracking-widest">OPENAI</span>
+            </div>
+         </div>
+      </div>
+
     </div>
   );
 };
