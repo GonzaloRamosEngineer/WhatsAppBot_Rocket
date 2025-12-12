@@ -7,85 +7,66 @@ const FeatureHighlights = () => {
   const features = [
     {
       icon: "MessageCircle",
-      title: "Respuestas automatizadas",
-      description:
-        "Configurá flujos de chatbot inteligentes para atender consultas 24/7.",
+      title: "Automated Responses",
+      description: "Setup intelligent flows to handle customer queries 24/7 without human intervention.",
     },
     {
       icon: "BarChart3",
-      title: "Métricas e insights",
-      description:
-        "Seguimiento de volumen de mensajes, tiempos de respuesta y satisfacción.",
+      title: "Advanced Analytics",
+      description: "Track message volume, response times, and customer satisfaction in real-time.",
     },
     {
       icon: "Users",
-      title: "Soporte multi-agente",
-      description:
-        "Gestioná el acceso de tu equipo y asigná conversaciones a cada agente.",
+      title: "Multi-Agent Support",
+      description: "Collaborate with your team. Assign conversations and manage roles efficiently.",
     },
     {
       icon: "Zap",
-      title: "Integración rápida",
-      description:
-        "Conectá tu número de WhatsApp Business en pocos pasos y sin fricción.",
-    },
-    {
-      icon: "Shield",
-      title: "Seguro y compliant",
-      description:
-        "Buenas prácticas de seguridad y privacidad para tus datos y los de tus clientes.",
-    },
-    {
-      icon: "Clock",
-      title: "Sincronización en tiempo real",
-      description:
-        "Mensajes instantáneos y actualización en vivo del estado de las conversaciones.",
+      title: "Instant Integration",
+      description: "Connect your WhatsApp Business number in seconds with our verified Meta partnership.",
     },
   ];
 
   return (
-    <div className="bg-muted/30 rounded-xl p-8">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-foreground mb-2">
-          ¿Por qué usar MatchBot?
-        </h2>
-        <p className="text-muted-foreground">
-          Todo lo que necesitás para automatizar y escalar tu atención por
-          WhatsApp.
+    <div className="text-white">
+      <div className="mb-10">
+        <h2 className="text-2xl font-bold mb-3">Why choose RocketBot?</h2>
+        <p className="text-slate-400 text-lg">
+          Everything you need to scale your WhatsApp support and sales.
         </p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {features?.map((feature, index) => (
-          <div key={index} className="flex items-start space-x-4">
-            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Icon name={feature?.icon} size={20} className="text-primary" />
+
+      <div className="grid gap-8">
+        {features.map((feature, index) => (
+          <div key={index} className="flex items-start gap-4 group">
+            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0 group-hover:bg-white/20 transition-colors backdrop-blur-sm border border-white/5">
+              <Icon name={feature.icon} size={24} className="text-indigo-300" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground mb-1">
-                {feature?.title}
+              <h3 className="font-bold text-lg mb-1 group-hover:text-indigo-200 transition-colors">
+                {feature.title}
               </h3>
-              <p className="text-sm text-muted-foreground">
-                {feature?.description}
+              <p className="text-slate-400 leading-relaxed text-sm">
+                {feature.description}
               </p>
             </div>
           </div>
         ))}
       </div>
-      {/* Indicadores de confianza */}
-      <div className="mt-8 pt-6 border-t border-border">
-        <div className="flex items-center justify-center space-x-8 text-sm text-muted-foreground">
-          <div className="flex items-center space-x-2">
-            <Icon name="Shield" size={16} />
-            <span>Conexión segura SSL</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Icon name="Lock" size={16} />
-            <span>Buenas prácticas de privacidad</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Icon name="CheckCircle" size={16} />
-            <span>Alta disponibilidad</span>
-          </div>
+
+      {/* Trust Indicators */}
+      <div className="mt-12 pt-8 border-t border-white/10 flex flex-wrap gap-6 text-sm text-slate-400">
+        <div className="flex items-center gap-2">
+          <Icon name="Shield" size={16} className="text-emerald-400" />
+          <span>SOC2 Compliant</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Icon name="Lock" size={16} className="text-emerald-400" />
+          <span>End-to-End Encrypted</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Icon name="CheckCircle" size={16} className="text-emerald-400" />
+          <span>99.9% Uptime</span>
         </div>
       </div>
     </div>
