@@ -238,36 +238,37 @@ function TemplateSenderForm({ template, channelId, onCancel }) {
 
   const variableIndices = getBodyVariables(template.body);
 
-  const handleSend = async (e) => {
+const handleSend = async (e) => {
     e.preventDefault();
     if (!phone) return alert("Please enter a phone number");
 
     setSending(true);
     try {
-      const components = [];
+      // 1. Preparamos las variables en un array simple (Strings)
+      // El backend espera: body: ["Juan", "Gracias"]
+      let bodyVars = [];
       if (variableIndices.length > 0) {
-        const parameters = variableIndices.map(index => ({
-          type: "text",
-          text: placeholders[index] || "" 
-        }));
-        
-        components.push({ type: "body", parameters: parameters });
+        bodyVars = variableIndices.map(index => placeholders[index] || "");
       }
 
+      // 2. Llamamos a la API con la estructura que espera nuestro nuevo Backend
       const res = await sendTemplateMessage({
         channelId,
         to: phone,
-        templateName: template.name,
-        language: template.language,
-        components
+        templateId: template.id, // <--- IMPORTANTE: Enviamos el ID, no el nombre
+        templateVariables: {
+          body: bodyVars // Enviamos el array simple
+        }
       });
 
       console.log("Send result:", res);
-      if (res.ok || res.success) {
+
+      // 3. Manejo de respuesta (Adaptado a si devuelve { message: ... } o { success: ... })
+      if (res && !res.error) {
           alert("✅ Message sent successfully!");
           onCancel(); 
       } else {
-          alert("❌ Error: " + JSON.stringify(res));
+          alert("❌ Error: " + (res.error || "Unknown error"));
       }
     } catch (err) {
       console.error(err);
@@ -277,6 +278,7 @@ function TemplateSenderForm({ template, channelId, onCancel }) {
     }
   };
 
+// ... (El resto del return se queda igual)
   return (
     <div className="p-6 bg-slate-50/50 min-h-[300px]">
       <div className="max-w-lg mx-auto bg-white p-6 rounded-lg shadow-sm border border-slate-200">

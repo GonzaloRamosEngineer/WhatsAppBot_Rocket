@@ -108,24 +108,21 @@ export async function getTemplateById(templateId) {
 }
 
 /**
- * NUEVA FUNCIÓN (Requerida para el video): Envía un mensaje de plantilla.
- * Llama a la edge function 'whatsapp-send-message'.
+ * NUEVA VERSIÓN CORREGIDA: Envía un mensaje de plantilla usando el ID.
+ * Se conecta con la lógica robusta de 'whatsapp-send-message'.
  */
-export async function sendTemplateMessage({ channelId, to, templateName, language, components }) {
-  if (!channelId || !to || !templateName) {
-    throw new Error("Missing required parameters for sending template");
+export async function sendTemplateMessage({ channelId, to, templateId, templateVariables }) {
+  // Validamos lo básico
+  if (!channelId || !to || !templateId) {
+    throw new Error("Missing required parameters: channelId, to, or templateId");
   }
 
-  // Estructura payload estándar de Meta
+  // Estructura payload para nuestro Backend Inteligente
   const payload = {
-    channelId, // Tu Edge Function debe saber manejar esto para buscar el token
-    to,
-    type: "template",
-    template: {
-      name: templateName,
-      language: { code: language },
-      components: components || []
-    }
+    channelId: channelId,       // Para saber qué canal usar
+    to: to,                     // El teléfono del cliente
+    templateId: templateId,     // El UUID de la tabla 'templates'
+    templateVariables: templateVariables // Objeto simple: { body: ['Var1', 'Var2'], header: [...] }
   };
 
   const { data, error } = await supabase.functions.invoke("whatsapp-send-message", {
@@ -134,7 +131,13 @@ export async function sendTemplateMessage({ channelId, to, templateName, languag
 
   if (error) {
     console.error("[templatesApi] sendTemplateMessage error:", error);
-    throw error;
+    // Intentamos parsear el error si viene como JSON string en el mensaje
+    try {
+        const errBody = JSON.parse(error.message);
+        throw new Error(errBody.error || error.message);
+    } catch {
+        throw error;
+    }
   }
 
   return data;
