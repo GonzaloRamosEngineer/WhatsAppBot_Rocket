@@ -65,17 +65,17 @@ const MessageTable = ({ messages, onBulkAction }) => {
 
         {/* --- VISTA DE ESCRITORIO --- */}
         <div className="hidden lg:block w-full">
-          {/* CAMBIO CLAVE: table-fixed obliga a respetar los anchos definidos abajo */}
           <table className="w-full table-fixed text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-400 border-b border-slate-200 tracking-wider">
               <tr>
-                {/* Definimos anchos porcentuales fijos para sumar 100% */}
                 <th className="px-4 py-3 w-[5%] text-center">
                    <div className="sr-only">Sel</div>
                 </th>
                 <th className="px-4 py-3 w-[15%] font-semibold">Time / ID</th>
-                <th className="px-4 py-3 w-[12%] font-semibold">Direction</th>
-                <th className="px-4 py-3 w-[45%] font-semibold">Message Content</th>
+                {/* Ajuste de ancho: 10% es suficiente para IN/OUT */}
+                <th className="px-4 py-3 w-[10%] font-semibold">Dir</th> 
+                {/* Le damos más espacio al contenido (47%) */}
+                <th className="px-4 py-3 w-[47%] font-semibold">Message Content</th>
                 <th className="px-4 py-3 w-[15%] font-semibold">Status</th>
                 <th className="px-4 py-3 w-[8%] text-right font-semibold">Action</th>
               </tr>
@@ -106,7 +106,7 @@ const MessageTable = ({ messages, onBulkAction }) => {
                       </div>
                     </td>
 
-                    {/* Dirección */}
+                    {/* Dirección (Compacta: IN/OUT) */}
                     <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
                            <div className={`p-1.5 rounded-full shrink-0 ${isInbound ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}>
@@ -114,13 +114,13 @@ const MessageTable = ({ messages, onBulkAction }) => {
                            </div>
                            <div className="flex flex-col min-w-0">
                               <span className={`text-xs font-bold uppercase tracking-wide truncate ${isInbound ? 'text-indigo-700' : 'text-orange-700'}`}>
-                                 {isInbound ? "Inbound" : "Outbound"}
+                                 {isInbound ? "IN" : "OUT"}
                               </span>
                            </div>
                         </div>
                     </td>
 
-                    {/* Contenido (Highlight) */}
+                    {/* Contenido */}
                     <td className="px-4 py-4">
                       {isTemplate ? (
                         <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100 group-hover:bg-white group-hover:border-slate-200 transition-colors shadow-sm max-w-full overflow-hidden">
@@ -176,7 +176,7 @@ const MessageTable = ({ messages, onBulkAction }) => {
           </table>
         </div>
 
-        {/* --- VISTA MÓVIL (Intacta) --- */}
+        {/* --- VISTA MÓVIL (Intacta, ya usaba IN/OUT) --- */}
         <div className="lg:hidden divide-y divide-slate-100">
           {messages?.map((msg) => {
              const isTemplate = msg.body?.startsWith("[TEMPLATE]") || msg.meta?.whatsapp_template;
