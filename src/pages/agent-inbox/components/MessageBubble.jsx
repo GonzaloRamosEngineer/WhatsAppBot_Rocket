@@ -1,5 +1,6 @@
-// src/pages/agent-inbox/components/MessageBubble.jsx
+// C:\Projects\WhatsAppBot_Rocket\src\pages\agent-inbox\components\MessageBubble.jsx
 import React from "react";
+import Icon from "../../../components/AppIcon";
 
 function formatTime(value) {
   if (!value) return "";
@@ -12,23 +13,53 @@ function formatTime(value) {
 }
 
 export default function MessageBubble({ message }) {
-  const isOutbound = message.direction === "out"; // 👈 'out' desde webhook / send
+  const isOutbound = message.direction === "out" || message.direction === "outbound";
+  const isTemplate = message.body?.startsWith("[TEMPLATE]") || message.meta?.whatsapp_template;
   const time = formatTime(message.created_at);
 
-  const alignment = isOutbound ? "items-end" : "items-start";
-  const bubbleClasses = isOutbound
-    ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm"
-    : "bg-muted text-foreground rounded-2xl rounded-bl-sm";
-
   return (
-    <div className={`flex ${alignment}`}>
-      <div className={`max-w-[80%] px-3 py-2 text-xs ${bubbleClasses}`}>
-        <div className="whitespace-pre-wrap break-words">{message.body}</div>
-        {time && (
-          <div className="mt-0.5 text-[9px] opacity-80 text-right">
-            {time}
-          </div>
-        )}
+    <div className={`flex w-full mb-1 ${isOutbound ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`
+          relative max-w-[85%] md:max-w-[70%] px-3 py-2 text-sm shadow-sm rounded-lg
+          ${isOutbound 
+            ? "bg-indigo-100 text-slate-800 rounded-tr-none" // Agente (Color suave)
+            : "bg-white text-slate-800 rounded-tl-none border border-slate-100" // Cliente (Blanco)
+          }
+        `}
+      >
+        {/* Contenido del Mensaje */}
+        <div className="whitespace-pre-wrap break-words leading-relaxed text-[13px]">
+          {isTemplate ? (
+             <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider opacity-60 flex items-center gap-1">
+                   <Icon name="LayoutTemplate" size={10} /> Template
+                </span>
+                <span className="italic opacity-80">{message.body}</span>
+             </div>
+          ) : (
+             message.body
+          )}
+        </div>
+
+        {/* Metadatos (Hora + Checks) */}
+        <div className={`flex items-center justify-end gap-1 mt-1 select-none ${isOutbound ? "opacity-70" : "opacity-50"}`}>
+          <span className="text-[10px]">{time}</span>
+          
+          {/* Solo mostramos checks si es mensaje saliente */}
+          {isOutbound && (
+            <span title={message.status || "sent"}>
+               {/* Lógica simple de iconos de estado */}
+               {message.status === 'read' ? (
+                  <Icon name="CheckCheck" size={12} className="text-blue-500" />
+               ) : message.status === 'delivered' ? (
+                  <Icon name="CheckCheck" size={12} />
+               ) : (
+                  <Icon name="Check" size={12} />
+               )}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
