@@ -7,254 +7,228 @@ import MessageDetailsModal from './MessageDetailsModal';
 
 const MessageTable = ({ messages, onBulkAction }) => {
   const [selectedMessages, setSelectedMessages] = useState([]);
-  const [expandedRows, setExpandedRows] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
 
+  // --- Lógica de Selección (Mantenida igual) ---
   const handleSelectAll = (checked) => {
-    if (checked) {
-      setSelectedMessages(messages?.map(msg => msg?.id));
-    } else {
-      setSelectedMessages([]);
-    }
+    if (checked) setSelectedMessages(messages?.map(msg => msg?.id));
+    else setSelectedMessages([]);
   };
 
   const handleSelectMessage = (messageId, checked) => {
-    if (checked) {
-      setSelectedMessages([...selectedMessages, messageId]);
-    } else {
-      setSelectedMessages(selectedMessages?.filter(id => id !== messageId));
-    }
+    if (checked) setSelectedMessages([...selectedMessages, messageId]);
+    else setSelectedMessages(selectedMessages?.filter(id => id !== messageId));
   };
 
-  const toggleRowExpansion = (messageId) => {
-    if (expandedRows?.includes(messageId)) {
-      setExpandedRows(expandedRows?.filter(id => id !== messageId));
-    } else {
-      setExpandedRows([...expandedRows, messageId]);
-    }
-  };
-
+  // --- Formateadores Visuales ---
   const formatTimestamp = (timestamp) => {
-    return new Date(timestamp)?.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    if (!timestamp) return "-";
+    return new Date(timestamp).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
-  };
-
-  const truncateMessage = (message, maxLength = 50) => {
-    return message?.length > maxLength ? `${message?.substring(0, maxLength)}...` : message;
   };
 
   return (
     <>
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
-        {/* Table Header */}
-        <div className="px-6 py-4 border-b border-border bg-muted/50">
-          <div className="flex items-center justify-between">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        
+        {/* Header de la Tabla (Acciones Masivas) */}
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Checkbox
-                checked={selectedMessages?.length === messages?.length && messages?.length > 0}
-                indeterminate={selectedMessages?.length > 0 && selectedMessages?.length < messages?.length}
+                checked={selectedMessages.length === messages?.length && messages?.length > 0}
+                indeterminate={selectedMessages.length > 0 && selectedMessages.length < messages?.length}
                 onChange={(e) => handleSelectAll(e?.target?.checked)}
               />
-              <span className="text-sm font-medium text-foreground">
-                {selectedMessages?.length > 0 ? `${selectedMessages?.length} selected` : 'Select all'}
+              <span className="text-sm font-semibold text-slate-600">
+                {selectedMessages.length > 0 ? `${selectedMessages.length} selected` : 'Message History'}
               </span>
             </div>
             
-            {selectedMessages?.length > 0 && (
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onBulkAction('export', selectedMessages)}
-                  iconName="Download"
-                  iconPosition="left"
-                >
-                  Export Selected
+            {selectedMessages.length > 0 && (
+              <div className="flex items-center space-x-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                <Button variant="outline" size="sm" onClick={() => onBulkAction('export', selectedMessages)} iconName="Download">
+                  Export
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onBulkAction('delete', selectedMessages)}
-                  iconName="Trash2"
-                  iconPosition="left"
-                >
-                  Delete Selected
+                <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200" onClick={() => onBulkAction('delete', selectedMessages)} iconName="Trash2">
+                  Delete
                 </Button>
               </div>
             )}
-          </div>
         </div>
 
-        {/* Desktop Table View */}
+        {/* --- VISTA DE ESCRITORIO --- */}
         <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted/30">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-500 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Message
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Contact
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Direction
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Timestamp
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-3 w-12">Select</th>
+                <th className="px-6 py-3">Time / ID</th>
+                <th className="px-6 py-3">Direction</th>
+                <th className="px-6 py-3 w-[40%]">Content</th>
+                <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3 text-right">Details</th>
               </tr>
             </thead>
-            <tbody className="bg-card divide-y divide-border">
-              {messages?.map((message) => (
-                <React.Fragment key={message?.id}>
-                  <tr className="hover:bg-muted/50 transition-colors">
+            <tbody className="divide-y divide-slate-100">
+              {messages?.map((msg) => {
+                // DETECCIÓN INTELIGENTE
+                // 1. ¿Es Template?
+                const isTemplate = msg.body?.startsWith("[TEMPLATE]") || msg.meta?.whatsapp_template;
+                // 2. ¿Es Entrante?
+                const isInbound = msg.direction === 'in' || msg.direction === 'inbound';
+                
+                return (
+                  <tr key={msg.id} className="hover:bg-slate-50/80 transition-colors group">
+                    
+                    {/* Checkbox */}
                     <td className="px-6 py-4">
-                      <div className="flex items-center space-x-3">
-                        <Checkbox
-                          checked={selectedMessages?.includes(message?.id)}
-                          onChange={(e) => handleSelectMessage(message?.id, e?.target?.checked)}
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm text-foreground font-medium">
-                            {truncateMessage(message?.body)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            ID: {message?.messageId}
-                          </p>
+                      <Checkbox
+                        checked={selectedMessages.includes(msg.id)}
+                        onChange={(e) => handleSelectMessage(msg.id, e.target.checked)}
+                      />
+                    </td>
+
+                    {/* Fecha e ID */}
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-slate-700">{formatTimestamp(msg.created_at || msg.timestamp)}</div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5 group-hover:text-indigo-500 transition-colors">
+                        {msg.id.slice(0, 8)}...
+                      </div>
+                    </td>
+
+                    {/* Dirección */}
+                    <td className="px-6 py-4">
+                       <div className={`flex items-center gap-2 font-medium ${isInbound ? 'text-indigo-700' : 'text-slate-600'}`}>
+                          <div className={`p-1.5 rounded-md ${isInbound ? 'bg-indigo-50' : 'bg-slate-100'}`}>
+                            <Icon name={isInbound ? "ArrowDownLeft" : "ArrowUpRight"} size={16} />
+                          </div>
+                          <div className="flex flex-col">
+                             <span className="text-xs font-bold">{isInbound ? "Inbound" : "Outbound"}</span>
+                             <span className="text-[10px] text-slate-400 font-normal">
+                               {isInbound ? msg.contactName || "User" : "System/Agent"}
+                             </span>
+                          </div>
+                       </div>
+                    </td>
+
+                    {/* Contenido (LA JOYA DE LA CORONA) */}
+                    <td className="px-6 py-4">
+                      {isTemplate ? (
+                        <div className="flex items-start gap-3 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                          <div className="bg-purple-100 p-1.5 rounded text-purple-600 mt-0.5">
+                             <Icon name="LayoutTemplate" size={14} />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100 uppercase tracking-wide">
+                              Template
+                            </span>
+                            <p className="text-slate-800 font-medium mt-1 text-sm">
+                              {/* Intentamos mostrar el nombre limpio del template */}
+                              {msg.meta?.whatsapp_template?.name || msg.body.replace("[TEMPLATE] ", "")}
+                            </p>
+                            {/* Si tenemos variables guardadas, las mostramos (Opcional) */}
+                            {msg.meta?.whatsapp_template?.variables && (
+                               <p className="text-xs text-slate-400 mt-0.5 italic">
+                                 Vars: {JSON.stringify(msg.meta.whatsapp_template.variables)}
+                               </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="flex items-start gap-2">
+                           <Icon name={isInbound ? "MessageCircle" : "MessageSquare"} size={16} className="text-slate-300 mt-1 shrink-0" />
+                           <p className="text-slate-600 text-sm leading-relaxed line-clamp-2">
+                             {msg.body}
+                           </p>
+                        </div>
+                      )}
                     </td>
+
+                    {/* Status Badge */}
                     <td className="px-6 py-4">
-                      <div className="text-sm text-foreground">{message?.contact}</div>
-                      <div className="text-xs text-muted-foreground">{message?.contactName}</div>
+                      <MessageStatusBadge status={msg.status} direction={msg.direction} />
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <Icon 
-                          name={message?.direction === 'inbound' ? 'ArrowDownLeft' : 'ArrowUpRight'} 
-                          size={16}
-                          className={message?.direction === 'inbound' ? 'text-blue-600' : 'text-green-600'}
-                        />
-                        <span className="text-sm text-foreground capitalize">{message?.direction}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <MessageStatusBadge status={message?.status} />
-                    </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {formatTimestamp(message?.timestamp)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleRowExpansion(message?.id)}
-                          iconName={expandedRows?.includes(message?.id) ? 'ChevronUp' : 'ChevronDown'}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedMessage(message)}
-                          iconName="Eye"
-                        />
-                      </div>
+
+                    {/* Actions */}
+                    <td className="px-6 py-4 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedMessage(msg)}
+                        iconName="Code"
+                        className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                        title="View JSON Payload"
+                      />
                     </td>
                   </tr>
-                  
-                  {expandedRows?.includes(message?.id) && (
-                    <tr>
-                      <td colSpan="6" className="px-6 py-4 bg-muted/20">
-                        <div className="space-y-3">
-                          <div>
-                            <h4 className="text-sm font-medium text-foreground mb-2">Full Message Content</h4>
-                            <p className="text-sm text-muted-foreground bg-background p-3 rounded border">
-                              {message?.body}
-                            </p>
-                          </div>
-                          {message?.metadata && (
-                            <div>
-                              <h4 className="text-sm font-medium text-foreground mb-2">Metadata</h4>
-                              <div className="grid grid-cols-2 gap-4 text-xs">
-                                <div>
-                                  <span className="font-medium">Thread ID:</span> {message?.metadata?.threadId}
-                                </div>
-                                <div>
-                                  <span className="font-medium">API Response:</span> {message?.metadata?.apiResponse}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        {/* Mobile Card View */}
-        <div className="lg:hidden divide-y divide-border">
-          {messages?.map((message) => (
-            <div key={message?.id} className="p-4 space-y-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-3 flex-1">
-                  <Checkbox
-                    checked={selectedMessages?.includes(message?.id)}
-                    onChange={(e) => handleSelectMessage(message?.id, e?.target?.checked)}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <Icon 
-                        name={message?.direction === 'inbound' ? 'ArrowDownLeft' : 'ArrowUpRight'} 
-                        size={14}
-                        className={message?.direction === 'inbound' ? 'text-blue-600' : 'text-green-600'}
-                      />
-                      <span className="text-sm font-medium text-foreground">{message?.contactName}</span>
+        {/* --- VISTA MÓVIL (Adaptada también) --- */}
+        <div className="lg:hidden divide-y divide-slate-100">
+          {messages?.map((msg) => {
+             const isTemplate = msg.body?.startsWith("[TEMPLATE]") || msg.meta?.whatsapp_template;
+             const isInbound = msg.direction === 'in' || msg.direction === 'inbound';
+             
+             return (
+              <div key={msg.id} className="p-4 space-y-3 bg-white">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3 flex-1">
+                    <Checkbox
+                      checked={selectedMessages.includes(msg.id)}
+                      onChange={(e) => handleSelectMessage(msg.id, e.target.checked)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      {/* Cabecera Móvil */}
+                      <div className="flex items-center gap-2 mb-1">
+                         <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${isInbound ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+                           {isInbound ? "IN" : "OUT"}
+                         </span>
+                         <span className="text-xs text-slate-400">
+                           {formatTimestamp(msg.created_at || msg.timestamp)}
+                         </span>
+                      </div>
+                      
+                      {/* Contenido Móvil */}
+                      {isTemplate ? (
+                         <div className="text-sm font-medium text-purple-700 flex items-center gap-1.5 mt-1">
+                            <Icon name="LayoutTemplate" size={12} />
+                            {msg.meta?.whatsapp_template?.name || "Template Message"}
+                         </div>
+                      ) : (
+                         <p className="text-sm text-slate-700 mt-1 line-clamp-2">{msg.body}</p>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">{message?.contact}</p>
-                    <p className="text-sm text-foreground">{truncateMessage(message?.body, 80)}</p>
                   </div>
+                  
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedMessage(msg)} iconName="Eye" />
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedMessage(message)}
-                  iconName="Eye"
-                />
+                
+                <div className="flex items-center justify-between pl-8">
+                  <MessageStatusBadge status={msg.status} direction={msg.direction} />
+                </div>
               </div>
-              
-              <div className="flex items-center justify-between">
-                <MessageStatusBadge status={message?.status} />
-                <span className="text-xs text-muted-foreground">
-                  {formatTimestamp(message?.timestamp)}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
+        {/* Empty State */}
         {messages?.length === 0 && (
-          <div className="text-center py-12">
-            <Icon name="MessageSquare" size={48} className="mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">No messages found</h3>
-            <p className="text-muted-foreground">Try adjusting your filters or check back later for new messages.</p>
+          <div className="text-center py-16">
+            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+               <Icon name="MessageSquareOff" size={24} className="text-slate-300" />
+            </div>
+            <h3 className="text-slate-900 font-medium">No messages yet</h3>
+            <p className="text-slate-500 text-sm mt-1">Send a template to start the history log.</p>
           </div>
         )}
       </div>
+
+      {/* MODAL DETALLES */}
       {selectedMessage && (
         <MessageDetailsModal
           message={selectedMessage}
