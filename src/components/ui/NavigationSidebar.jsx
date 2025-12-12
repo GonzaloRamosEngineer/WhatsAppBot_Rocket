@@ -40,7 +40,7 @@ const NavigationSidebar = ({
           {!isCollapsed && (
             <div className="flex flex-col animate-in fade-in duration-300 min-w-0">
               <span className="text-sm font-bold text-white tracking-wide truncate">
-                MATCH<span className="text-indigo-400">BOT</span>
+                Match<span className="text-indigo-400">Bot</span>
               </span>
               <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider truncate">
                 Workspace
