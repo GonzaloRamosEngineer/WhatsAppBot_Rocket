@@ -68,8 +68,8 @@ const LoginPage = () => {
            </div>
 
            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome back</h1>
-              <p className="text-slate-500">
+              <h1 className="text-3xl font-bold text-slate-900 mb-2 tracking-tight">Welcome back</h1>
+              <p className="text-slate-500 text-lg">
                  Sign in to manage your WhatsApp workspace and automation flows.
               </p>
            </div>
@@ -92,7 +92,7 @@ const LoginPage = () => {
                  value={form.email}
                  onChange={handleChange}
                  required
-                 className="bg-slate-50 border-slate-200 focus:bg-white transition-all h-11"
+                 className="bg-slate-50 border-slate-200 focus:bg-white transition-all h-12 text-base"
               />
 
               <div>
@@ -112,7 +112,7 @@ const LoginPage = () => {
                     value={form.password}
                     onChange={handleChange}
                     required
-                    className="bg-slate-50 border-slate-200 focus:bg-white transition-all h-11"
+                    className="bg-slate-50 border-slate-200 focus:bg-white transition-all h-12 text-base"
                  />
               </div>
 
@@ -122,7 +122,7 @@ const LoginPage = () => {
                  fullWidth
                  loading={loading}
                  disabled={loading}
-                 className="h-12 text-base bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all mt-2"
+                 className="h-12 text-base bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all mt-4"
               >
                  {loading ? "Signing in..." : "Sign in to Dashboard"}
                  {!loading && <Icon name="ArrowRight" size={18} className="ml-2" />}
@@ -141,11 +141,19 @@ const LoginPage = () => {
            </p>
         </div>
         
-        {/* Footer Legal (Opcional) */}
-        <div className="mt-12 pt-6 border-t border-slate-100 text-center lg:text-left">
-           <p className="text-xs text-slate-400">
-              &copy; {new Date().getFullYear()} DigitalMatch. Secure & Encrypted.
-           </p>
+        {/* Footer Legal & Security */}
+        <div className="mt-12 pt-6 border-t border-slate-100">
+           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+              <span>&copy; {new Date().getFullYear()} DigitalMatch.</span>
+              <div className="flex items-center gap-3">
+                 <span className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                    <Icon name="Lock" size={12} className="text-emerald-500" /> SSL Secured
+                 </span>
+                 <span className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                    <Icon name="Shield" size={12} className="text-blue-500" /> SOC2 Ready
+                 </span>
+              </div>
+           </div>
         </div>
       </div>
 
@@ -168,14 +176,11 @@ const LoginPage = () => {
                Connect with customers on WhatsApp, build powerful flows, and scale your support without adding headcount.
             </p>
             
-            {/* Social Proof (Falso para demo) */}
-            <div className="mt-12 flex items-center justify-center gap-4 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-               {/* Aquí podrías poner logos de clientes, por ahora usamos texto estilizado */}
-               <span className="text-white font-bold text-xl tracking-widest">META</span>
-               <span className="text-white font-bold text-xl tracking-widest mx-4">•</span>
-               <span className="text-white font-bold text-xl tracking-widest">STRIPE</span>
-               <span className="text-white font-bold text-xl tracking-widest mx-4">•</span>
-               <span className="text-white font-bold text-xl tracking-widest">OPENAI</span>
+            {/* Social Proof (Falso para demo - Aprobado por Meta) */}
+            <div className="mt-12 flex items-center justify-center gap-6 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+               <span className="text-white font-bold text-lg tracking-widest flex items-center gap-2">
+                  <Icon name="BadgeCheck" size={20} className="text-blue-400" /> META TECH PROVIDER
+               </span>
             </div>
          </div>
       </div>
