@@ -339,36 +339,36 @@ const currentUser = {
           sidebarCollapsed ? "md:ml-16" : "md:ml-60"
         }`}
       >
-        {/* Header */}
-        <header className="bg-card border-b border-border px-6 py-4">
+{/* Header - Dashboard */}
+        <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-20 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">
-                  Panel de control
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  ¡Bienvenido de nuevo, {currentUser?.name}! Acá ves cómo
-                  viene funcionando tu bot de WhatsApp.
-                </p>
-                {profile && !profile.tenant_id && (
-                  <p className="mt-1 text-xs text-amber-600">
-                    Tu usuario todavía no está asociado a ningún workspace
-                    (tenant). Podés vincularlo creando uno o agregando tu
-                    usuario en <code>tenant_members</code>.
+            <div className="flex items-center gap-3">
+               <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
+                  <Icon name="LayoutDashboard" size={20} />
+               </div>
+               <div>
+                  <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Dashboard</h1>
+                  <p className="text-slate-500 text-xs font-medium">
+                    Welcome back, {currentUser?.name}. Here is your bot performance overview.
                   </p>
-                )}
-              </div>
+                  
+                  {/* Mantenemos la lógica de alerta pero más bonita */}
+                  {profile && !profile.tenant_id && (
+                    <div className="mt-2 flex items-center gap-1.5 text-[10px] bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-200">
+                      <Icon name="AlertTriangle" size={10} />
+                      <span>Your user is not linked to any workspace yet.</span>
+                    </div>
+                  )}
+               </div>
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Notificaciones */}
-              <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md micro-animation relative">
+              {/* Notificaciones (Estilizadas) */}
+              <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all relative">
                 <Icon name="Bell" size={20} />
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full" />
+                <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
               </button>
 
-              {/* Usuario */}
               <UserProfileDropdown
                 user={currentUser}
                 onLogout={logout}

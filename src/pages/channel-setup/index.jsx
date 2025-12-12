@@ -347,20 +347,30 @@ const ChannelSetup = () => {
 
       <div className={`transition-all duration-200 ${sidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
         
-        {/* HEADER */}
-        <header className="bg-white border-b border-slate-200 px-8 py-5 sticky top-0 z-10 shadow-sm">
+{/* Header - Channel Setup */}
+        <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-20 shadow-sm">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Channel Settings</h1>
-              <p className="text-slate-500 text-sm mt-1">Manage your WhatsApp Business connection and templates.</p>
+            <div className="flex items-center gap-3">
+               <div className="bg-emerald-600 p-2 rounded-lg text-white shadow-sm">
+                  <Icon name="MessageSquare" size={20} />
+               </div>
+               <div>
+                  <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Channel Settings</h1>
+                  <p className="text-slate-500 text-xs font-medium">
+                    Manage your WhatsApp Business connection & assets
+                  </p>
+               </div>
             </div>
+            
             <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2 px-3 py-1 bg-slate-100 rounded-full border border-slate-200">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-slate-400"}`} />
-                <span className="text-xs font-semibold text-slate-600">
-                  {isConnected ? "System Online" : "Offline"}
+              {/* Status Pill Mejorado */}
+              <div className={`flex items-center space-x-2 px-3 py-1 rounded-full border ${isConnected ? "bg-emerald-50 border-emerald-200" : "bg-slate-100 border-slate-200"}`}>
+                <div className={`w-2 h-2 rounded-full animate-pulse ${isConnected ? "bg-emerald-500" : "bg-slate-400"}`} />
+                <span className={`text-xs font-bold ${isConnected ? "text-emerald-700" : "text-slate-500"}`}>
+                  {isConnected ? "SYSTEM ONLINE" : "OFFLINE"}
                 </span>
               </div>
+              
               <UserProfileDropdown user={currentUser} onLogout={handleLogout} />
             </div>
           </div>

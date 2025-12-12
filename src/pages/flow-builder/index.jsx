@@ -326,14 +326,19 @@ const FlowBuilder = () => {
           isSidebarCollapsed ? "md:ml-16" : "md:ml-60"
         }`}
       >
-        {/* Header */}
-        <header className="bg-card border-b border-border px-6 py-4">
+{/* Header - Flow Builder */}
+        <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-20 shadow-sm">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold">Flow Builder</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Diseñá y administrá las respuestas automáticas del bot.
-              </p>
+            <div className="flex items-center gap-3">
+               <div className="bg-purple-600 p-2 rounded-lg text-white shadow-sm">
+                  <Icon name="GitBranch" size={20} />
+               </div>
+               <div>
+                  <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Flow Builder</h1>
+                  <p className="text-slate-500 text-xs font-medium">
+                    Design and manage automated bot responses
+                  </p>
+               </div>
             </div>
 
             <div className="flex items-center space-x-4">
@@ -342,8 +347,9 @@ const FlowBuilder = () => {
                 iconName="Save"
                 onClick={handlePersistRules}
                 disabled={isSaving || isLoading}
+                className="border-slate-300 hover:border-purple-500 hover:text-purple-600"
               >
-                {isSaving ? "Guardando..." : "Guardar reglas"}
+                {isSaving ? "Saving..." : "Save Rules"}
               </Button>
 
               <UserProfileDropdown

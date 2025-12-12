@@ -165,15 +165,29 @@ const MessagesLog = () => {
       />
 
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
-        {/* Header */}
-        <header className="bg-white border-b border-slate-200 px-8 py-5 sticky top-0 z-10 shadow-sm">
+{/* Header - Messages Log */}
+        <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-20 shadow-sm">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Messages Logs</h1>
-              <p className="text-slate-500 text-sm mt-1">Audit trail of all communication via WhatsApp API</p>
-            </div>
             <div className="flex items-center gap-3">
-               <Button variant="outline" size="sm" onClick={() => window.location.reload()} iconName="RefreshCw">
+               <div className="bg-slate-700 p-2 rounded-lg text-white shadow-sm">
+                  <Icon name="List" size={20} />
+               </div>
+               <div>
+                  <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Messages Logs</h1>
+                  <p className="text-slate-500 text-xs font-medium">
+                    Audit trail of all communication history
+                  </p>
+               </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+               <Button 
+                 variant="outline" 
+                 size="sm" 
+                 onClick={() => window.location.reload()} 
+                 iconName="RefreshCw"
+                 className="text-slate-500 border-slate-200 hover:bg-slate-50"
+               >
                  Refresh
                </Button>
                <UserProfileDropdown user={{ name: tenant?.name || "User", role: profile?.role }} onLogout={handleLogout} />
