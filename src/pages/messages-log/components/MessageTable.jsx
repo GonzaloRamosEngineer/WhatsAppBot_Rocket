@@ -11,7 +11,7 @@ const MessageTable = ({ messages, onBulkAction }) => {
   const [selectedMessages, setSelectedMessages] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
 
-  // --- Lógica de Selección (Intacta) ---
+  // --- Lógica de Selección ---
   const handleSelectAll = (checked) => {
     if (checked) setSelectedMessages(messages?.map(msg => msg?.id));
     else setSelectedMessages([]);
@@ -22,7 +22,7 @@ const MessageTable = ({ messages, onBulkAction }) => {
     else setSelectedMessages(selectedMessages?.filter(id => id !== messageId));
   };
 
-  // --- Formateadores Visuales ---
+  // --- Formateadores ---
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return "-";
     return new Date(timestamp).toLocaleString('en-US', {
@@ -30,15 +30,14 @@ const MessageTable = ({ messages, onBulkAction }) => {
     });
   };
 
-  // Helper para acortar IDs visualmente
   const shortId = (id) => id ? id.substring(0, 8) : "";
 
   return (
     <>
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
         
-        {/* Header de la Tabla (Acciones Masivas) */}
-        <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between">
+        {/* Header de la Tabla */}
+        <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between shrink-0">
             <div className="flex items-center space-x-4">
               <Checkbox
                 checked={selectedMessages.length === messages?.length && messages?.length > 0}
@@ -65,22 +64,20 @@ const MessageTable = ({ messages, onBulkAction }) => {
         </div>
 
         {/* --- VISTA DE ESCRITORIO --- */}
-        {/* CAMBIO 1: Agregamos custom-scrollbar para que el scroll se vea bonito si aparece */}
-        <div className="hidden lg:block overflow-x-auto custom-scrollbar">
-          {/* CAMBIO 2: min-w-full asegura que la tabla ocupe todo, min-w-[1000px] evita que se aplaste */}
-          <table className="w-full min-w-[1000px] text-left text-sm">
+        <div className="hidden lg:block w-full">
+          {/* CAMBIO CLAVE: table-fixed obliga a respetar los anchos definidos abajo */}
+          <table className="w-full table-fixed text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-400 border-b border-slate-200 tracking-wider">
               <tr>
-                <th className="px-6 py-3 w-12 text-center whitespace-nowrap">
-                   <div className="sr-only">Selection</div>
+                {/* Definimos anchos porcentuales fijos para sumar 100% */}
+                <th className="px-4 py-3 w-[5%] text-center">
+                   <div className="sr-only">Sel</div>
                 </th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">Timestamp / ID</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">Direction</th>
-                {/* CAMBIO 3: Reduje el ancho de 45% a 35% para dar aire a la derecha */}
-                <th className="px-6 py-3 w-[35%] font-semibold whitespace-nowrap">Message Content</th>
-                <th className="px-6 py-3 font-semibold whitespace-nowrap">Status</th>
-                {/* CAMBIO 4: Aseguramos padding derecho suficiente */}
-                <th className="px-6 py-3 text-right font-semibold whitespace-nowrap">Action</th>
+                <th className="px-4 py-3 w-[15%] font-semibold">Time / ID</th>
+                <th className="px-4 py-3 w-[12%] font-semibold">Direction</th>
+                <th className="px-4 py-3 w-[45%] font-semibold">Message Content</th>
+                <th className="px-4 py-3 w-[15%] font-semibold">Status</th>
+                <th className="px-4 py-3 w-[8%] text-right font-semibold">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
@@ -92,7 +89,7 @@ const MessageTable = ({ messages, onBulkAction }) => {
                   <tr key={msg.id} className="hover:bg-slate-50/50 transition-colors group">
                     
                     {/* Checkbox */}
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-4 py-4 text-center">
                       <Checkbox
                         checked={selectedMessages.includes(msg.id)}
                         onChange={(e) => handleSelectMessage(msg.id, e.target.checked)}
@@ -100,56 +97,54 @@ const MessageTable = ({ messages, onBulkAction }) => {
                     </td>
 
                     {/* Fecha e ID */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-slate-700">{formatTimestamp(msg.created_at || msg.timestamp)}</div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-1 bg-slate-100 inline-block px-1.5 py-0.5 rounded border border-slate-200 group-hover:border-slate-300 transition-colors">
+                    <td className="px-4 py-4 truncate">
+                      <div className="font-medium text-slate-700 truncate" title={formatTimestamp(msg.created_at || msg.timestamp)}>
+                        {formatTimestamp(msg.created_at || msg.timestamp)}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-1 bg-slate-100 inline-block px-1.5 py-0.5 rounded border border-slate-200 truncate max-w-full">
                         #{shortId(msg.id)}
                       </div>
                     </td>
 
                     {/* Dirección */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                           <div className={`p-1.5 rounded-full ${isInbound ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}>
+                    <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                           <div className={`p-1.5 rounded-full shrink-0 ${isInbound ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}>
                               <Icon name={isInbound ? "ArrowDownLeft" : "ArrowUpRight"} size={14} />
                            </div>
-                           <div className="flex flex-col">
-                              <span className={`text-xs font-bold uppercase tracking-wide ${isInbound ? 'text-indigo-700' : 'text-orange-700'}`}>
+                           <div className="flex flex-col min-w-0">
+                              <span className={`text-xs font-bold uppercase tracking-wide truncate ${isInbound ? 'text-indigo-700' : 'text-orange-700'}`}>
                                  {isInbound ? "Inbound" : "Outbound"}
-                              </span>
-                              <span className="text-[10px] text-slate-400">
-                                {isInbound ? msg.contactName || "User" : "System"}
                               </span>
                            </div>
                         </div>
                     </td>
 
                     {/* Contenido (Highlight) */}
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       {isTemplate ? (
-                        <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100 group-hover:bg-white group-hover:border-slate-200 transition-colors shadow-sm">
-                          <div className="bg-purple-100 text-purple-600 p-1.5 rounded-md mt-0.5 shrink-0">
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100 group-hover:bg-white group-hover:border-slate-200 transition-colors shadow-sm max-w-full overflow-hidden">
+                          <div className="bg-purple-100 text-purple-600 p-1 rounded-md shrink-0">
                              <Icon name="LayoutTemplate" size={14} />
                           </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                               <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">Template</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                               <span className="text-[10px] font-bold text-purple-700 uppercase">Template</span>
                                {msg.meta?.whatsapp_template?.name && (
-                                  <span className="text-[10px] text-slate-400 truncate max-w-[150px]" title={msg.meta.whatsapp_template.name}>
+                                  <span className="text-[10px] text-slate-400 truncate">
                                      • {msg.meta.whatsapp_template.name}
                                   </span>
                                )}
                             </div>
-                            <p className="text-slate-700 text-sm font-medium leading-snug break-words">
-                              {/* Texto limpio del template si es posible, o fallback */}
+                            <p className="text-slate-700 text-sm font-medium leading-snug truncate">
                               {msg.body.replace("[TEMPLATE] ", "")}
                             </p>
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-start gap-2 py-1">
-                           <Icon name={isInbound ? "MessageCircle" : "MessageSquare"} size={16} className="text-slate-300 mt-0.5 shrink-0" />
-                           <p className="text-slate-600 text-sm leading-relaxed line-clamp-2 break-words">
+                        <div className="flex items-center gap-2 py-1 max-w-full overflow-hidden">
+                           <Icon name={isInbound ? "MessageCircle" : "MessageSquare"} size={16} className="text-slate-300 shrink-0" />
+                           <p className="text-slate-600 text-sm leading-relaxed truncate" title={msg.body}>
                              {msg.body || <span className="italic text-slate-300">No content</span>}
                            </p>
                         </div>
@@ -157,18 +152,20 @@ const MessageTable = ({ messages, onBulkAction }) => {
                     </td>
 
                     {/* Status Badge */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <MessageStatusBadge status={msg.status} direction={msg.direction} />
+                    <td className="px-4 py-4">
+                      <div className="truncate">
+                        <MessageStatusBadge status={msg.status} direction={msg.direction} />
+                      </div>
                     </td>
 
                     {/* Actions */}
-                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                    <td className="px-4 py-4 text-right">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setSelectedMessage(msg)}
                         iconName="Code"
-                        className="text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        className="text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                         title="View JSON Payload"
                       />
                     </td>
@@ -179,7 +176,7 @@ const MessageTable = ({ messages, onBulkAction }) => {
           </table>
         </div>
 
-        {/* --- VISTA MÓVIL --- */}
+        {/* --- VISTA MÓVIL (Intacta) --- */}
         <div className="lg:hidden divide-y divide-slate-100">
           {messages?.map((msg) => {
              const isTemplate = msg.body?.startsWith("[TEMPLATE]") || msg.meta?.whatsapp_template;
@@ -195,7 +192,6 @@ const MessageTable = ({ messages, onBulkAction }) => {
                       className="mt-1"
                     />
                     <div className="flex-1 min-w-0">
-                      {/* Cabecera Móvil */}
                       <div className="flex items-center gap-2 mb-1">
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${isInbound ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700'}`}>
                             {isInbound ? "IN" : "OUT"}
@@ -205,7 +201,6 @@ const MessageTable = ({ messages, onBulkAction }) => {
                           </span>
                       </div>
                       
-                      {/* Contenido Móvil */}
                       {isTemplate ? (
                           <div className="flex items-center gap-1.5 mt-1 text-slate-800 font-medium text-sm">
                              <Icon name="LayoutTemplate" size={14} className="text-purple-500" />
