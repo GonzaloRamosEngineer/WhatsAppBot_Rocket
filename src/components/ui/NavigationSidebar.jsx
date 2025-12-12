@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\src\components\ui\NavigationSidebar.jsx
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Icon from "../AppIcon";
@@ -17,38 +19,39 @@ const NavigationSidebar = ({
       label: "Dashboard",
       path: "/tenant-dashboard",
       icon: "LayoutDashboard",
-      tooltip: "Overview and analytics",
+      tooltip: "Overview",
     },
     {
       label: "Channels",
       path: "/channel-setup",
       icon: "MessageSquare",
-      tooltip: "WhatsApp integration setup",
+      tooltip: "Connections",
     },
     {
-      label: "Template Library",
+      label: "Templates",
       path: "/templates",
-      icon: "BookOpen", // Asegúrate que tu AppIcon soporte este nombre, si no usa "FileText" o "Layers"
-      tooltip: "Official Meta Templates",
+      icon: "LayoutTemplate", // Icono más específico para templates
+      tooltip: "Meta Templates",
     },
     {
       label: "Automation",
       path: "/flow-builder",
-      icon: "GitBranch",
-      tooltip: "Build chatbot flows",
+      icon: "GitBranch", // O "Workflow" si existe
+      tooltip: "Flow Builder",
     },
     {
-      label: "Messages",
+      label: "Messages Log",
       path: "/messages-log",
-      icon: "MessageCircle",
-      tooltip: "Conversation history",
+      icon: "List", // "List" suele representar mejor un log que "MessageCircle"
+      tooltip: "Audit History",
     },
-    // 👇 NUEVO: Inbox de agente
+    // 👇 NUEVO: Inbox de agente (destacado visualmente después)
     {
       label: "Agent Inbox",
       path: "/agent-inbox",
       icon: "Headphones",
-      tooltip: "Responder como agente",
+      tooltip: "Live Chat",
+      highlight: true, // Propiedad para darle un estilo especial si quisieras
     },
   ];
 
@@ -61,73 +64,80 @@ const NavigationSidebar = ({
     return location?.pathname === path;
   };
 
+  // Close mobile menu on resize
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setIsMobileOpen(false);
-      }
+      if (window.innerWidth >= 768) setIsMobileOpen(false);
     };
-
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-card border-r border-border">
-      {/* Logo Section */}
-      <div className="flex items-center px-4 py-6 border-b border-border">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Icon name="MessageSquare" size={20} color="white" />
+    <div className="flex flex-col h-full bg-slate-900 text-slate-300 border-r border-slate-800 shadow-2xl transition-all duration-300">
+      
+      {/* 1. Logo Section (Brand) */}
+      <div className={`flex items-center h-16 border-b border-slate-800 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-6'}`}>
+        <div className="flex items-center gap-3">
+          <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
+             <Icon name="MessageCircle" size={18} className="text-white" />
           </div>
+          
           {!isCollapsed && (
-            <div className="flex flex-col">
-              <span className="text-lg font-semibold text-foreground">
-                WhatsApp
+            <div className="flex flex-col animate-in fade-in duration-300">
+              <span className="text-sm font-bold text-white tracking-wide">
+                ROCKET<span className="text-indigo-400">BOT</span>
               </span>
-              <span className="text-sm text-muted-foreground">
-                Bot Manager
+              <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+                Workspace
               </span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Navigation Items */}
-      <nav className="flex-1 px-4 py-6 space-y-2">
-        {navigationItems?.map((item) => {
-          const isActive = isActivePath(item?.path);
+      {/* 2. Navigation Items */}
+      <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto custom-scrollbar">
+        {navigationItems.map((item) => {
+          const isActive = isActivePath(item.path);
 
           return (
             <button
-              key={item?.path}
-              onClick={() => handleNavigation(item?.path)}
+              key={item.path}
+              onClick={() => handleNavigation(item.path)}
               className={`
-                w-full flex items-center px-3 py-3 rounded-md text-left
-                micro-animation group relative
-                ${
-                  isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                group relative flex items-center w-full rounded-lg transition-all duration-200 outline-none
+                ${isCollapsed ? "justify-center px-0 py-3" : "px-3.5 py-2.5 space-x-3"}
+                ${isActive 
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-900/20" 
+                  : "hover:bg-slate-800/50 text-slate-400 hover:text-slate-100"
                 }
-                ${isCollapsed ? "justify-center" : "justify-start space-x-3"}
               `}
-              title={isCollapsed ? item?.tooltip : ""}
+              title={isCollapsed ? item.tooltip : ""}
             >
-              <Icon
-                name={item?.icon}
-                size={20}
-                className={`flex-shrink-0 ${
-                  isActive ? "text-primary-foreground" : ""
-                }`}
-              />
-              {!isCollapsed && (
-                <span className="font-medium">{item?.label}</span>
+              {/* Active Indicator (Left Bar) */}
+              {isActive && !isCollapsed && (
+                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-indigo-300 rounded-r-full shadow-[0_0_8px_rgba(165,180,252,0.4)]" />
               )}
-              {/* Tooltip para estado colapsado */}
+
+              <Icon
+                name={item.icon}
+                size={20}
+                className={`transition-colors duration-200 ${isActive ? "text-white" : "text-slate-500 group-hover:text-slate-200"}`}
+              />
+              
+              {!isCollapsed && (
+                <span className={`text-sm font-medium tracking-tight ${isActive ? "text-white" : "group-hover:translate-x-0.5 transition-transform"}`}>
+                  {item.label}
+                </span>
+              )}
+
+              {/* Tooltip personalizado para modo colapsado */}
               {isCollapsed && (
-                <div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-sm rounded-md shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-200">
-                  {item?.label}
+                <div className="absolute left-14 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-medium rounded-md shadow-xl border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                  {item.label}
+                  {/* Flechita del tooltip */}
+                  <div className="absolute top-1/2 -translate-y-1/2 -left-1 w-2 h-2 bg-slate-800 border-l border-b border-slate-700 transform rotate-45"></div>
                 </div>
               )}
             </button>
@@ -135,15 +145,14 @@ const NavigationSidebar = ({
         })}
       </nav>
 
-      {/* Collapse Toggle (Desktop) */}
+      {/* 3. Footer / Collapse Toggle */}
       {onToggle && (
-        <div className="px-4 py-4 border-t border-border">
+        <div className="p-3 border-t border-slate-800 bg-slate-900/50">
           <button
             onClick={onToggle}
-            className="w-full flex items-center justify-center p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md micro-animation"
-            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="w-full flex items-center justify-center p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
           >
-            <Icon name={isCollapsed ? "ChevronRight" : "ChevronLeft"} size={20} />
+            <Icon name={isCollapsed ? "ChevronRight" : "ChevronsLeft"} size={18} />
           </button>
         </div>
       )}
@@ -152,18 +161,18 @@ const NavigationSidebar = ({
 
   return (
     <>
-      {/* Mobile Hamburger Button */}
+      {/* Mobile Hamburger Button (Floating) */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="md:hidden fixed top-4 left-4 z-300 p-2 bg-card border border-border rounded-md shadow-md"
+        className="md:hidden fixed top-4 left-4 z-50 p-2.5 bg-white text-slate-700 border border-slate-200 rounded-lg shadow-lg active:scale-95 transition-transform"
       >
         <Icon name="Menu" size={20} />
       </button>
 
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar (Fixed) */}
       <aside
         className={`
-          hidden md:block fixed left-0 top-0 h-full z-100 sidebar-transition
+          hidden md:block fixed left-0 top-0 h-full z-40 transition-all duration-300 ease-in-out
           ${isCollapsed ? "w-16" : "w-60"}
           ${className}
         `}
@@ -171,14 +180,17 @@ const NavigationSidebar = ({
         {sidebarContent}
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Sidebar Overlay (Backdrop + Drawer) */}
       {isMobileOpen && (
-        <div className="md:hidden fixed inset-0 z-300">
+        <div className="md:hidden fixed inset-0 z-50">
+          {/* Backdrop Blur */}
           <div
-            className="absolute inset-0 bg-black bg-opacity-50"
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={() => setIsMobileOpen(false)}
           />
-          <aside className="absolute left-0 top-0 h-full w-60 sidebar-transition">
+          
+          {/* Drawer Slide-in */}
+          <aside className="absolute left-0 top-0 h-full w-64 animate-in slide-in-from-left duration-300 shadow-2xl">
             {sidebarContent}
           </aside>
         </div>
