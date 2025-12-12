@@ -15,16 +15,16 @@ const MessagesLog = () => {
   const { profile, tenant, supabase, logout } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
-  // Estado de Datos
+  // Estado de Datos (Lógica Intacta)
   const [localMessages, setLocalMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
-  // Estado de Filtros
+  // Estado de Filtros (Lógica Intacta)
   const [activeFilters, setActiveFilters] = useState({});
   const [selectedConversation, setSelectedConversation] = useState(null);
 
-  // --- CARGAR MENSAJES ---
+  // --- CARGAR MENSAJES (Lógica Intacta) ---
   useEffect(() => {
     if (!supabase || !tenant?.id) return;
 
@@ -43,7 +43,7 @@ const MessagesLog = () => {
             meta,
             conversation_id,
             conversations ( contact_phone )
-          `) // <--- AQUÍ ESTABA EL ERROR: Quité 'status' de la lista
+          `) 
           .eq("tenant_id", tenant.id)
           .order("created_at", { ascending: false })
           .limit(500);
@@ -55,12 +55,9 @@ const MessagesLog = () => {
           const meta = m.meta || {};
           const isInbound = m.direction === "in" || m.direction === "inbound";
           
-          // Determinamos el contacto
-          // A veces conversations es null si se borró, fallback al meta
           const contactPhone = m.conversations?.contact_phone || meta.from || meta.to || "Unknown";
           const contactName = meta.contactName || meta.profile_name || contactPhone;
 
-          // Status fallback: Buscamos dentro de META
           const finalStatus = 
             meta.status || 
             meta.delivery_status || 
@@ -73,7 +70,7 @@ const MessagesLog = () => {
             contactName: contactName,
             body: m.body || "",
             direction: isInbound ? "inbound" : "outbound",
-            status: finalStatus, // Aquí usamos el calculado
+            status: finalStatus,
             timestamp: m.created_at,
             meta: meta, 
           };
@@ -92,7 +89,7 @@ const MessagesLog = () => {
     
   }, [supabase, tenant?.id]);
 
-  // --- CÁLCULO DE STATS ---
+  // --- CÁLCULO DE STATS (Lógica Intacta) ---
   const stats = useMemo(() => {
     const today = new Date().toDateString();
     return {
@@ -103,33 +100,28 @@ const MessagesLog = () => {
     };
   }, [localMessages]);
 
-  // --- FILTRADO ---
+  // --- FILTRADO (Lógica Intacta) ---
   const filteredMessages = useMemo(() => {
     return localMessages.filter(m => {
-      // Filtro por Fecha
       if (activeFilters.dateFrom && new Date(m.timestamp) < new Date(activeFilters.dateFrom)) return false;
       if (activeFilters.dateTo && new Date(m.timestamp) > new Date(activeFilters.dateTo)) return false;
       
-      // Filtro por Contacto
       if (activeFilters.contact) {
         const term = activeFilters.contact.toLowerCase();
         if (!m.contact.toLowerCase().includes(term) && !m.contactName.toLowerCase().includes(term)) return false;
       }
 
-      // Filtro por Status
       if (activeFilters.status && m.status !== activeFilters.status) return false;
 
-      // Filtro por Keyword
       if (activeFilters.keyword && !m.body.toLowerCase().includes(activeFilters.keyword.toLowerCase())) return false;
 
-      // Filtro por Conversación Seleccionada (Summary sidebar)
       if (selectedConversation && m.contact !== selectedConversation.contact) return false;
 
       return true;
     });
   }, [localMessages, activeFilters, selectedConversation]);
 
-  // --- AGRUPAR CONVERSACIONES (Para Sidebar Derecho) ---
+  // --- AGRUPAR CONVERSACIONES (Lógica Intacta) ---
   const conversations = useMemo(() => {
     const map = new Map();
     localMessages.forEach(m => {
@@ -165,37 +157,52 @@ const MessagesLog = () => {
       />
 
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
-{/* Header - Messages Log */}
-        <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-20 shadow-sm">
+        
+        {/* Header - Messages Log (Estilo Unificado & Responsive) */}
+        <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-3 md:py-4 sticky top-0 z-20 shadow-sm transition-all">
           <div className="flex items-center justify-between">
+            
+            {/* IZQUIERDA: Menú + Título */}
             <div className="flex items-center gap-3">
-               <div className="bg-slate-700 p-2 rounded-lg text-white shadow-sm">
+               {/* Botón Menú (Solo Móvil - Estilo Violáceo) */}
+               <button 
+                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                 className="md:hidden p-2 mr-1 text-indigo-600 bg-white border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-md transition-all active:scale-95"
+               >
+                 <Icon name="Menu" size={20} />
+               </button>
+
+               <div className="hidden md:block bg-slate-700 p-2 rounded-lg text-white shadow-sm">
                   <Icon name="List" size={20} />
                </div>
                <div>
-                  <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-tight">Messages Logs</h1>
-                  <p className="text-slate-500 text-xs font-medium">
+                  <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight">Messages Logs</h1>
+                  <p className="text-slate-500 text-xs font-medium hidden md:block">
                     Audit trail of all communication history
                   </p>
                </div>
             </div>
 
+            {/* DERECHA: Acciones + Perfil */}
             <div className="flex items-center gap-3">
+               {/* Botón Refresh (Icono solo en móvil) */}
                <Button 
                  variant="outline" 
                  size="sm" 
                  onClick={() => window.location.reload()} 
-                 iconName="RefreshCw"
                  className="text-slate-500 border-slate-200 hover:bg-slate-50"
+                 title="Refresh Data"
                >
-                 Refresh
+                 <Icon name="RefreshCw" size={16} className={loadingMessages ? "animate-spin" : ""} />
+                 <span className="hidden md:inline ml-2">Refresh</span>
                </Button>
+               
                <UserProfileDropdown user={{ name: tenant?.name || "User", role: profile?.role }} onLogout={handleLogout} />
             </div>
           </div>
         </header>
 
-        <main className="p-8 max-w-[1600px] mx-auto">
+        <main className="p-4 md:p-8 max-w-[1600px] mx-auto">
           {/* Stats Cards */}
           <MessageStats stats={stats} />
 
