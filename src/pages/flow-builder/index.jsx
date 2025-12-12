@@ -1,11 +1,11 @@
 // C:\Projects\WhatsAppBot_Rocket\src\pages\flow-builder\index.jsx
 
 import React, { useState, useEffect } from "react";
-import NavigationSidebar from "../../components/ui/NavigationSidebar";
+import { useOutletContext } from "react-router-dom"; // CONEXIÓN CON LAYOUT
 import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
 import Icon from "../../components/AppIcon";
 import Button from "../../components/ui/Button";
-import Input from "../../components/ui/Input"; // Asegúrate de que este componente soporte className o style
+import Input from "../../components/ui/Input"; 
 import FlowCard from "./components/FlowCard";
 import FlowEditor from "./components/FlowEditor";
 import FlowPreview from "./components/FlowPreview";
@@ -17,9 +17,11 @@ import { useAuth } from "@/lib/AuthProvider";
 const RULES_KEY = "rules_v1";
 
 const FlowBuilder = () => {
-  const { supabase, tenant, profile } = useAuth();
+  const { supabase, tenant, profile, logout } = useAuth();
+  
+  // 👇 1. Contexto del Layout
+  const { toggleMobileMenu } = useOutletContext();
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedFlow, setSelectedFlow] = useState(null);
@@ -36,13 +38,11 @@ const FlowBuilder = () => {
   const [uiMessage, setUiMessage] = useState(null);
   const [uiError, setUiError] = useState(null);
 
-  const handleToggleSidebar = () => setIsSidebarCollapsed(!isSidebarCollapsed);
-
-  const handleLogout = () => console.log("Logging out...");
+  const handleLogout = async () => { await logout(); };
   const handleProfileClick = () => console.log("Opening profile...");
 
   // --------------------------------------------------
-  //    Load flows del tenant (tabla flows)
+  //    Load flows del tenant (tabla flows) - LÓGICA INTACTA
   // --------------------------------------------------
   useEffect(() => {
     const loadRulesFlow = async () => {
@@ -296,225 +296,212 @@ const FlowBuilder = () => {
 
   const currentUser = {
     name: tenant?.name || "Tenant",
-    email:
-      profile?.role === "tenant"
-        ? "tenant@business.com"
-        : "admin@whatsappbot.com",
-    avatar: null,
     role: profile?.role || "tenant"
   };
 
+  // --- RENDER REFACTORIZADO (Layout Pattern) ---
   return (
     <div className="min-h-screen bg-slate-50">
       
-      <NavigationSidebar
-        isCollapsed={isSidebarCollapsed}
-        onToggle={handleToggleSidebar}
-        userRole="tenant"
-      />
-
-      <div className={`transition-all duration-300 ${isSidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
-        
-{/* Header - Flow Builder (Estilo Unificado & Responsive Pro) */}
-        <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 sticky top-0 z-20 shadow-sm transition-all">
-          <div className="flex items-center justify-between">
-            
-            {/* IZQUIERDA: Menú + Icono + Título */}
-            <div className="flex items-center gap-3">
-               
-               {/* Botón Menú (Solo Móvil - Estilo Violáceo) */}
-               <button 
-                 onClick={handleToggleSidebar}
-                 className="md:hidden p-2 mr-1 text-indigo-600 bg-white border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-md transition-all active:scale-95"
-                 title="Toggle Menu"
-               >
-                 <Icon name="Menu" size={20} />
-               </button>
-
-               <div className="hidden md:block bg-purple-600 p-2 rounded-lg text-white shadow-sm shrink-0">
-                  <Icon name="GitBranch" size={20} />
-               </div>
-               
-               <div>
-                  <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight">Flow Builder</h1>
-                  <p className="text-slate-500 text-xs font-medium hidden md:block">
-                    Design and manage automated bot responses
-                  </p>
-               </div>
-            </div>
-
-            {/* DERECHA: Acciones + Perfil */}
-            <div className="flex items-center gap-3 md:gap-4">
-              
-              {/* Botón Guardar (Compacto en móvil) */}
-              <Button
-                variant="outline"
-                iconName="Save"
-                onClick={handlePersistRules} // Asumiendo que esta función está definida arriba
-                disabled={isSaving || isLoading}
-                className={`border-slate-300 hover:border-purple-500 hover:text-purple-600 h-9 text-xs md:text-sm ${isSaving ? 'opacity-70' : ''}`}
-              >
-                {isSaving ? "Saving..." : <span className="hidden md:inline">Save Rules</span>}
-                {!isSaving && <span className="md:hidden">Save</span>}
-              </Button>
-
-              <UserProfileDropdown
-                user={currentUser}
-                onLogout={handleLogout}
-                onProfileClick={handleProfileClick}
-              />
-            </div>
-          </div>
-        </header>
-
-        {/* Contenido Principal */}
-        <main className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8">
+      {/* Header - Flow Builder (Estilo Unificado & Responsive Pro) */}
+      <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 sticky top-0 z-20 shadow-sm transition-all">
+        <div className="flex items-center justify-between">
           
-          {/* Alertas UI */}
-          <div className="space-y-2">
-             {isLoading && (
-               <div className="flex items-center gap-2 p-3 bg-slate-100 text-slate-600 rounded-lg text-sm border border-slate-200 animate-pulse">
-                 <Icon name="Loader2" className="animate-spin" size={16} /> Cargando reglas...
-               </div>
-             )}
-             {uiError && (
-               <div className="flex items-center gap-2 p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100">
-                 <Icon name="AlertTriangle" size={16} /> {uiError}
-               </div>
-             )}
-             {uiMessage && !uiError && (
-               <div className="flex items-center gap-2 p-3 bg-emerald-50 text-emerald-600 rounded-lg text-sm border border-emerald-100">
-                 <Icon name="CheckCircle" size={16} /> {uiMessage}
-               </div>
-             )}
-          </div>
-
-          {/* Tarjetas de Estadísticas (Estilo Dashboard) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
-               <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Total Flows</p>
-                  <p className="text-2xl font-bold text-slate-800 mt-1">{stats.totalFlows}</p>
-               </div>
-               <div className="p-3 bg-slate-100 text-slate-500 rounded-lg">
-                  <Icon name="Layers" size={24} />
-               </div>
-            </div>
-
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
-               <div>
-                  <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide">Active Flows</p>
-                  <p className="text-2xl font-bold text-emerald-700 mt-1">{stats.activeFlows}</p>
-               </div>
-               <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
-                  <Icon name="CheckCircle" size={24} />
-               </div>
-            </div>
-
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
-               <div>
-                  <p className="text-xs font-bold text-purple-600 uppercase tracking-wide">Total Triggers</p>
-                  <p className="text-2xl font-bold text-purple-700 mt-1">{stats.totalTriggers.toLocaleString()}</p>
-               </div>
-               <div className="p-3 bg-purple-50 text-purple-600 rounded-lg">
-                  <Icon name="Zap" size={24} />
-               </div>
-            </div>
-          </div>
-
-          {/* Barra de Herramientas (Búsqueda y Acciones) */}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          {/* IZQUIERDA: Menú + Icono + Título */}
+          <div className="flex items-center gap-3">
              
-             {/* Filtros */}
-             <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-                <div className="relative w-full sm:w-64">
-                   <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                   <input 
-                      type="text" 
-                      placeholder="Search flows..." 
-                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                   />
-                </div>
+             {/* Botón Menú (Solo Móvil - Estilo Violáceo) */}
+             <button 
+               onClick={toggleMobileMenu}
+               className="md:hidden p-2 mr-1 text-indigo-600 bg-white border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-md transition-all active:scale-95"
+               title="Toggle Menu"
+             >
+               <Icon name="Menu" size={20} />
+             </button>
 
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active Only</option>
-                  <option value="inactive">Inactive Only</option>
-                </select>
+             <div className="hidden md:block bg-purple-600 p-2 rounded-lg text-white shadow-sm shrink-0">
+                <Icon name="GitBranch" size={20} />
              </div>
-
-             {/* Botones de Acción */}
-             <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                <Button
-                  variant="outline"
-                  iconName="BookOpen"
-                  onClick={() => setIsTemplateLibraryOpen(true)}
-                  className="whitespace-nowrap"
-                >
-                  Templates
-                </Button>
-
-                <Button
-                  variant="default"
-                  iconName="Plus"
-                  onClick={handleCreateFlow}
-                  className="bg-purple-600 hover:bg-purple-700 text-white whitespace-nowrap shadow-md shadow-purple-200"
-                >
-                  Create Flow
-                </Button>
+             
+             <div>
+                <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight">Flow Builder</h1>
+                <p className="text-slate-500 text-xs font-medium hidden md:block">
+                  Design and manage automated bot responses
+                </p>
              </div>
           </div>
 
-          {/* Grid de Flows */}
-          {filteredFlows.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredFlows.map((flow) => (
-                <FlowCard
-                  key={flow.id}
-                  flow={flow}
-                  onEdit={handleEditFlow}
-                  onToggle={handleToggleFlow}
-                  onDelete={handleDeleteFlow}
-                  onPreview={handlePreviewFlow}
-                />
-              ))}
-              
-              {/* Tarjeta de "Crear Nuevo" al final (UX Pattern) */}
-              <button 
-                 onClick={handleCreateFlow}
-                 className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all group min-h-[250px]"
-              >
-                 <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 group-hover:bg-purple-100 transition-colors">
-                    <Icon name="Plus" className="text-slate-400 group-hover:text-purple-600" size={24} />
-                 </div>
-                 <span className="text-sm font-medium text-slate-500 group-hover:text-purple-700">Create New Flow</span>
-              </button>
-            </div>
-          ) : (
-            <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
-              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                 <Icon name="GitBranch" size={32} className="text-slate-300" />
+          {/* DERECHA: Acciones + Perfil */}
+          <div className="flex items-center gap-3 md:gap-4">
+            
+            {/* Botón Guardar (Compacto en móvil) */}
+            <Button
+              variant="outline"
+              iconName="Save"
+              onClick={handlePersistRules}
+              disabled={isSaving || isLoading}
+              className={`border-slate-300 hover:border-purple-500 hover:text-purple-600 h-9 text-xs md:text-sm ${isSaving ? 'opacity-70' : ''}`}
+            >
+              {isSaving ? "Saving..." : <span className="hidden md:inline">Save Rules</span>}
+              {!isSaving && <span className="md:hidden">Save</span>}
+            </Button>
+
+            <UserProfileDropdown
+              user={currentUser}
+              onLogout={handleLogout}
+              onProfileClick={handleProfileClick}
+            />
+          </div>
+        </div>
+      </header>
+
+      {/* Contenido Principal */}
+      <main className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8 w-full">
+        
+        {/* Alertas UI */}
+        <div className="space-y-2">
+            {isLoading && (
+              <div className="flex items-center gap-2 p-3 bg-slate-100 text-slate-600 rounded-lg text-sm border border-slate-200 animate-pulse">
+                <Icon name="Loader2" className="animate-spin" size={16} /> Cargando reglas...
               </div>
-              <h3 className="text-lg font-bold text-slate-700">No flows found</h3>
-              <p className="text-slate-500 text-sm mt-1 mb-6 max-w-sm mx-auto">
-                Try adjusting your search filters or create a new automation flow to get started.
-              </p>
-              <Button variant="default" onClick={handleCreateFlow} className="bg-purple-600 hover:bg-purple-700">
-                 Create First Flow
-              </Button>
+            )}
+            {uiError && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100">
+                <Icon name="AlertTriangle" size={16} /> {uiError}
+              </div>
+            )}
+            {uiMessage && !uiError && (
+              <div className="flex items-center gap-2 p-3 bg-emerald-50 text-emerald-600 rounded-lg text-sm border border-emerald-100">
+                <Icon name="CheckCircle" size={16} /> {uiMessage}
+              </div>
+            )}
+        </div>
+
+        {/* Tarjetas de Estadísticas */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+             <div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Total Flows</p>
+                <p className="text-2xl font-bold text-slate-800 mt-1">{stats.totalFlows}</p>
+             </div>
+             <div className="p-3 bg-slate-100 text-slate-500 rounded-lg">
+                <Icon name="Layers" size={24} />
+             </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+             <div>
+                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide">Active Flows</p>
+                <p className="text-2xl font-bold text-emerald-700 mt-1">{stats.activeFlows}</p>
+             </div>
+             <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+                <Icon name="CheckCircle" size={24} />
+             </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+             <div>
+                <p className="text-xs font-bold text-purple-600 uppercase tracking-wide">Total Triggers</p>
+                <p className="text-2xl font-bold text-purple-700 mt-1">{stats.totalTriggers.toLocaleString()}</p>
+             </div>
+             <div className="p-3 bg-purple-50 text-purple-600 rounded-lg">
+                <Icon name="Zap" size={24} />
+             </div>
+          </div>
+        </div>
+
+        {/* Barra de Herramientas */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            
+            {/* Filtros */}
+            <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+               <div className="relative w-full sm:w-64">
+                  <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                     type="text" 
+                     placeholder="Search flows..." 
+                     className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+                     value={searchTerm}
+                     onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+               </div>
+
+               <select
+                 value={filterStatus}
+                 onChange={(e) => setFilterStatus(e.target.value)}
+                 className="px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+               >
+                 <option value="all">All Status</option>
+                 <option value="active">Active Only</option>
+                 <option value="inactive">Inactive Only</option>
+               </select>
             </div>
-          )}
 
-        </main>
-      </div>
+            {/* Botones de Acción */}
+            <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+               <Button
+                 variant="outline"
+                 iconName="BookOpen"
+                 onClick={() => setIsTemplateLibraryOpen(true)}
+                 className="whitespace-nowrap"
+               >
+                 Templates
+               </Button>
 
-      {/* Modals (Sin cambios visuales profundos, solo lógica) */}
+               <Button
+                 variant="default"
+                 iconName="Plus"
+                 onClick={handleCreateFlow}
+                 className="bg-purple-600 hover:bg-purple-700 text-white whitespace-nowrap shadow-md shadow-purple-200"
+               >
+                 Create Flow
+               </Button>
+            </div>
+        </div>
+
+        {/* Grid de Flows */}
+        {filteredFlows.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredFlows.map((flow) => (
+              <FlowCard
+                key={flow.id}
+                flow={flow}
+                onEdit={handleEditFlow}
+                onToggle={handleToggleFlow}
+                onDelete={handleDeleteFlow}
+                onPreview={handlePreviewFlow}
+              />
+            ))}
+            
+            {/* Tarjeta de "Crear Nuevo" */}
+            <button 
+               onClick={handleCreateFlow}
+               className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all group min-h-[250px]"
+            >
+               <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 group-hover:bg-purple-100 transition-colors">
+                  <Icon name="Plus" className="text-slate-400 group-hover:text-purple-600" size={24} />
+               </div>
+               <span className="text-sm font-medium text-slate-500 group-hover:text-purple-700">Create New Flow</span>
+            </button>
+          </div>
+        ) : (
+          <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+               <Icon name="GitBranch" size={32} className="text-slate-300" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-700">No flows found</h3>
+            <p className="text-slate-500 text-sm mt-1 mb-6 max-w-sm mx-auto">
+              Try adjusting your search filters or create a new automation flow to get started.
+            </p>
+            <Button variant="default" onClick={handleCreateFlow} className="bg-purple-600 hover:bg-purple-700">
+               Create First Flow
+            </Button>
+          </div>
+        )}
+
+      </main>
+
+      {/* Modals */}
       <FlowEditor
         flow={selectedFlow}
         isOpen={isEditorOpen}
