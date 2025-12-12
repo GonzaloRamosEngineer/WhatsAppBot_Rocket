@@ -1,12 +1,11 @@
 // C:\Projects\WhatsAppBot_Rocket\src\pages\agent-inbox\index.jsx
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom"; // IMPORTANTE: useOutletContext
 
 import { useAuth } from "../../lib/AuthProvider";
-import NavigationSidebar from "../../components/ui/NavigationSidebar";
 import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
-import Icon from "../../components/AppIcon"; // Asegúrate de importar Icon
+import Icon from "../../components/AppIcon";
 
 import ConversationList from "./components/ConversationList";
 import ChatHeader from "./components/ChatHeader";
@@ -15,9 +14,12 @@ import MessageComposer from "./components/MessageComposer";
 
 export default function AgentInboxPage() {
   const navigate = useNavigate();
+  
+  // 👇 1. Conexión con el Layout para menú móvil
+  const { toggleMobileMenu } = useOutletContext();
 
   // --- LÓGICA ORIGINAL (INTACTA) ---
-  const { supabase, tenant, profile, session, loading: authLoading, logout } = useAuth(); // Agregué logout
+  const { supabase, tenant, profile, session, loading: authLoading, logout } = useAuth();
 
   const [conversations, setConversations] = useState([]);
   const [conversationsLoading, setConversationsLoading] = useState(true);
@@ -35,8 +37,7 @@ export default function AgentInboxPage() {
   const [updatingConversation, setUpdatingConversation] = useState(false);
   const [updateConversationError, setUpdateConversationError] = useState(null);
   
-  // Estado UI Nuevo (para responsividad del Sidebar)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); 
+  // (Eliminado estado local sidebarCollapsed)
 
   // 🔁 Cargar lista de conversaciones del tenant
   const loadConversations = useCallback(async () => {
@@ -320,23 +321,29 @@ export default function AgentInboxPage() {
 
   const handleLogout = async () => { await logout(); };
 
-  // --- NUEVO RENDER (VISUALMENTE MEJORADO) ---
+  // --- RENDER REFACTORIZADO (Layout Pattern) ---
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    // Se elimina el contenedor con márgenes dinámicos y el Sidebar
+    // Ocupamos todo el alto disponible del layout padre
+    <div className="flex flex-col h-full bg-slate-50 relative">
       
-      <NavigationSidebar 
-        isCollapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        userRole="tenant"
-      />
-
-      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${sidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
-        
         {/* HEADER UNIFICADO */}
         {/* Oculto en móvil si hay chat seleccionado para maximizar espacio */}
         <header className={`bg-white border-b border-slate-200 px-4 md:px-6 py-3 shrink-0 z-20 shadow-sm flex items-center justify-between ${selectedConversation ? 'hidden md:flex' : 'flex'}`}>
+            
+            {/* IZQUIERDA: Menú + Icono + Título */}
             <div className="flex items-center gap-3">
-               <div className="bg-amber-500 p-2 rounded-lg text-white shadow-md shadow-amber-200">
+               
+               {/* Botón Menú (Solo Móvil) - Llama al Layout */}
+               <button 
+                 onClick={toggleMobileMenu}
+                 className="md:hidden p-2 mr-1 text-indigo-600 bg-white border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-md transition-all active:scale-95"
+                 title="Toggle Menu"
+               >
+                 <Icon name="Menu" size={20} />
+               </button>
+
+               <div className="bg-amber-500 p-2 rounded-lg text-white shadow-md shadow-amber-200 shrink-0">
                   <Icon name="Headphones" size={20} />
                </div>
                <div>
@@ -368,7 +375,6 @@ export default function AgentInboxPage() {
                 <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                    Active ({conversations.length})
                 </h2>
-                {/* Aquí podrías poner un botón de refrescar manual si quisieras */}
              </div>
 
              <div className="flex-1 overflow-y-auto">
@@ -457,7 +463,6 @@ export default function AgentInboxPage() {
           </main>
 
         </section>
-      </div>
     </div>
   );
 }
