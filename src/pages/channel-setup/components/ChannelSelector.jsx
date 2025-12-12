@@ -1,3 +1,4 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\channel-setup\components\ChannelSelector.jsx
 import React from "react";
 import Icon from "../../../components/AppIcon";
 
@@ -9,23 +10,22 @@ const ChannelSelector = ({
   const hasChannels = channels && channels.length > 0;
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
+    <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-2">
-          <Icon name="Phone" size={18} className="text-primary" />
+          <div className="bg-emerald-100 p-1.5 rounded-md">
+            <Icon name="Phone" size={18} className="text-emerald-700" />
+          </div>
           <div>
-            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-              Números de WhatsApp
+            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+              Connected Numbers
             </h2>
-            <p className="text-xs text-muted-foreground">
-              Podés gestionar varios números de WhatsApp por cada tenant.
-            </p>
           </div>
         </div>
       </div>
 
       {hasChannels ? (
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex flex-col gap-2 mb-4">
           {channels.map((channel) => {
             const isSelected = channel.id === selectedChannelId;
             return (
@@ -33,23 +33,28 @@ const ChannelSelector = ({
                 key={channel.id}
                 type="button"
                 onClick={() => onSelectChannel(channel.id)}
-                className={`inline-flex items-center px-3 py-1.5 rounded-full border text-xs md:text-sm micro-animation ${
+                className={`flex items-center justify-between w-full px-4 py-3 rounded-lg border text-sm transition-all ${
                   isSelected
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted text-foreground border-border hover:bg-muted/80"
+                    ? "bg-slate-800 text-white border-slate-800 shadow-md"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                 }`}
               >
-                <Icon
-                  name="MessageCircle"
-                  size={14}
-                  className={isSelected ? "mr-1.5" : "mr-1.5 text-muted-foreground"}
-                />
-                <span className="truncate max-w-[160px]">
-                  {channel.display_name || "WhatsApp sin nombre"}
-                </span>
+                <div className="flex items-center gap-3 overflow-hidden">
+                    <Icon
+                    name="MessageCircle"
+                    size={16}
+                    className={isSelected ? "text-emerald-400" : "text-slate-400"}
+                    />
+                    <span className="truncate font-medium">
+                    {channel.display_name || "Unnamed Number"}
+                    </span>
+                </div>
+                
                 {channel.status === "active" && (
-                  <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full bg-success/20 text-success text-[10px]">
-                    Activo
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                      isSelected ? "bg-emerald-500/20 text-emerald-300" : "bg-emerald-100 text-emerald-700"
+                  }`}>
+                    Active
                   </span>
                 )}
               </button>
@@ -57,19 +62,20 @@ const ChannelSelector = ({
           })}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground mb-3">
-          Todavía no tenés ningún número de WhatsApp configurado para este
-          tenant. Empezá creando el primero con el botón de abajo.
-        </p>
+        <div className="text-center py-4 px-2 bg-slate-50 rounded-lg border border-dashed border-slate-200 mb-4">
+             <p className="text-xs text-slate-500">
+                No WhatsApp numbers configured yet.
+            </p>
+        </div>
       )}
 
       <button
         type="button"
         onClick={() => onSelectChannel(null)}
-        className="inline-flex items-center px-3 py-1.5 rounded-md border border-dashed border-primary text-primary text-xs md:text-sm hover:bg-primary/5 micro-animation"
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-dashed border-slate-300 text-slate-500 text-xs font-medium hover:bg-slate-50 hover:text-slate-700 transition-colors"
       >
-        <Icon name="Plus" size={14} className="mr-1.5" />
-        {hasChannels ? "Agregar nuevo número" : "Crear primer número"}
+        <Icon name="Plus" size={14} />
+        {hasChannels ? "Connect Another Number" : "Connect First Number"}
       </button>
     </div>
   );
