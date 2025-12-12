@@ -39,15 +39,14 @@ const MessagesLog = () => {
             id,
             body,
             direction,
-            status,
             created_at,
             meta,
             conversation_id,
             conversations ( contact_phone )
-          `)
+          `) // <--- AQUÍ ESTABA EL ERROR: Quité 'status' de la lista
           .eq("tenant_id", tenant.id)
           .order("created_at", { ascending: false })
-          .limit(500); // Límite seguro para demo
+          .limit(500);
 
         if (error) throw error;
 
@@ -57,11 +56,15 @@ const MessagesLog = () => {
           const isInbound = m.direction === "in" || m.direction === "inbound";
           
           // Determinamos el contacto
+          // A veces conversations es null si se borró, fallback al meta
           const contactPhone = m.conversations?.contact_phone || meta.from || meta.to || "Unknown";
           const contactName = meta.contactName || meta.profile_name || contactPhone;
 
-          // Status fallback
-          const finalStatus = m.status || meta.status || "sent";
+          // Status fallback: Buscamos dentro de META
+          const finalStatus = 
+            meta.status || 
+            meta.delivery_status || 
+            (isInbound ? "received" : "sent");
 
           return {
             id: m.id,
@@ -70,9 +73,9 @@ const MessagesLog = () => {
             contactName: contactName,
             body: m.body || "",
             direction: isInbound ? "inbound" : "outbound",
-            status: finalStatus,
+            status: finalStatus, // Aquí usamos el calculado
             timestamp: m.created_at,
-            meta: meta, // Guardamos todo el meta para el modal JSON
+            meta: meta, 
           };
         });
 
@@ -87,7 +90,6 @@ const MessagesLog = () => {
 
     loadMessages();
     
-    // Aquí podrías agregar una suscripción .on('postgres_changes') para tiempo real
   }, [supabase, tenant?.id]);
 
   // --- CÁLCULO DE STATS ---
@@ -143,7 +145,7 @@ const MessagesLog = () => {
       }
       const conv = map.get(m.contact);
       conv.messageCount++;
-      // Actualizamos si este mensaje es más nuevo
+      
       if (new Date(m.timestamp) > new Date(conv.lastMessageTime)) {
         conv.lastMessage = m.body;
         conv.lastMessageTime = m.timestamp;
@@ -203,7 +205,6 @@ const MessagesLog = () => {
 
             {/* Sidebar Resumen */}
             <div className="xl:col-span-1">
-               {/* Asumiendo que ConversationSummary ya existe, lo envolvemos para estilo */}
                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden sticky top-28">
                   <div className="p-4 border-b border-slate-100 bg-slate-50 font-semibold text-slate-700">
                     Active Conversations
