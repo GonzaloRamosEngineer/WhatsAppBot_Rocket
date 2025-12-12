@@ -1,10 +1,12 @@
 // C:\Projects\WhatsAppBot_Rocket\src\pages\agent-inbox\index.jsx
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../lib/AuthProvider";
 import NavigationSidebar from "../../components/ui/NavigationSidebar";
+import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
+import Icon from "../../components/AppIcon"; // Asegúrate de importar Icon
 
 import ConversationList from "./components/ConversationList";
 import ChatHeader from "./components/ChatHeader";
@@ -14,8 +16,8 @@ import MessageComposer from "./components/MessageComposer";
 export default function AgentInboxPage() {
   const navigate = useNavigate();
 
-  const { supabase, tenant, profile, session, loading: authLoading } =
-    useAuth();
+  // --- LÓGICA ORIGINAL (INTACTA) ---
+  const { supabase, tenant, profile, session, loading: authLoading, logout } = useAuth(); // Agregué logout
 
   const [conversations, setConversations] = useState([]);
   const [conversationsLoading, setConversationsLoading] = useState(true);
@@ -31,8 +33,10 @@ export default function AgentInboxPage() {
   const [sendError, setSendError] = useState(null);
 
   const [updatingConversation, setUpdatingConversation] = useState(false);
-  const [updateConversationError, setUpdateConversationError] =
-    useState(null);
+  const [updateConversationError, setUpdateConversationError] = useState(null);
+  
+  // Estado UI Nuevo (para responsividad del Sidebar)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); 
 
   // 🔁 Cargar lista de conversaciones del tenant
   const loadConversations = useCallback(async () => {
@@ -43,8 +47,7 @@ export default function AgentInboxPage() {
 
     const { data, error } = await supabase
       .from("conversations")
-      .select(
-        `
+      .select(`
         id,
         tenant_id,
         channel_id,
@@ -56,8 +59,7 @@ export default function AgentInboxPage() {
         last_message_at,
         context_state,
         context_data
-      `
-      )
+      `)
       .eq("tenant_id", tenant.id)
       .in("status", ["new", "open", "pending", "closed"])
       .order("last_message_at", { ascending: false });
@@ -83,8 +85,7 @@ export default function AgentInboxPage() {
 
       const { data, error } = await supabase
         .from("messages")
-        .select(
-          `
+        .select(`
           id,
           conversation_id,
           tenant_id,
@@ -94,8 +95,7 @@ export default function AgentInboxPage() {
           body,
           meta,
           created_at
-        `
-        )
+        `)
         .eq("conversation_id", conversation.id)
         .order("created_at", { ascending: true });
 
@@ -131,6 +131,11 @@ export default function AgentInboxPage() {
     setSelectedConversation(conv);
   };
 
+  // Botón "Atrás" para móvil
+  const handleBackToList = () => {
+    setSelectedConversation(null);
+  };
+
   const handleSendMessage = async (text) => {
     if (!text.trim()) return;
     if (!selectedConversation) return;
@@ -157,9 +162,7 @@ export default function AgentInboxPage() {
         const inserted = data?.message;
 
         const newMessage = inserted || {
-          id:
-            (crypto.randomUUID && crypto.randomUUID()) ||
-            `temp-${Date.now().toString()}`,
+          id: (crypto.randomUUID && crypto.randomUUID()) || `temp-${Date.now().toString()}`,
           conversation_id: selectedConversation.id,
           tenant_id: tenant.id,
           channel_id: selectedConversation.channel_id,
@@ -181,7 +184,7 @@ export default function AgentInboxPage() {
     setSending(false);
   };
 
-  // 🔔 Realtime: escuchar INSERTs en messages del tenant
+  // 🔔 Realtime
   useEffect(() => {
     if (!tenant?.id) return;
 
@@ -207,10 +210,12 @@ export default function AgentInboxPage() {
           });
 
           setConversations((prev) => {
-            const idx = prev.findIndex(
-              (c) => c.id === newMsg.conversation_id
-            );
-            if (idx === -1) return prev;
+            const idx = prev.findIndex((c) => c.id === newMsg.conversation_id);
+            if (idx === -1) {
+                // Si es nuevo, recargamos la lista completa para asegurarnos
+                loadConversations();
+                return prev; 
+            }
 
             const updated = [...prev];
             updated[idx] = {
@@ -233,9 +238,9 @@ export default function AgentInboxPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, tenant?.id, selectedConversation]);
+  }, [supabase, tenant?.id, selectedConversation, loadConversations]);
 
-  // 🧩 Helper para aplicar patch a la conversación seleccionada
+  // 🧩 Helpers de lógica de negocio (INTACTOS)
   const patchSelectedConversation = useCallback(
     async (fields) => {
       if (!selectedConversation?.id) return;
@@ -247,28 +252,11 @@ export default function AgentInboxPage() {
         .from("conversations")
         .update(fields)
         .eq("id", selectedConversation.id)
-        .select(
-          `
-          id,
-          tenant_id,
-          channel_id,
-          contact_phone,
-          contact_name,
-          topic,
-          status,
-          assigned_agent,
-          last_message_at,
-          context_state,
-          context_data
-        `
-        )
-        .single();
+        .select().single();
 
       if (error) {
         console.error("[AgentInbox] patchSelectedConversation error", error);
-        setUpdateConversationError(
-          error.message || "Error updating conversation"
-        );
+        setUpdateConversationError(error.message || "Error updating conversation");
       } else if (data) {
         setConversations((prev) => {
           const idx = prev.findIndex((c) => c.id === data.id);
@@ -287,199 +275,189 @@ export default function AgentInboxPage() {
 
   const handleAssignToMe = async () => {
     if (!session?.user?.id || !selectedConversation) return;
-
-    const nextStatus =
-      selectedConversation.status === "new"
-        ? "open"
-        : selectedConversation.status;
-
-    await patchSelectedConversation({
-      assigned_agent: session.user.id,
-      status: nextStatus,
-    });
+    const nextStatus = selectedConversation.status === "new" ? "open" : selectedConversation.status;
+    await patchSelectedConversation({ assigned_agent: session.user.id, status: nextStatus });
   };
 
   const handleUnassign = async () => {
     if (!selectedConversation) return;
-    await patchSelectedConversation({
-      assigned_agent: null,
-    });
+    await patchSelectedConversation({ assigned_agent: null });
   };
 
   const handleChangeStatus = async (newStatus) => {
-    if (!selectedConversation) return;
-    if (newStatus === selectedConversation.status) return;
-
-    await patchSelectedConversation({
-      status: newStatus,
-    });
+    if (!selectedConversation || newStatus === selectedConversation.status) return;
+    await patchSelectedConversation({ status: newStatus });
   };
 
   const handleSaveContact = async (contactName, topic) => {
     if (!selectedConversation) return;
-
-    await patchSelectedConversation({
-      contact_name: contactName,
-      topic: topic,
-    });
+    await patchSelectedConversation({ contact_name: contactName, topic: topic });
   };
 
-  // 🗑️ NUEVO: borrar conversación (y sus mensajes)
   const handleDeleteConversation = async (conversationId) => {
     const conv = conversations.find((c) => c.id === conversationId);
     if (!conv) return;
 
-    const confirmar = window.confirm(
-      `Vas a borrar la conversación con ${conv.contact_name || conv.contact_phone}. ` +
-        "Se perderá el historial de mensajes. ¿Continuar?"
-    );
-    if (!confirmar) return;
+    if (!window.confirm(`Delete conversation with ${conv.contact_name || conv.contact_phone}?`)) return;
 
     try {
-      // primero borramos mensajes
-      const { error: msgError } = await supabase
-        .from("messages")
-        .delete()
-        .eq("conversation_id", conversationId);
+      const { error: msgError } = await supabase.from("messages").delete().eq("conversation_id", conversationId);
+      if (msgError) throw msgError;
 
-      if (msgError) {
-        console.error("[AgentInbox] delete messages error", msgError);
-        alert("Error borrando mensajes de la conversación.");
-        return;
-      }
+      const { error: convError } = await supabase.from("conversations").delete().eq("id", conversationId);
+      if (convError) throw convError;
 
-      const { error: convError } = await supabase
-        .from("conversations")
-        .delete()
-        .eq("id", conversationId);
-
-      if (convError) {
-        console.error("[AgentInbox] delete conversation error", convError);
-        alert("Error borrando la conversación.");
-        return;
-      }
-
-      // Actualizar estado en memoria
-      setConversations((prev) =>
-        prev.filter((c) => c.id !== conversationId)
-      );
-
+      setConversations((prev) => prev.filter((c) => c.id !== conversationId));
       if (selectedConversation?.id === conversationId) {
         setSelectedConversation(null);
         setMessages([]);
       }
     } catch (e) {
-      console.error("[AgentInbox] unexpected delete error", e);
-      alert("Error inesperado borrando la conversación.");
+      console.error("[AgentInbox] delete error", e);
+      alert("Error deleting conversation.");
     }
   };
 
-  const handleBackToDashboard = () => {
-    navigate("/tenant-dashboard");
-  };
+  const handleLogout = async () => { await logout(); };
 
-  const noTenant = !tenant?.id;
-
+  // --- NUEVO RENDER (VISUALMENTE MEJORADO) ---
   return (
-    <div className="flex min-h-screen bg-background">
-      <NavigationSidebar />
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
+      
+      <NavigationSidebar 
+        isCollapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        userRole="tenant"
+      />
 
-      <main className="flex-1 ml-0 md:ml-60 flex flex-col">
-        <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card/60 backdrop-blur">
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-foreground">
-              Bandeja de agente
-            </span>
-            <span className="text-xs text-muted-foreground">
-              Conversaciones · {tenant?.name || "DigitalMatch"}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleBackToDashboard}
-            className="text-xs md:text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted micro-animation"
-          >
-            Volver al dashboard
-          </button>
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${sidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
+        
+        {/* HEADER UNIFICADO */}
+        {/* Oculto en móvil si hay chat seleccionado para maximizar espacio */}
+        <header className={`bg-white border-b border-slate-200 px-4 md:px-6 py-3 shrink-0 z-20 shadow-sm flex items-center justify-between ${selectedConversation ? 'hidden md:flex' : 'flex'}`}>
+            <div className="flex items-center gap-3">
+               <div className="bg-amber-500 p-2 rounded-lg text-white shadow-md shadow-amber-200">
+                  <Icon name="Headphones" size={20} />
+               </div>
+               <div>
+                  <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-tight">Agent Inbox</h1>
+                  <p className="text-slate-500 text-xs font-medium hidden md:block">
+                    Live Chat · {tenant?.name || "Workspace"}
+                  </p>
+               </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-full border border-slate-200">
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
+                    <span className="text-xs font-bold text-slate-600">Online</span>
+                </div>
+                <UserProfileDropdown user={{ name: tenant?.name, role: profile?.role }} onLogout={handleLogout} />
+            </div>
         </header>
 
-        <section className="flex-1 p-4 min-h-0">
-          {noTenant ? (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground border border-dashed border-border rounded-xl">
-              No tenés un tenant asociado todavía. Completá el registro de tu
-              organización para usar la bandeja de agente.
-            </div>
-          ) : (
-            <div className="flex h-full border border-border rounded-xl overflow-hidden bg-background">
-              <div className="w-full max-w-xs border-right border-border bg-muted/30 flex flex-col border-r">
-                <div className="px-4 py-3 border-b border-border">
-                  <h2 className="text-sm font-semibold">
-                    Conversaciones
-                    {tenant?.name ? ` · ${tenant.name}` : ""}
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    Seleccioná un chat para responder como agente.
-                  </p>
-                </div>
+        {/* LAYOUT PRINCIPAL */}
+        <section className="flex-1 flex overflow-hidden relative">
+          
+          {/* 1. LISTA DE CONVERSACIONES */}
+          <aside className={`
+             bg-white border-r border-slate-200 flex-col shrink-0 z-10 transition-all
+             ${selectedConversation ? 'hidden md:flex md:w-80' : 'flex w-full md:w-80'}
+          `}>
+             <div className="p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-center">
+                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                   Active ({conversations.length})
+                </h2>
+                {/* Aquí podrías poner un botón de refrescar manual si quisieras */}
+             </div>
 
+             <div className="flex-1 overflow-y-auto">
                 <ConversationList
                   conversations={conversations}
                   loading={conversationsLoading}
                   error={conversationsError}
                   selectedId={selectedConversation?.id || null}
                   onSelect={handleSelectConversation}
-                  onDeleteConversation={handleDeleteConversation} // 👈 NUEVO
+                  onDeleteConversation={handleDeleteConversation}
                 />
-              </div>
+             </div>
+          </aside>
 
-              <div className="flex flex-1 flex-col min-h-0">
-                {selectedConversation ? (
-                  <>
-                    <ChatHeader
-                      conversation={selectedConversation}
-                      profile={profile}
-                      session={session}
-                      updating={updatingConversation}
-                      updateError={updateConversationError}
-                      onAssignToMe={handleAssignToMe}
-                      onUnassign={handleUnassign}
-                      onChangeStatus={handleChangeStatus}
-                      onSaveContact={handleSaveContact}
-                    />
+          {/* 2. CHAT ACTIVO */}
+          <main className={`
+             flex-col min-w-0 bg-[#F0F2F5] relative transition-all
+             ${selectedConversation ? 'flex w-full md:flex-1' : 'hidden md:flex md:flex-1'}
+          `}>
+             {/* Fondo WhatsApp Style */}
+             <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+                  style={{ backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")' }}>
+             </div>
 
+             {selectedConversation ? (
+               <>
+                 {/* Header del Chat con botón "Atrás" para móvil */}
+                 <div className="z-10 shadow-sm relative bg-white border-b border-slate-200">
+                    <div className="flex items-center">
+                        {/* Botón Volver (Solo Móvil) */}
+                        <div className="md:hidden pl-2">
+                            <button 
+                              onClick={handleBackToList}
+                              className="p-2 hover:bg-slate-100 rounded-full text-slate-600"
+                            >
+                               <Icon name="ArrowLeft" size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                            <ChatHeader
+                              conversation={selectedConversation}
+                              profile={profile}
+                              session={session}
+                              updating={updatingConversation}
+                              updateError={updateConversationError}
+                              onAssignToMe={handleAssignToMe}
+                              onUnassign={handleUnassign}
+                              onChangeStatus={handleChangeStatus}
+                              onSaveContact={handleSaveContact}
+                            />
+                        </div>
+                    </div>
+                 </div>
+
+                 {/* Mensajes */}
+                 <div className="flex-1 overflow-y-auto relative z-0 p-4">
                     <ChatMessages
                       messages={messages}
                       loading={messagesLoading}
                       error={messagesError}
                     />
+                 </div>
 
-                    <div className="border-t border-border">
-                      <MessageComposer
-                        disabled={
-                          sending || selectedConversation.status === "closed"
-                        }
-                        onSend={handleSendMessage}
-                        error={sendError}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex flex-1 flex-col items-center justify-center text-sm text-muted-foreground">
-                    <p className="mb-2 font-medium">
-                      No hay conversación seleccionada
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Elegí un contacto de la lista para ver el historial y
-                      responder.
-                    </p>
+                 {/* Composer */}
+                 <div className="p-3 md:p-4 bg-white border-t border-slate-200 z-10">
+                    <MessageComposer
+                      disabled={sending || selectedConversation.status === "closed"}
+                      onSend={handleSendMessage}
+                      error={sendError}
+                    />
+                 </div>
+               </>
+             ) : (
+               // Estado Vacío (Desktop)
+               <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8">
+                  <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6 shadow-inner">
+                      <Icon name="MessageSquare" size={48} className="text-slate-300" />
                   </div>
-                )}
-              </div>
-            </div>
-          )}
+                  <h2 className="text-xl font-bold text-slate-600 mb-2">Ready to chat?</h2>
+                  <p className="max-w-xs text-center text-sm text-slate-500">
+                    Select a conversation from the sidebar to start messaging your customers.
+                  </p>
+               </div>
+             )}
+          </main>
+
         </section>
-      </main>
+      </div>
     </div>
   );
 }
