@@ -9,18 +9,22 @@ import ConversationSummary from "./components/ConversationSummary";
 import MessageStats from "./components/MessageStats";
 import Button from "../../components/ui/Button";
 import { useAuth } from "@/lib/AuthProvider";
+import Icon from "../../components/AppIcon";
 
 const MessagesLog = () => {
   const { profile, tenant, supabase, logout } = useAuth();
-
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeFilters, setActiveFilters] = useState({});
-  const [selectedConversation, setSelectedConversation] = useState(null);
+  
+  // Estado de Datos
   const [localMessages, setLocalMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
-  // Cargar mensajes reales desde Supabase
+  // Estado de Filtros
+  const [activeFilters, setActiveFilters] = useState({});
+  const [selectedConversation, setSelectedConversation] = useState(null);
+
+  // --- CARGAR MENSAJES ---
   useEffect(() => {
     if (!supabase || !tenant?.id) return;
 
@@ -31,327 +35,184 @@ const MessagesLog = () => {
       try {
         const { data, error } = await supabase
           .from("messages")
-          .select(
-            `
+          .select(`
             id,
             body,
             direction,
+            status,
             created_at,
             meta,
             conversation_id,
-            conversations (
-              contact_phone
-            )
-          `
-          )
+            conversations ( contact_phone )
+          `)
           .eq("tenant_id", tenant.id)
           .order("created_at", { ascending: false })
-          .limit(500);
+          .limit(500); // Límite seguro para demo
 
-        if (error) {
-          console.error("[MessagesLog] error loading messages", error);
-          setLoadError(error.message);
-          setLocalMessages([]);
-          return;
-        }
+        if (error) throw error;
 
+        // Adaptamos datos crudos de DB a nuestra UI
         const adapted = (data || []).map((m) => {
           const meta = m.meta || {};
           const isInbound = m.direction === "in" || m.direction === "inbound";
+          
+          // Determinamos el contacto
+          const contactPhone = m.conversations?.contact_phone || meta.from || meta.to || "Unknown";
+          const contactName = meta.contactName || meta.profile_name || contactPhone;
 
-          const contactFromConv = m.conversations?.contact_phone;
-
-          const contact =
-            contactFromConv ||
-            (isInbound
-              ? meta.from || meta.wa_id || meta.contact
-              : meta.to || meta.wa_id || meta.contact) ||
-            "+0 000 000 000";
-
-          const contactName =
-            meta.contactName ||
-            meta.name ||
-            meta.profile_name ||
-            contact ||
-            "Unknown";
-
-          // Derivar status desde meta (ya que no existe columna status)
-          const derivedStatus =
-            meta.status ||
-            meta.delivery_status ||
-            meta.message_status ||
-            "sent";
+          // Status fallback
+          const finalStatus = m.status || meta.status || "sent";
 
           return {
             id: m.id,
-            messageId: meta.message_id || meta.id || `msg_${m.id}`,
-            contact,
-            contactName,
+            messageId: meta.message_id || meta.wamid || m.id,
+            contact: contactPhone,
+            contactName: contactName,
             body: m.body || "",
             direction: isInbound ? "inbound" : "outbound",
-            status: derivedStatus,
-            timestamp: m.created_at ? new Date(m.created_at) : new Date(),
-            metadata: meta,
-            conversationContext: meta.context || [],
+            status: finalStatus,
+            timestamp: m.created_at,
+            meta: meta, // Guardamos todo el meta para el modal JSON
           };
         });
 
         setLocalMessages(adapted);
       } catch (e) {
-        console.error("[MessagesLog] unexpected error loading messages", e);
+        console.error("Error loading messages:", e);
         setLoadError(e.message);
-        setLocalMessages([]);
       } finally {
         setLoadingMessages(false);
       }
     };
 
     loadMessages();
+    
+    // Aquí podrías agregar una suscripción .on('postgres_changes') para tiempo real
   }, [supabase, tenant?.id]);
 
-  // Stats calculadas
+  // --- CÁLCULO DE STATS ---
   const stats = useMemo(() => {
-    const totalMessages = localMessages.length;
-    const todayStr = new Date().toDateString();
-
-    const sentToday = localMessages.filter(
-      (m) =>
-        m.direction === "outbound" &&
-        new Date(m.timestamp).toDateString() === todayStr
-    ).length;
-
-    const receivedToday = localMessages.filter(
-      (m) =>
-        m.direction === "inbound" &&
-        new Date(m.timestamp).toDateString() === todayStr
-    ).length;
-
-    const failedMessages = localMessages.filter(
-      (m) => m.status === "failed"
-    ).length;
-
-    return { totalMessages, sentToday, receivedToday, failedMessages };
+    const today = new Date().toDateString();
+    return {
+      totalMessages: localMessages.length,
+      sentToday: localMessages.filter(m => m.direction === 'outbound' && new Date(m.timestamp).toDateString() === today).length,
+      receivedToday: localMessages.filter(m => m.direction === 'inbound' && new Date(m.timestamp).toDateString() === today).length,
+      failedMessages: localMessages.filter(m => m.status === 'failed').length
+    };
   }, [localMessages]);
 
-  // Filtros
+  // --- FILTRADO ---
   const filteredMessages = useMemo(() => {
-    let data = [...localMessages];
+    return localMessages.filter(m => {
+      // Filtro por Fecha
+      if (activeFilters.dateFrom && new Date(m.timestamp) < new Date(activeFilters.dateFrom)) return false;
+      if (activeFilters.dateTo && new Date(m.timestamp) > new Date(activeFilters.dateTo)) return false;
+      
+      // Filtro por Contacto
+      if (activeFilters.contact) {
+        const term = activeFilters.contact.toLowerCase();
+        if (!m.contact.toLowerCase().includes(term) && !m.contactName.toLowerCase().includes(term)) return false;
+      }
 
-    if (activeFilters?.dateFrom) {
-      const from = new Date(activeFilters.dateFrom);
-      data = data.filter((m) => new Date(m.timestamp) >= from);
-    }
+      // Filtro por Status
+      if (activeFilters.status && m.status !== activeFilters.status) return false;
 
-    if (activeFilters?.dateTo) {
-      const to = new Date(activeFilters.dateTo);
-      data = data.filter((m) => new Date(m.timestamp) <= to);
-    }
+      // Filtro por Keyword
+      if (activeFilters.keyword && !m.body.toLowerCase().includes(activeFilters.keyword.toLowerCase())) return false;
 
-    if (activeFilters?.contact) {
-      const q = activeFilters.contact.toLowerCase();
-      data = data.filter(
-        (m) =>
-          (m.contact && m.contact.toLowerCase().includes(q)) ||
-          (m.contactName && m.contactName.toLowerCase().includes(q))
-      );
-    }
+      // Filtro por Conversación Seleccionada (Summary sidebar)
+      if (selectedConversation && m.contact !== selectedConversation.contact) return false;
 
-    if (activeFilters?.status) {
-      data = data.filter((m) => m.status === activeFilters.status);
-    }
-
-    if (activeFilters?.keyword) {
-      const k = activeFilters.keyword.toLowerCase();
-      data = data.filter((m) =>
-        (m.body || "").toLowerCase().includes(k)
-      );
-    }
-
-    if (selectedConversation?.contact) {
-      data = data.filter(
-        (m) => m.contact === selectedConversation.contact
-      );
-    }
-
-    return data;
+      return true;
+    });
   }, [localMessages, activeFilters, selectedConversation]);
 
-  // Conversaciones agrupadas desde los mensajes
+  // --- AGRUPAR CONVERSACIONES (Para Sidebar Derecho) ---
   const conversations = useMemo(() => {
     const map = new Map();
-
-    for (const m of localMessages) {
-      const key = m.contact;
-      const prev =
-        map.get(key) || {
-          id: key,
-          contact: key,
-          contactName: m.contactName || key,
-          lastMessage: "",
-          lastMessageTime: new Date(0),
-          messageCount: 0,
-          unreadCount: 0,
-          status: "active",
-        };
-
-      const newer = new Date(m.timestamp) > new Date(prev.lastMessageTime);
-
-      map.set(key, {
-        ...prev,
-        lastMessage: newer ? m.body : prev.lastMessage,
-        lastMessageTime: newer ? m.timestamp : prev.lastMessageTime,
-        messageCount: prev.messageCount + 1,
-        status:
-          newer && m.direction === "inbound" ? "active" : prev.status,
-      });
-    }
-
-    return Array.from(map.values()).sort(
-      (a, b) =>
-        new Date(b.lastMessageTime) - new Date(a.lastMessageTime)
-    );
+    localMessages.forEach(m => {
+      if (!map.has(m.contact)) {
+        map.set(m.contact, {
+          id: m.contact,
+          contact: m.contact,
+          contactName: m.contactName,
+          lastMessage: m.body,
+          lastMessageTime: m.timestamp,
+          messageCount: 0
+        });
+      }
+      const conv = map.get(m.contact);
+      conv.messageCount++;
+      // Actualizamos si este mensaje es más nuevo
+      if (new Date(m.timestamp) > new Date(conv.lastMessageTime)) {
+        conv.lastMessage = m.body;
+        conv.lastMessageTime = m.timestamp;
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
   }, [localMessages]);
 
-  const handleFilterChange = (filters) => setActiveFilters(filters);
-
-  const handleBulkAction = (action, messageIds) => {
-    console.log(`Performing ${action} on messages:`, messageIds);
-    // TODO: luego update real en DB
-  };
-
-  const handleExport = () => {
-    const rows = filteredMessages.map((m) => ({
-      id: m.id,
-      messageId: m.messageId,
-      contact: m.contact,
-      contactName: m.contactName,
-      direction: m.direction,
-      status: m.status,
-      timestamp: new Date(m.timestamp).toISOString(),
-      body: (m.body || "").replace(/\n/g, " "),
-    }));
-
-    if (rows.length === 0) return;
-
-    const header = Object.keys(rows[0]).join(",");
-    const csv = [
-      header,
-      ...rows.map((r) =>
-        Object.values(r)
-          .map((v) =>
-            `"${String(v).replace(/"/g, '""')}"`
-          )
-          .join(",")
-      ),
-    ].join("\n");
-
-    const blob = new Blob([csv], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "messages_export.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleSelectConversation = (conversation) => {
-    setSelectedConversation(conversation);
-  };
-
-  const handleLogout = async () => {
-    await logout();
-  };
-
-  const currentUser = {
-    name: tenant?.name || "Tenant",
-    email:
-      profile?.role === "tenant"
-        ? "tenant@business.com"
-        : "admin@whatsappbot.com",
-    avatar: null,
-    role: profile?.role || "Tenant Admin",
-  };
+  const handleLogout = async () => { await logout(); };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50">
       <NavigationSidebar
         isCollapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         userRole="tenant"
       />
 
-      <div
-        className={`transition-all duration-200 ${
-          sidebarCollapsed ? "md:ml-16" : "md:ml-60"
-        }`}
-      >
-        <header className="bg-card border-b border-border px-6 py-4">
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-16" : "md:ml-60"}`}>
+        {/* Header */}
+        <header className="bg-white border-b border-slate-200 px-8 py-5 sticky top-0 z-10 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Messages Log
-              </h1>
-              <p className="text-muted-foreground">
-                Monitor and manage WhatsApp conversations
-              </p>
+              <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Messages Logs</h1>
+              <p className="text-slate-500 text-sm mt-1">Audit trail of all communication via WhatsApp API</p>
             </div>
-
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="outline"
-                iconName="RefreshCw"
-                iconPosition="left"
-                onClick={() => window.location?.reload()}
-              >
-                Refresh
-              </Button>
-
-              <UserProfileDropdown
-                user={currentUser}
-                onLogout={handleLogout}
-                onProfileClick={() =>
-                  console.log("Profile clicked")
-                }
-              />
+            <div className="flex items-center gap-3">
+               <Button variant="outline" size="sm" onClick={() => window.location.reload()} iconName="RefreshCw">
+                 Refresh
+               </Button>
+               <UserProfileDropdown user={{ name: tenant?.name || "User", role: profile?.role }} onLogout={handleLogout} />
             </div>
           </div>
         </header>
 
-        <main className="p-6">
-          {loadError && (
-            <div className="mb-4 p-4 border border-destructive rounded bg-destructive/10 text-destructive text-sm">
-              Error loading messages: {loadError}
-            </div>
-          )}
-
-          {loadingMessages && (
-            <div className="mb-4 text-sm text-muted-foreground">
-              Loading messages...
-            </div>
-          )}
-
+        <main className="p-8 max-w-[1600px] mx-auto">
+          {/* Stats Cards */}
           <MessageStats stats={stats} />
 
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+            {/* Main Content */}
             <div className="xl:col-span-3 space-y-6">
-              <MessageFilters
-                onFilterChange={handleFilterChange}
-                onExport={handleExport}
-              />
-
-              <MessageTable
-                messages={filteredMessages}
-                onBulkAction={handleBulkAction}
-              />
+              <MessageFilters onFilterChange={setActiveFilters} onExport={() => console.log("Export triggered")} />
+              
+              {loadError ? (
+                <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-200 flex items-center gap-2">
+                   <Icon name="AlertTriangle" /> Error loading data: {loadError}
+                </div>
+              ) : (
+                <MessageTable 
+                   messages={filteredMessages} 
+                   loading={loadingMessages}
+                   onBulkAction={(action, ids) => console.log(action, ids)} 
+                />
+              )}
             </div>
 
+            {/* Sidebar Resumen */}
             <div className="xl:col-span-1">
-              <ConversationSummary
-                conversations={conversations}
-                onSelectConversation={handleSelectConversation}
-              />
+               {/* Asumiendo que ConversationSummary ya existe, lo envolvemos para estilo */}
+               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden sticky top-28">
+                  <div className="p-4 border-b border-slate-100 bg-slate-50 font-semibold text-slate-700">
+                    Active Conversations
+                  </div>
+                  <ConversationSummary 
+                    conversations={conversations} 
+                    onSelectConversation={setSelectedConversation} 
+                  />
+               </div>
             </div>
           </div>
         </main>

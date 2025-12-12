@@ -1,8 +1,9 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\messages-log\components\MessageFilters.jsx
 import React, { useState } from 'react';
 import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import Button from '../../../components/ui/Button';
-
+import Icon from '../../../components/AppIcon';
 
 const MessageFilters = ({ onFilterChange, onExport }) => {
   const [filters, setFilters] = useState({
@@ -14,11 +15,12 @@ const MessageFilters = ({ onFilterChange, onExport }) => {
   });
 
   const statusOptions = [
-    { value: '', label: 'All Status' },
+    { value: '', label: 'All Statuses' },
     { value: 'sent', label: 'Sent' },
     { value: 'delivered', label: 'Delivered' },
     { value: 'read', label: 'Read' },
-    { value: 'failed', label: 'Failed' }
+    { value: 'failed', label: 'Failed' },
+    { value: 'received', label: 'Received (Inbound)' }
   ];
 
   const handleFilterChange = (field, value) => {
@@ -28,83 +30,75 @@ const MessageFilters = ({ onFilterChange, onExport }) => {
   };
 
   const handleClearFilters = () => {
-    const clearedFilters = {
-      dateFrom: '',
-      dateTo: '',
-      contact: '',
-      status: '',
-      keyword: ''
-    };
-    setFilters(clearedFilters);
-    onFilterChange(clearedFilters);
+    const cleared = { dateFrom: '', dateTo: '', contact: '', status: '', keyword: '' };
+    setFilters(cleared);
+    onFilterChange(cleared);
   };
 
+  // Contamos filtros activos para UI visual
+  const activeCount = Object.values(filters).filter(Boolean).length;
+
   return (
-    <div className="bg-card border border-border rounded-lg p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-foreground">Filter Messages</h3>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleClearFilters}
-            iconName="X"
-            iconPosition="left"
-          >
-            Clear Filters
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onExport}
-            iconName="Download"
-            iconPosition="left"
-          >
-            Export
+    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mb-6">
+      
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+        <div className="flex items-center gap-2">
+           <div className="bg-indigo-50 p-2 rounded-lg text-indigo-600">
+              <Icon name="Filter" size={18} />
+           </div>
+           <div>
+              <h3 className="text-sm font-bold text-slate-800">Filter Messages</h3>
+              <p className="text-xs text-slate-500">Refine your search history</p>
+           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {activeCount > 0 && (
+             <Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-slate-500 hover:text-red-600">
+               <Icon name="X" size={14} className="mr-1"/> Clear ({activeCount})
+             </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={onExport} iconName="Download">
+            Export CSV
           </Button>
         </div>
       </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Input
           type="date"
-          label="From Date"
-          value={filters?.dateFrom}
-          onChange={(e) => handleFilterChange('dateFrom', e?.target?.value)}
-          className="w-full"
+          label="From"
+          value={filters.dateFrom}
+          onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+          className="w-full text-xs"
         />
-
         <Input
           type="date"
-          label="To Date"
-          value={filters?.dateTo}
-          onChange={(e) => handleFilterChange('dateTo', e?.target?.value)}
-          className="w-full"
+          label="To"
+          value={filters.dateTo}
+          onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+          className="w-full text-xs"
         />
-
         <Input
           type="text"
-          label="Contact Number"
-          placeholder="Search by phone..."
-          value={filters?.contact}
-          onChange={(e) => handleFilterChange('contact', e?.target?.value)}
-          className="w-full"
+          label="Phone / Name"
+          placeholder="e.g. 54911..."
+          value={filters.contact}
+          onChange={(e) => handleFilterChange('contact', e.target.value)}
+          iconName="Search"
         />
-
         <Select
-          label="Message Status"
+          label="Status"
           options={statusOptions}
-          value={filters?.status}
-          onChange={(value) => handleFilterChange('status', value)}
-          className="w-full"
+          value={filters.status}
+          onChange={(val) => handleFilterChange('status', val)}
         />
-
         <Input
           type="text"
-          label="Keyword Search"
-          placeholder="Search message content..."
-          value={filters?.keyword}
-          onChange={(e) => handleFilterChange('keyword', e?.target?.value)}
-          className="w-full"
+          label="Content Keyword"
+          placeholder="Search text..."
+          value={filters.keyword}
+          onChange={(e) => handleFilterChange('keyword', e.target.value)}
         />
       </div>
     </div>
