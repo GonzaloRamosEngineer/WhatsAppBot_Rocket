@@ -15,10 +15,11 @@ import MessagesLog from "./pages/messages-log";
 import TenantDashboard from "./pages/tenant-dashboard";
 import AgentInboxPage from "./pages/agent-inbox";
 
+// 👇 1. IMPORTAMOS LA NUEVA PÁGINA
+import TemplateBlueprintsPage from "./pages/template-blueprints";
+
 import ProtectedRoute from "./lib/ProtectedRoute";
 import PasswordResetPage from "./pages/password-reset";
-
-// 👇 NUEVO: callback de Facebook OAuth
 import FacebookCallback from "./pages/oauth/FacebookCallback";
 
 const Routes = () => {
@@ -27,26 +28,14 @@ const Routes = () => {
       <ErrorBoundary>
         <ScrollToTop />
         <RouterRoutes>
-          {/* Login (default) */}
+          {/* ... rutas públicas (login, etc) igual que antes ... */}
           <Route path="/" element={<LoginPage />} />
           <Route path="/login" element={<LoginPage />} />
-
-          {/* Password reset (Supabase redirectTo) */}
           <Route path="/auth/reset-password" element={<PasswordResetPage />} />
+          <Route path="/tenant-registration" element={<TenantRegistration />} />
+          <Route path="/oauth/facebook/callback" element={<FacebookCallback />} />
 
-          {/* Public routes */}
-          <Route
-            path="/tenant-registration"
-            element={<TenantRegistration />}
-          />
-
-          {/* ⚠️ Callback de Facebook – NO debe ir dentro de ProtectedRoute */}
-          <Route
-            path="/oauth/facebook/callback"
-            element={<FacebookCallback />}
-          />
-
-          {/* Protected routes (requieren usuario autenticado) */}
+          {/* Protected routes */}
           <Route
             path="/tenant-dashboard"
             element={
@@ -61,6 +50,16 @@ const Routes = () => {
             element={
               <ProtectedRoute>
                 <FlowBuilder />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 👇 2. AGREGAMOS LA NUEVA RUTA AQUÍ */}
+          <Route
+            path="/templates"
+            element={
+              <ProtectedRoute>
+                <TemplateBlueprintsPage />
               </ProtectedRoute>
             }
           />
@@ -92,7 +91,6 @@ const Routes = () => {
             }
           />
 
-          {/* Catch all */}
           <Route path="*" element={<NotFound />} />
         </RouterRoutes>
       </ErrorBoundary>

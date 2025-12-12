@@ -26,6 +26,12 @@ const NavigationSidebar = ({
       tooltip: "WhatsApp integration setup",
     },
     {
+      label: "Template Library",
+      path: "/templates",
+      icon: "BookOpen", // Asegúrate que tu AppIcon soporte este nombre, si no usa "FileText" o "Layers"
+      tooltip: "Official Meta Templates",
+    },
+    {
       label: "Automation",
       path: "/flow-builder",
       icon: "GitBranch",
