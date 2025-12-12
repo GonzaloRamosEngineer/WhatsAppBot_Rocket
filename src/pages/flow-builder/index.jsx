@@ -12,7 +12,7 @@ import FlowPreview from "./components/FlowPreview";
 import TemplateLibrary from "./components/TemplateLibrary";
 
 // 👇 NUEVO: import del modal Blueprint Meta
-import MetaTemplateBlueprints from "./components/MetaTemplateBlueprints";
+// import MetaTemplateBlueprints from "./components/MetaTemplateBlueprints";
 
 // Hook global
 import { useAuth } from "@/lib/AuthProvider";
@@ -31,7 +31,7 @@ const FlowBuilder = () => {
   const [isTemplateLibraryOpen, setIsTemplateLibraryOpen] = useState(false);
 
   // 👇 NUEVO: estado para el modal Blueprints
-  const [showMetaBlueprints, setShowMetaBlueprints] = useState(false);
+  //const [showMetaBlueprints, setShowMetaBlueprints] = useState(false);
 
   // flows en memoria
   const [localFlows, setLocalFlows] = useState([]);
@@ -443,13 +443,13 @@ const FlowBuilder = () => {
               </Button>
 
               {/*  NUEVO BOTÓN DE BLUEPRINTS META  */}
-              <Button
+              {/* <Button
                 variant="outline"
                 iconName="Layers"
                 onClick={() => setShowMetaBlueprints(true)}
               >
                 Plantillas Meta
-              </Button>
+              </Button> */}
 
               <Button
                 variant="default"
@@ -514,10 +514,10 @@ const FlowBuilder = () => {
       />
 
       {/* NUEVO: Modal de BLUEPRINTS META */}
-      <MetaTemplateBlueprints
+      {/* <MetaTemplateBlueprints
         isOpen={showMetaBlueprints}
         onClose={() => setShowMetaBlueprints(false)}
-      />
+      /> */}
     </div>
   );
 };
