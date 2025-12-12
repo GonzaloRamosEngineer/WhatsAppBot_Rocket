@@ -65,18 +65,22 @@ const MessageTable = ({ messages, onBulkAction }) => {
         </div>
 
         {/* --- VISTA DE ESCRITORIO --- */}
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        {/* CAMBIO 1: Agregamos custom-scrollbar para que el scroll se vea bonito si aparece */}
+        <div className="hidden lg:block overflow-x-auto custom-scrollbar">
+          {/* CAMBIO 2: min-w-full asegura que la tabla ocupe todo, min-w-[1000px] evita que se aplaste */}
+          <table className="w-full min-w-[1000px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-400 border-b border-slate-200 tracking-wider">
               <tr>
-                <th className="px-6 py-3 w-12 text-center">
+                <th className="px-6 py-3 w-12 text-center whitespace-nowrap">
                    <div className="sr-only">Selection</div>
                 </th>
-                <th className="px-6 py-3 font-semibold">Timestamp / ID</th>
-                <th className="px-6 py-3 font-semibold">Direction</th>
-                <th className="px-6 py-3 w-[45%] font-semibold">Message Content</th>
-                <th className="px-6 py-3 font-semibold">Status</th>
-                <th className="px-6 py-3 text-right font-semibold">Action</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Timestamp / ID</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Direction</th>
+                {/* CAMBIO 3: Reduje el ancho de 45% a 35% para dar aire a la derecha */}
+                <th className="px-6 py-3 w-[35%] font-semibold whitespace-nowrap">Message Content</th>
+                <th className="px-6 py-3 font-semibold whitespace-nowrap">Status</th>
+                {/* CAMBIO 4: Aseguramos padding derecho suficiente */}
+                <th className="px-6 py-3 text-right font-semibold whitespace-nowrap">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
@@ -96,15 +100,15 @@ const MessageTable = ({ messages, onBulkAction }) => {
                     </td>
 
                     {/* Fecha e ID */}
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-slate-700 whitespace-nowrap">{formatTimestamp(msg.created_at || msg.timestamp)}</div>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-medium text-slate-700">{formatTimestamp(msg.created_at || msg.timestamp)}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-1 bg-slate-100 inline-block px-1.5 py-0.5 rounded border border-slate-200 group-hover:border-slate-300 transition-colors">
                         #{shortId(msg.id)}
                       </div>
                     </td>
 
                     {/* Dirección */}
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                            <div className={`p-1.5 rounded-full ${isInbound ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}>
                               <Icon name={isInbound ? "ArrowDownLeft" : "ArrowUpRight"} size={14} />
@@ -136,7 +140,7 @@ const MessageTable = ({ messages, onBulkAction }) => {
                                   </span>
                                )}
                             </div>
-                            <p className="text-slate-700 text-sm font-medium leading-snug">
+                            <p className="text-slate-700 text-sm font-medium leading-snug break-words">
                               {/* Texto limpio del template si es posible, o fallback */}
                               {msg.body.replace("[TEMPLATE] ", "")}
                             </p>
@@ -145,7 +149,7 @@ const MessageTable = ({ messages, onBulkAction }) => {
                       ) : (
                         <div className="flex items-start gap-2 py-1">
                            <Icon name={isInbound ? "MessageCircle" : "MessageSquare"} size={16} className="text-slate-300 mt-0.5 shrink-0" />
-                           <p className="text-slate-600 text-sm leading-relaxed line-clamp-2">
+                           <p className="text-slate-600 text-sm leading-relaxed line-clamp-2 break-words">
                              {msg.body || <span className="italic text-slate-300">No content</span>}
                            </p>
                         </div>
@@ -153,12 +157,12 @@ const MessageTable = ({ messages, onBulkAction }) => {
                     </td>
 
                     {/* Status Badge */}
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <MessageStatusBadge status={msg.status} direction={msg.direction} />
                     </td>
 
                     {/* Actions */}
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
                       <Button
                         variant="ghost"
                         size="sm"
