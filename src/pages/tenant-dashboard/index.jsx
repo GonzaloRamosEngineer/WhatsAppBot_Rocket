@@ -1,7 +1,7 @@
 // C:\Projects\WhatsAppBot_Rocket\src\pages\tenant-dashboard\index.jsx
 
 import React, { useState, useEffect } from "react";
-import { useOutletContext } from "react-router-dom"; // IMPORTANTE: Conexión con Layout
+import { useOutletContext } from "react-router-dom"; // CONEXIÓN CON LAYOUT
 import UserProfileDropdown from "../../components/ui/UserProfileDropdown";
 import MetricsCard from "./components/MetricsCard";
 import ActivityFeed from "./components/ActivityFeed";
@@ -40,6 +40,7 @@ const TenantDashboard = () => {
     const loadData = async () => {
       if (!profile) return;
 
+      // Usuario sin tenant asociado todavía
       if (!profile.tenant_id) {
         setIsLoading(false);
         return;
@@ -55,13 +56,18 @@ const TenantDashboard = () => {
           .eq("id", profile.tenant_id)
           .single();
 
-        if (tenantError) console.error("Error cargando tenant", tenantError);
-        else setTenantInfo(tenant);
+        if (tenantError) {
+          console.error("Error cargando tenant", tenantError);
+        } else {
+          setTenantInfo(tenant);
+        }
 
-        // 2) Mensajes del tenant
+        // 2) Mensajes del tenant (últimos 200)
         const { data: msgs, error: msgsError } = await supabase
           .from("messages")
-          .select("id, direction, body, created_at, sender, conversation_id, tenant_id, channel_id")
+          .select(
+            "id, direction, body, created_at, sender, conversation_id, tenant_id, channel_id"
+          )
           .eq("tenant_id", profile.tenant_id)
           .order("created_at", { ascending: false })
           .limit(200);
@@ -73,7 +79,7 @@ const TenantDashboard = () => {
           setMessages(msgs || []);
         }
 
-        // 3) Flows asociados
+        // 3) Flows asociados a bots del tenant
         const { data: flowsData, error: flowsError } = await supabase
           .from("flows")
           .select("id, key, bots!inner(tenant_id)")
@@ -86,7 +92,7 @@ const TenantDashboard = () => {
           setFlows(flowsData || []);
         }
 
-        // 4) Conversaciones del tenant
+        // 4) Conversaciones del tenant (últimas 10 por actividad)
         const { data: convs, error: convsError } = await supabase
           .from("conversations")
           .select("id, contact_phone, status, last_message_at")
@@ -99,12 +105,15 @@ const TenantDashboard = () => {
           setConversations([]);
         } else {
           const convItems = (convs || []).map((c) => {
-            const lastMsg = (msgs || []).find((m) => m.conversation_id === c.id);
+            const lastMsg = (msgs || []).find(
+              (m) => m.conversation_id === c.id
+            );
+
             return {
               id: c.id,
               name: c.contact_phone || "Contacto",
               phone: c.contact_phone || "",
-              avatar: null,
+              avatar: null, // Placeholder handled by component
               avatarAlt: "Avatar contacto",
               lastMessage: lastMsg?.body || "Sin mensajes todavía",
               lastSeen: c.last_message_at || lastMsg?.created_at,
@@ -112,10 +121,11 @@ const TenantDashboard = () => {
               unreadCount: 0,
             };
           });
+
           setConversations(convItems);
         }
 
-        // 5) Estado de canales
+        // 5) Estado de canales de WhatsApp del tenant
         const { data: channels, error: channelsError } = await supabase
           .from("channels")
           .select("id, type, status, phone, display_name")
@@ -137,7 +147,7 @@ const TenantDashboard = () => {
           setChannelSummary({ hasChannel: false, isActive: false, phone: null, displayName: null });
         }
 
-        // 6) Actividad reciente
+        // 6) Actividad reciente basada en lo que tenemos
         const latestMsg = (msgs || [])[0];
         const now = new Date();
         const activityItems = [];
@@ -190,8 +200,8 @@ const TenantDashboard = () => {
 
   // --- CÁLCULOS Y MÉTRICAS (Tu lógica original intacta) ---
   const totalMessages = messages.length;
-  // const inCount = messages.filter((m) => m.direction === "in").length; // (Unused)
-  // const outCount = messages.filter((m) => m.direction === "out").length; // (Unused)
+  // const inCount = messages.filter((m) => m.direction === "in").length; // Unused
+  // const outCount = messages.filter((m) => m.direction === "out").length; // Unused
   const activeFlows = flows.length;
 
   const now = new Date();
@@ -250,9 +260,8 @@ const TenantDashboard = () => {
 
   const currentUser = {
     name: tenantInfo?.name || profile?.tenant?.name || session?.user?.user_metadata?.full_name || "User",
-    // Ocultamos el email del objeto si UserProfileDropdown lo usa para mostrarlo, 
-    // pero mantenemos la lógica segura. Si el componente dropdown es inteligente, mostrará solo nombre.
-    email: session?.user?.email || "user@example.com", 
+    // 🛑 TRUCO: Pasamos email vacío para que el Dropdown NO muestre el correo en el header
+    email: null, 
     avatar: null,
     role: profile?.role || "Tenant Admin",
   };
@@ -271,7 +280,7 @@ const TenantDashboard = () => {
              {/* Botón Hamburguesa (Solo Móvil) - Estilo "Violáceo/Índigo" */}
              <button 
                onClick={toggleMobileMenu} 
-               className="md:hidden p-2 mr-1 text-indigo-600 bg-white border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-md transition-all active:scale-95"
+               className="md:hidden p-2 -ml-2 text-indigo-600 bg-white border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-md transition-all active:scale-95"
                title="Toggle Menu"
              >
                <Icon name="Menu" size={24} />
