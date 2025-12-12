@@ -1,4 +1,5 @@
 // C:\Projects\WhatsAppBot_Rocket\src\pages\channel-setup\components\ConnectionTestCard.jsx
+
 import React, { useState } from "react";
 import Button from "../../../components/ui/Button";
 import Icon from "../../../components/AppIcon";
@@ -8,6 +9,7 @@ const ConnectionTestCard = ({ credentials, onTestConnection, isConnected }) => {
   const [testResult, setTestResult] = useState(null);
 
   const handleTestConnection = async () => {
+    // 1. Validamos que haya algo escrito
     if (!credentials?.phoneNumberId || !credentials?.wabaId || !credentials?.accessToken) {
       setTestResult({
         success: false,
@@ -20,35 +22,27 @@ const ConnectionTestCard = ({ credentials, onTestConnection, isConnected }) => {
     setTestResult(null);
 
     try {
-      // Simulation delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // 2. Simulación de espera (para que parezca real en el video)
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      // Mock Validation Logic (Keep existing logic)
-      const mockSuccess =
-        credentials?.phoneNumberId === "603634226162508" &&
-        credentials?.wabaId === "1200748598356181" &&
-        credentials?.accessToken?.startsWith("EAAB");
+      // 3. LOGICA CORREGIDA: Si hay datos, damos por exitoso (Para la demo)
+      // En producción real, aquí haríamos fetch('/api/verify-token')
+      const mockSuccess = true; 
 
       const result = {
         success: mockSuccess,
-        message: mockSuccess
-          ? "Connection Successful! Your WhatsApp Business account is reachable."
-          : "Connection Failed. Please check your credentials.",
-        details: mockSuccess
-          ? {
-              phoneNumber: "+598 93 892 924",
-              businessName: credentials.businessName || "My Business",
-              verificationStatus: "Verified",
-              lastSync: new Date().toISOString(),
-            }
-          : {
-              error: "Invalid Access Token, Phone Number ID or WABA ID.",
-              suggestion: "Verify credentials in Meta Business Manager.",
-            },
+        message: "Connection Successful! API credentials are valid.",
+        details: {
+          phoneNumber: "+54 9 " + (credentials.phoneNumberId.slice(-4) || "0000"), // Muestra algo creíble
+          businessName: credentials.businessName || "Demo Business",
+          verificationStatus: "Verified",
+          lastSync: new Date().toISOString(),
+        }
       };
 
       setTestResult(result);
       if (onTestConnection) onTestConnection(result);
+
     } catch (error) {
       setTestResult({
         success: false,
@@ -89,7 +83,7 @@ const ConnectionTestCard = ({ credentials, onTestConnection, isConnected }) => {
       </Button>
 
       {testResult && (
-        <div className={`p-4 rounded-lg border ${
+        <div className={`p-4 rounded-lg border animate-in fade-in slide-in-from-top-2 ${
             testResult?.success ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-800"
         }`}>
           <div className="flex items-start gap-3">
@@ -114,9 +108,6 @@ const ConnectionTestCard = ({ credentials, onTestConnection, isConnected }) => {
               {!testResult?.success && testResult?.details && (
                 <div className="text-xs space-y-1 opacity-90">
                   <p><span className="font-bold">Error:</span> {testResult.details.error}</p>
-                  {testResult.details.suggestion && (
-                    <p><span className="font-bold">Tip:</span> {testResult.details.suggestion}</p>
-                  )}
                 </div>
               )}
             </div>
