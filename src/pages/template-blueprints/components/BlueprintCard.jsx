@@ -1,5 +1,7 @@
 import { useState } from "react";
 import Icon from "../../../components/AppIcon";
+// 👇 1. IMPORTANTE: Importamos el cliente de Supabase
+import { supabase } from "../../../lib/supabaseClient"; 
 
 const categoryColors = {
   MARKETING: "bg-blue-50 text-blue-700 border-blue-200",
@@ -21,25 +23,33 @@ export default function BlueprintCard({ bp }) {
 
     setActivating(true);
     try {
-      const res = await fetch("/functions/v1/activate-template-blueprint", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      // 👇 2. CAMBIO CLAVE: Usamos invoke en lugar de fetch
+      // Esto envía la petición a la nube de Supabase automáticamente
+      const { data, error } = await supabase.functions.invoke('activate-template-blueprint', {
+        body: {
           blueprintId: bp.id,
           channelId: activeChannelId 
-        }),
+        }
       });
 
-      const data = await res.json();
-      
-      if (res.ok) {
-        alert(`Success! Template "${bp.name}" sent to Meta for approval.`);
-      } else {
-        alert("Error activating: " + (data.error || "Unknown error"));
+      if (error) {
+        // Si hay error técnico (500, network, etc)
+        throw new Error(error.message || "Error calling function");
       }
-      console.log(data);
+
+      // 3. Verificamos la respuesta lógica
+      if (data && (data.ok || data.success)) {
+        alert(`Success! Template "${bp.name}" sent to Meta for approval.`);
+        console.log("Template created:", data);
+      } else {
+        // Si la función respondió pero con un error lógico (ej: 400 Bad Request)
+        console.error("Function error data:", data);
+        alert("Error activating: " + (data?.error || "Unknown error"));
+      }
+
     } catch (e) {
-      alert("Network error: " + e.message);
+      console.error(e);
+      alert("System error: " + e.message);
     } finally {
       setActivating(false);
     }
@@ -74,12 +84,11 @@ export default function BlueprintCard({ bp }) {
         })}
       </div>
 
-      {/* Variables List (if any) */}
+      {/* Variables List */}
       {parsedVariables.length > 0 && (
           <div className="mb-4 flex flex-wrap gap-1">
               {parsedVariables.map(v => (
                   <span key={v.index} className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
-                      {/* CORRECCIÓN AQUÍ: Una sola llave para abrir expresión JS */}
                       {`{{${v.index}}}`} = {v.label}
                   </span>
               ))}
