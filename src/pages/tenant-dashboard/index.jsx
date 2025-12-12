@@ -9,7 +9,7 @@ import QuickActions from "./components/QuickActions";
 import ActiveConversations from "./components/ActiveConversations";
 import OnboardingChecklist from "./components/OnboardingChecklist";
 import Icon from "../../components/AppIcon";
-import Button from "../../components/ui/Button"; // Asegúrate de tener este componente
+import Button from "../../components/ui/Button";
 
 import { useAuth } from "../../lib/AuthProvider";
 import { supabase } from "../../lib/supabaseClient";
@@ -227,7 +227,7 @@ const TenantDashboard = () => {
       change: messagesToday.length ? `${messagesToday.filter((m) => m.direction === "out").length} today` : "No data today",
       changeType: messagesToday.length ? "positive" : "neutral",
       icon: "Send",
-      color: "blue", // Usamos nombres de color para que MetricsCard decida el estilo
+      color: "blue",
     },
     {
       title: "Inbound Messages",
