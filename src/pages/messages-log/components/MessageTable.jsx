@@ -64,30 +64,30 @@ const MessageTable = ({ messages, onBulkAction }) => {
         </div>
 
         {/* --- VISTA DE ESCRITORIO --- */}
-        <div className="hidden lg:block w-full overflow-x-auto custom-scrollbar">
-          {/* min-w-[1000px] asegura que no se aplaste en pantallas chicas de laptop */}
-          <table className="w-full min-w-[1000px] table-fixed text-left text-sm">
+        <div className="hidden lg:block w-full">
+          {/* table-fixed es obligatorio para que funcionen los truncates */}
+          <table className="w-full table-fixed text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-400 border-b border-slate-200 tracking-wider">
               <tr>
-                {/* 1. SELECT: Ancho fijo pequeño */}
+                {/* Definimos anchos exactos en píxeles para columnas fijas */}
                 <th className="px-4 py-3 w-[50px] text-center">
                    <div className="sr-only">Sel</div>
                 </th>
                 
-                {/* 2. TIME/ID: Porcentaje cómodo */}
-                <th className="px-4 py-3 w-[18%] font-semibold whitespace-nowrap">Time / ID</th>
+                {/* Time/ID: Espacio justo para fecha y hash */}
+                <th className="px-4 py-3 w-[180px] font-semibold">Time / ID</th>
                 
-                {/* 3. DIR: ANCHO FIJO BLINDADO (No se encoge) */}
-                <th className="px-4 py-3 w-[90px] font-semibold text-center whitespace-nowrap">Dir</th> 
+                {/* Dir: Espacio exacto para el badge IN/OUT */}
+                <th className="px-4 py-3 w-[90px] font-semibold text-center">Dir</th> 
                 
-                {/* 4. CONTENT: w-auto toma todo el espacio restante */}
-                <th className="px-4 py-3 w-auto font-semibold whitespace-nowrap">Message Content</th>
+                {/* Content: w-auto toma TODO el espacio restante */}
+                <th className="px-4 py-3 w-auto font-semibold">Message Content</th>
                 
-                {/* 5. STATUS: Porcentaje fijo */}
-                <th className="px-4 py-3 w-[15%] font-semibold whitespace-nowrap">Status</th>
+                {/* Status: Espacio para el badge de estado */}
+                <th className="px-4 py-3 w-[130px] font-semibold text-center">Status</th>
                 
-                {/* 6. ACTION: Ancho fijo pequeño alineado derecha */}
-                <th className="px-4 py-3 w-[80px] text-right font-semibold whitespace-nowrap">Action</th>
+                {/* Action: Espacio para el botón */}
+                <th className="px-4 py-3 w-[70px] text-right font-semibold">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
@@ -116,7 +116,7 @@ const MessageTable = ({ messages, onBulkAction }) => {
                       </div>
                     </td>
 
-                    {/* Dirección (Compacta y Centrada en su columna fija) */}
+                    {/* Dirección */}
                     <td className="px-4 py-4 text-center">
                         <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border border-transparent ${isInbound ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700'}`}>
                            <Icon name={isInbound ? "ArrowDownLeft" : "ArrowUpRight"} size={12} />
@@ -126,16 +126,17 @@ const MessageTable = ({ messages, onBulkAction }) => {
                         </div>
                     </td>
 
-                    {/* Contenido */}
+                    {/* Contenido (Fluido) */}
                     <td className="px-4 py-4">
                       {isTemplate ? (
-                        <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100 group-hover:bg-white group-hover:border-slate-200 transition-colors shadow-sm max-w-full overflow-hidden">
+                        <div className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-50 border border-slate-100 group-hover:bg-white group-hover:border-slate-200 transition-colors shadow-sm max-w-full overflow-hidden">
                           <div className="bg-purple-100 text-purple-600 p-1 rounded-md shrink-0">
                              <Icon name="LayoutTemplate" size={14} />
                           </div>
+                          {/* min-w-0 permite que el flex-child se encoja y active el truncate */}
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                               <span className="text-[10px] font-bold text-purple-700 uppercase">Template</span>
+                               <span className="text-[10px] font-bold text-purple-700 uppercase shrink-0">Template</span>
                                {msg.meta?.whatsapp_template?.name && (
                                   <span className="text-[10px] text-slate-400 truncate">
                                      • {msg.meta.whatsapp_template.name}
@@ -148,9 +149,10 @@ const MessageTable = ({ messages, onBulkAction }) => {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 py-1 max-w-full overflow-hidden">
+                        <div className="flex items-center gap-2 max-w-full">
                            <Icon name={isInbound ? "MessageCircle" : "MessageSquare"} size={16} className="text-slate-300 shrink-0" />
-                           <p className="text-slate-600 text-sm leading-relaxed truncate" title={msg.body}>
+                           {/* Truncate aplica aquí para cortar el texto largo */}
+                           <p className="text-slate-600 text-sm truncate w-full" title={msg.body}>
                              {msg.body || <span className="italic text-slate-300">No content</span>}
                            </p>
                         </div>
@@ -158,8 +160,8 @@ const MessageTable = ({ messages, onBulkAction }) => {
                     </td>
 
                     {/* Status Badge */}
-                    <td className="px-4 py-4">
-                      <div className="truncate">
+                    <td className="px-4 py-4 text-center">
+                      <div className="flex justify-center">
                         <MessageStatusBadge status={msg.status} direction={msg.direction} />
                       </div>
                     </td>
