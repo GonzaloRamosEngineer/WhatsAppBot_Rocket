@@ -30,7 +30,7 @@ const FeatureHighlights = () => {
   return (
     <div className="text-white">
       <div className="mb-10">
-        <h2 className="text-2xl font-bold mb-3">Why choose RocketBot?</h2>
+        <h2 className="text-2xl font-bold mb-3">Why choose MatchBot?</h2>
         <p className="text-slate-400 text-lg">
           Everything you need to scale your WhatsApp support and sales.
         </p>

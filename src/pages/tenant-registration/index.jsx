@@ -10,10 +10,10 @@ const TenantRegistrationPage = () => {
   return (
     <>
       <Helmet>
-        <title>Create Workspace - RocketBot</title>
+        <title>Create Workspace - MatchBot</title>
         <meta
           name="description"
-          content="Create your RocketBot account to connect WhatsApp Business and manage conversations."
+          content="Create your MatchBot account to connect WhatsApp Business and manage conversations."
         />
       </Helmet>
 
@@ -28,7 +28,7 @@ const TenantRegistrationPage = () => {
                  <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
                     <Icon name="MessageCircle" size={24} className="text-white" />
                  </div>
-                 <span className="text-xl font-bold text-slate-800 tracking-tight">RocketBot</span>
+                 <span className="text-xl font-bold text-slate-800 tracking-tight">MatchBot</span>
               </div>
 
               <div className="mb-8">
