@@ -11,7 +11,7 @@ const MessageTable = ({ messages, onBulkAction }) => {
   const [selectedMessages, setSelectedMessages] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
 
-  // --- Lógica de Selección ---
+  // --- Lógica de Selección (Intacta) ---
   const handleSelectAll = (checked) => {
     if (checked) setSelectedMessages(messages?.map(msg => msg?.id));
     else setSelectedMessages([]);
@@ -64,20 +64,30 @@ const MessageTable = ({ messages, onBulkAction }) => {
         </div>
 
         {/* --- VISTA DE ESCRITORIO --- */}
-        <div className="hidden lg:block w-full">
-          <table className="w-full table-fixed text-left text-sm">
+        <div className="hidden lg:block w-full overflow-x-auto custom-scrollbar">
+          {/* min-w-[1000px] asegura que no se aplaste en pantallas chicas de laptop */}
+          <table className="w-full min-w-[1000px] table-fixed text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-400 border-b border-slate-200 tracking-wider">
               <tr>
-                <th className="px-4 py-3 w-[5%] text-center">
+                {/* 1. SELECT: Ancho fijo pequeño */}
+                <th className="px-4 py-3 w-[50px] text-center">
                    <div className="sr-only">Sel</div>
                 </th>
-                <th className="px-4 py-3 w-[15%] font-semibold">Time / ID</th>
-                {/* Ajuste de ancho: 10% es suficiente para IN/OUT */}
-                <th className="px-4 py-3 w-[10%] font-semibold">Dir</th> 
-                {/* Le damos más espacio al contenido (47%) */}
-                <th className="px-4 py-3 w-[47%] font-semibold">Message Content</th>
-                <th className="px-4 py-3 w-[15%] font-semibold">Status</th>
-                <th className="px-4 py-3 w-[8%] text-right font-semibold">Action</th>
+                
+                {/* 2. TIME/ID: Porcentaje cómodo */}
+                <th className="px-4 py-3 w-[18%] font-semibold whitespace-nowrap">Time / ID</th>
+                
+                {/* 3. DIR: ANCHO FIJO BLINDADO (No se encoge) */}
+                <th className="px-4 py-3 w-[90px] font-semibold text-center whitespace-nowrap">Dir</th> 
+                
+                {/* 4. CONTENT: w-auto toma todo el espacio restante */}
+                <th className="px-4 py-3 w-auto font-semibold whitespace-nowrap">Message Content</th>
+                
+                {/* 5. STATUS: Porcentaje fijo */}
+                <th className="px-4 py-3 w-[15%] font-semibold whitespace-nowrap">Status</th>
+                
+                {/* 6. ACTION: Ancho fijo pequeño alineado derecha */}
+                <th className="px-4 py-3 w-[80px] text-right font-semibold whitespace-nowrap">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
@@ -106,17 +116,13 @@ const MessageTable = ({ messages, onBulkAction }) => {
                       </div>
                     </td>
 
-                    {/* Dirección (Compacta: IN/OUT) */}
-                    <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                           <div className={`p-1.5 rounded-full shrink-0 ${isInbound ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}>
-                              <Icon name={isInbound ? "ArrowDownLeft" : "ArrowUpRight"} size={14} />
-                           </div>
-                           <div className="flex flex-col min-w-0">
-                              <span className={`text-xs font-bold uppercase tracking-wide truncate ${isInbound ? 'text-indigo-700' : 'text-orange-700'}`}>
-                                 {isInbound ? "IN" : "OUT"}
-                              </span>
-                           </div>
+                    {/* Dirección (Compacta y Centrada en su columna fija) */}
+                    <td className="px-4 py-4 text-center">
+                        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border border-transparent ${isInbound ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700'}`}>
+                           <Icon name={isInbound ? "ArrowDownLeft" : "ArrowUpRight"} size={12} />
+                           <span className="text-[10px] font-bold uppercase tracking-wider">
+                              {isInbound ? "IN" : "OUT"}
+                           </span>
                         </div>
                     </td>
 
@@ -176,7 +182,7 @@ const MessageTable = ({ messages, onBulkAction }) => {
           </table>
         </div>
 
-        {/* --- VISTA MÓVIL (Intacta, ya usaba IN/OUT) --- */}
+        {/* --- VISTA MÓVIL (Intacta) --- */}
         <div className="lg:hidden divide-y divide-slate-100">
           {messages?.map((msg) => {
              const isTemplate = msg.body?.startsWith("[TEMPLATE]") || msg.meta?.whatsapp_template;
