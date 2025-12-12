@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from "react";
 import Icon from "../../../components/AppIcon";
 import Button from "../../../components/ui/Button";
-import Input from "../../../components/ui/Input";
-import Select from "../../../components/ui/Select";
+import Input from "../../../components/ui/Input"; // Asumiendo que soporta className
+import Select from "../../../components/ui/Select"; // Asumiendo que soporta className
 
 const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
+  // --- LÓGICA DE ESTADO (INTACTA) ---
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -21,20 +22,18 @@ const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
   const triggerTypeOptions = [
     {
       value: "keyword",
-      label: "Palabras clave",
-      description: "Responde cuando el mensaje contiene ciertas palabras",
+      label: "Keyword Match",
+      description: "Trigger when message contains specific words",
     },
     {
       value: "welcome",
-      label: "Mensaje de bienvenida",
-      description:
-        "Primer mensaje cuando el usuario inicia la conversación con tu bot",
+      label: "Welcome Message",
+      description: "First message sent to new users",
     },
     {
       value: "fallback",
-      label: "Respuesta por defecto",
-      description:
-        "Se usa cuando ninguna otra regla coincide con el mensaje recibido",
+      label: "Default Reply",
+      description: "Sent when no other logic matches",
     },
   ];
 
@@ -62,15 +61,9 @@ const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
   }, [flow, isOpen]);
 
   const handleInputChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors?.[field]) {
-      setErrors((prev) => ({
-        ...prev,
-        [field]: "",
-      }));
+      setErrors((prev) => ({ ...prev, [field]: "" }));
     }
   };
 
@@ -123,24 +116,13 @@ const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
 
   const validateForm = () => {
     const newErrors = {};
-
-    if (!formData?.name?.trim()) {
-      newErrors.name = "El nombre del flujo es obligatorio.";
+    if (!formData?.name?.trim()) newErrors.name = "Flow name is required.";
+    if (formData?.triggerType === "keyword" && formData?.keywords?.length === 0) {
+      newErrors.keywords = "Add at least one keyword.";
     }
-
-    if (
-      formData?.triggerType === "keyword" &&
-      formData?.keywords?.length === 0
-    ) {
-      newErrors.keywords =
-        "Para flujos por palabras clave, agregá al menos una palabra.";
-    }
-
     if (formData?.responses?.some((response) => !response?.message?.trim())) {
-      newErrors.responses =
-        "Todos los mensajes de respuesta deben estar cargados.";
+      newErrors.responses = "Response message cannot be empty.";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors)?.length === 0;
   };
@@ -149,7 +131,7 @@ const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
     if (validateForm()) {
       const flowData = {
         ...formData,
-        id: flow?.id || Date.now(), // ID local para el JSON de reglas
+        id: flow?.id || Date.now(),
         triggerCount: flow?.triggerCount || 0,
         lastUpdated: new Date().toLocaleDateString(),
       };
@@ -160,236 +142,210 @@ const FlowEditor = ({ flow = null, isOpen, onClose, onSave }) => {
 
   if (!isOpen) return null;
 
+  // --- RENDERIZADO VISUAL PRO ---
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-300 p-4">
-      <div className="bg-card rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      {/* Backdrop con Blur */}
+      <div 
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+        onClick={onClose}
+      />
+
+      {/* Modal Container */}
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200">
+        
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">
-              {flow ? "Editar flujo" : "Crear nuevo flujo"}
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Configurá las respuestas automáticas de tu bot de WhatsApp
-              (motor rules_v1).
-            </p>
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-center gap-3">
+             <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
+                <Icon name={flow ? "Edit3" : "Plus"} size={20} />
+             </div>
+             <div>
+                <h2 className="text-lg font-bold text-slate-800 tracking-tight">
+                  {flow ? "Edit Automation Flow" : "Create New Flow"}
+                </h2>
+                <p className="text-xs text-slate-500">Configure triggers and automated responses.</p>
+             </div>
           </div>
-          <Button variant="ghost" size="icon" iconName="X" onClick={onClose} />
+          <button 
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full transition-colors"
+          >
+            <Icon name="X" size={20} />
+          </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          <div className="space-y-6">
-            {/* Información básica */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-foreground">
-                Información básica
-              </h3>
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+          
+          {/* SECTION 1: BASIC INFO */}
+          <section className="space-y-4">
+             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">
+                1. General Information
+             </h3>
+             <div className="grid gap-4">
+                <Input
+                  label="Flow Name"
+                  placeholder="e.g. Pricing Inquiry"
+                  value={formData?.name}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  error={errors?.name}
+                  required
+                  className="text-sm"
+                />
+                <Input
+                  label="Description (Optional)"
+                  placeholder="Briefly describe what this flow does..."
+                  value={formData?.description}
+                  onChange={(e) => handleInputChange("description", e.target.value)}
+                  className="text-sm"
+                />
+             </div>
+          </section>
 
-              <Input
-                label="Nombre del flujo"
-                placeholder="Ej: Saludo inicial"
-                value={formData?.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-                error={errors?.name}
-                required
-              />
+          {/* SECTION 2: TRIGGER CONFIG */}
+          <section className="space-y-4">
+             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">
+                2. Trigger Logic
+             </h3>
+             
+             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <Select
+                  label="Trigger Type"
+                  options={triggerTypeOptions}
+                  value={formData?.triggerType}
+                  onChange={(value) => handleInputChange("triggerType", value)}
+                  className="mb-4 bg-white"
+                />
 
-              <Input
-                label="Descripción (opcional)"
-                placeholder="Describe brevemente qué hace este flujo"
-                value={formData?.description}
-                onChange={(e) =>
-                  handleInputChange("description", e.target.value)
-                }
-              />
-
-              <Select
-                label="Tipo de disparador"
-                description="Elegí cómo se va a activar este flujo"
-                options={triggerTypeOptions}
-                value={formData?.triggerType}
-                onChange={(value) => handleInputChange("triggerType", value)}
-              />
-
-              {formData.triggerType !== "keyword" && (
-                <p className="text-xs text-muted-foreground">
-                  Para flujos de tipo <b>Bienvenida</b> o <b>Fallback</b> se
-                  ignoran las palabras clave. El motor los usa según contexto y
-                  orden de evaluación.
-                </p>
-              )}
-            </div>
-
-            {/* Palabras clave */}
-            {formData?.triggerType === "keyword" && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium text-foreground">
-                  Palabras clave
-                </h3>
-
-                <p className="text-xs text-muted-foreground">
-                  El motor intentará matchear estas palabras dentro del mensaje
-                  del usuario (búsqueda por <b>contiene</b>, sin distinción de
-                  mayúsculas/minúsculas).
-                </p>
-
-                <div className="flex space-x-2">
-                  <Input
-                    placeholder="Ej: precio, soporte, demo"
-                    value={keywordInput}
-                    onChange={(e) => setKeywordInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddKeyword()}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    iconName="Plus"
-                    onClick={handleAddKeyword}
-                  >
-                    Agregar
-                  </Button>
-                </div>
-
-                {formData?.keywords?.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {formData?.keywords?.map((keyword, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center space-x-2 bg-primary/10 text-primary px-3 py-1 rounded-md"
-                      >
-                        <span className="text-sm">{keyword}</span>
-                        <button
-                          onClick={() => handleRemoveKeyword(index)}
-                          className="text-primary hover:text-primary/70"
-                        >
-                          <Icon name="X" size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {errors?.keywords && (
-                  <p className="text-sm text-destructive">
-                    {errors?.keywords}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Respuestas */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-foreground">
-                  Respuestas automáticas
-                </h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  iconName="Plus"
-                  iconPosition="left"
-                  onClick={handleAddResponse}
-                >
-                  Agregar respuesta
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                {formData?.responses?.map((response, index) => (
-                  <div
-                    key={index}
-                    className="border border-border rounded-lg p-4"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium text-foreground">
-                        Respuesta {index + 1}
-                      </span>
-                      {formData?.responses?.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          iconName="Trash2"
-                          onClick={() => handleRemoveResponse(index)}
-                        />
-                      )}
-                    </div>
-
-                    <div className="space-y-3">
-                      <textarea
-                        placeholder="Escribí el mensaje que querés enviar"
-                        value={response?.message}
-                        onChange={(e) =>
-                          handleResponseChange(
-                            index,
-                            "message",
-                            e.target.value
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                        rows={3}
-                      />
-
+                {/* Keyword Input Area */}
+                {formData?.triggerType === "keyword" && (
+                  <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                    <label className="text-sm font-medium text-slate-700">Keywords</label>
+                    <div className="flex gap-2">
                       <Input
-                        label="Delay (segundos)"
-                        type="number"
-                        placeholder="0"
-                        value={response?.delay}
-                        onChange={(e) =>
-                          handleResponseChange(
-                            index,
-                            "delay",
-                            parseInt(e.target.value, 10) || 0
-                          )
-                        }
-                        min={0}
-                        max={60}
+                        placeholder="Type keyword and press Enter..."
+                        value={keywordInput}
+                        onChange={(e) => setKeywordInput(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddKeyword()}
+                        className="flex-1 bg-white"
                       />
+                      <Button variant="outline" onClick={handleAddKeyword} iconName="Plus">Add</Button>
                     </div>
+                    
+                    {/* Keyword Chips */}
+                    <div className="flex flex-wrap gap-2 min-h-[32px] p-2 bg-white rounded-lg border border-slate-200 border-dashed">
+                       {formData?.keywords?.length > 0 ? (
+                          formData.keywords.map((keyword, index) => (
+                            <span key={index} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 text-xs font-medium border border-purple-100">
+                               {keyword}
+                               <button onClick={() => handleRemoveKeyword(index)} className="hover:text-purple-900 transition-colors">
+                                  <Icon name="X" size={12} />
+                               </button>
+                            </span>
+                          ))
+                       ) : (
+                          <span className="text-xs text-slate-400 italic p-1">No keywords added yet.</span>
+                       )}
+                    </div>
+                    {errors?.keywords && <p className="text-xs text-red-500 mt-1">{errors.keywords}</p>}
                   </div>
-                ))}
-              </div>
+                )}
 
-              {errors?.responses && (
-                <p className="text-sm text-destructive">
-                  {errors?.responses}
-                </p>
-              )}
-            </div>
-          </div>
+                {/* Hint Text for other types */}
+                {formData.triggerType !== "keyword" && (
+                   <div className="flex items-start gap-2 p-3 bg-blue-50 text-blue-700 text-xs rounded-lg mt-2">
+                      <Icon name="Info" size={16} className="mt-0.5 shrink-0" />
+                      <p>This flow will trigger automatically based on conversation context, ignoring specific keywords.</p>
+                   </div>
+                )}
+             </div>
+          </section>
+
+          {/* SECTION 3: RESPONSE BUILDER */}
+          <section className="space-y-4">
+             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                   3. Bot Response
+                </h3>
+                <button onClick={handleAddResponse} className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1">
+                   <Icon name="Plus" size={14} /> Add Step
+                </button>
+             </div>
+
+             <div className="space-y-4">
+                {formData?.responses?.map((response, index) => (
+                   <div key={index} className="relative pl-4 border-l-2 border-slate-200 group">
+                      {/* Step Indicator */}
+                      <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white border-2 border-slate-300 flex items-center justify-center text-[8px] font-bold text-slate-500">
+                         {index + 1}
+                      </div>
+
+                      <div className="bg-slate-50 p-4 rounded-r-xl rounded-bl-xl border border-slate-200 relative">
+                         {/* Remove Button */}
+                         {formData.responses.length > 1 && (
+                            <button 
+                              onClick={() => handleRemoveResponse(index)}
+                              className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-colors p-1"
+                            >
+                               <Icon name="Trash2" size={14} />
+                            </button>
+                         )}
+
+                         <div className="space-y-3">
+                            <div>
+                               <label className="text-xs font-bold text-slate-500 mb-1 block uppercase">Message Text</label>
+                               <textarea
+                                  placeholder="Hi there! How can I help you today?"
+                                  value={response?.message}
+                                  onChange={(e) => handleResponseChange(index, "message", e.target.value)}
+                                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 min-h-[80px] resize-y"
+                               />
+                            </div>
+                            <div className="w-1/3">
+                               <Input
+                                  type="number"
+                                  label="Delay (seconds)"
+                                  value={response?.delay}
+                                  onChange={(e) => handleResponseChange(index, "delay", parseInt(e.target.value) || 0)}
+                                  min={0}
+                                  max={10}
+                                  className="text-sm"
+                               />
+                            </div>
+                         </div>
+                      </div>
+                   </div>
+                ))}
+             </div>
+             {errors?.responses && <p className="text-xs text-red-500">{errors.responses}</p>}
+          </section>
+
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-border">
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="isActive"
-              checked={formData?.isActive}
-              onChange={(e) =>
-                handleInputChange("isActive", e.target.checked)
-              }
-              className="w-4 h-4 text-primary border-border rounded focus:ring-ring"
-            />
-            <label htmlFor="isActive" className="text-sm text-foreground">
-              Activar flujo inmediatamente
-            </label>
-          </div>
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+           <label className="flex items-center gap-2 cursor-pointer group">
+              <div className="relative">
+                 <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={formData?.isActive}
+                    onChange={(e) => handleInputChange("isActive", e.target.checked)}
+                 />
+                 <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+              </div>
+              <span className="text-sm font-medium text-slate-600 group-hover:text-slate-800">Activate Immediately</span>
+           </label>
 
-          <div className="flex items-center space-x-3">
-            <Button variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button
-              variant="default"
-              iconName="Save"
-              iconPosition="left"
-              onClick={handleSave}
-            >
-              Guardar flujo
-            </Button>
-          </div>
+           <div className="flex items-center gap-3">
+              <Button variant="outline" onClick={onClose} className="border-slate-300">Cancel</Button>
+              <Button variant="default" onClick={handleSave} iconName="Save" className="bg-purple-600 hover:bg-purple-700 shadow-md shadow-purple-200">
+                 Save Flow
+              </Button>
+           </div>
         </div>
+
       </div>
     </div>
   );
