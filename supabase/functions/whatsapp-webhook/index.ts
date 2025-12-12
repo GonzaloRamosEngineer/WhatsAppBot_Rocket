@@ -5,7 +5,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { runStateMachineForTenant } from "./state-machine-dm.ts";
 import { resolveMetaToken } from "../_shared/metaToken.ts";
 
-
 const SUPABASE_URL = Deno.env.get("PROJECT_URL")!;
 const SERVICE_ROLE = Deno.env.get("SERVICE_ROLE_KEY")!;
 const VERIFY_TOKEN = Deno.env.get("META_VERIFY_TOKEN")!;
@@ -28,8 +27,6 @@ type RulesDefinitionV1 = {
   engine: string;
   rules: UiFlowRule[];
 };
-
-
 
 // ----------------------------------------------
 // Motor de reglas v1 (flows.key = 'rules_v1')
@@ -74,7 +71,7 @@ async function runRulesEngine(options: {
 
   const def = flowRow.definition as RulesDefinitionV1;
   let rules = def.rules || [];
-  // Solo reglas activas (por default todas salvo que isActive === false)
+  // Solo reglas activas
   rules = rules.filter((r) => r.isActive !== false);
 
   if (rules.length === 0) return null;
@@ -116,11 +113,8 @@ async function runRulesEngine(options: {
       "[whatsapp-webhook][rules_v1] No Meta token for channel token_alias:",
       channel.token_alias,
     );
-    // No devolvemos null "duro" si solo queremos evitar responder,
-    // pero como el motor de reglas se basa en enviar msg, tiene sentido cortar acá.
     return null;
   }
-
 
   // 5) Enviar respuestas al usuario
   for (const resp of selected.responses || []) {
@@ -128,7 +122,6 @@ async function runRulesEngine(options: {
     if (!replyText) continue;
 
     try {
-      // WhatsApp API
       await fetch(
         `https://graph.facebook.com/v20.0/${channel.phone_id}/messages`,
         {
@@ -145,7 +138,6 @@ async function runRulesEngine(options: {
         },
       );
 
-      // Guardar mensaje out en tabla messages
       await supabase.from("messages").insert({
         conversation_id: convId,
         tenant_id: tenantId,
@@ -225,7 +217,35 @@ serve(async (req) => {
   const msgs = value?.messages ?? [];
   for (const m of msgs) {
     const from = m.from;
-    const text = m.text?.body ?? "";
+    
+    // --- [PARCHE CRÍTICO INICIO] Extracción Inteligente de Texto ---
+    // Extraemos el contenido real visible independientemente del tipo (texto, botón, lista)
+    let text = "";
+    
+    if (m.type === "text") {
+      text = m.text?.body ?? "";
+    } else if (m.type === "button") {
+      // Botones legacy (Reply Buttons en templates viejos)
+      text = m.button?.text ?? "[Botón]";
+    } else if (m.type === "interactive") {
+      // Interacciones Modernas (Quick Replies, Lists, etc.)
+      const interaction = m.interactive;
+      if (interaction?.type === "button_reply") {
+        text = interaction.button_reply?.title ?? "[Opción]";
+      } else if (interaction?.type === "list_reply") {
+        text = interaction.list_reply?.title ?? "[Lista]";
+      } else {
+        text = "[Interacción]"; // Fallback para tipos desconocidos
+      }
+    } else {
+      // Multimedia y otros (Imagen, Audio, Sticker, Location, etc.)
+      // Guardamos el tipo entre corchetes para que se vea algo en el log
+      text = `[${m.type.toUpperCase()}]`; 
+      // Opcional: Si es imagen y tiene caption, podrías concatenarlo:
+      // if (m.image?.caption) text += " " + m.image.caption;
+    }
+    // --- [PARCHE CRÍTICO FIN] ---
+
     if (!from) continue;
 
     const nowIso = new Date().toISOString();
@@ -243,7 +263,7 @@ serve(async (req) => {
     let isNewConversation = false;
 
     if (!convId) {
-      // Nueva conversación: arranca como 'new'
+      // Nueva conversación
       const { data: newConv } = await supabase
         .from("conversations")
         .insert({
@@ -258,7 +278,7 @@ serve(async (req) => {
       convId = newConv?.id ?? null;
       isNewConversation = true;
     } else {
-      // Hay conversación: actualizamos last_message_at
+      // Actualizar existente
       const nextStatus =
         existingConv.status === "closed" ? "open" : existingConv.status;
 
@@ -275,7 +295,7 @@ serve(async (req) => {
       continue;
     }
 
-    // Recargar la conversación para tener context_state/context_data actualizados
+    // Recargar la conversación
     const { data: conversation } = await supabase
       .from("conversations")
       .select("*")
@@ -286,15 +306,15 @@ serve(async (req) => {
       continue;
     }
 
-    // Guardar mensaje entrante
+    // Guardar mensaje entrante (Con el 'text' corregido)
     await supabase.from("messages").insert({
       conversation_id: convId,
       tenant_id: channel.tenant_id,
       channel_id: channel.id,
       direction: "in",
       sender: from,
-      body: text,
-      meta: m,
+      body: text, // Ahora contiene el título del botón o el texto normal
+      meta: m,    // Guardamos el JSON crudo original aquí por si acaso
       created_at: nowIso,
     });
 
@@ -308,37 +328,36 @@ serve(async (req) => {
       .maybeSingle();
 
     if (bot?.id && convId) {
-      // 1) Intentar primero la state machine (tenant-aware / DM)
+      // 1) State Machine
       const handledByStateMachine = await runStateMachineForTenant({
         supabase,
         tenantId: channel.tenant_id,
         channel,
         conv: conversation,
         from,
-        text,
+        text, // Pasamos el texto extraído correctamente al bot
         isNewConversation,
       });
 
       if (handledByStateMachine) {
-        // Ya respondió la state machine → no seguimos
         continue;
       }
 
-      // 2) Intentar motor de reglas configurables (rules_v1)
+      // 2) Rules Engine
       const usedRule = await runRulesEngine({
         supabase,
         tenantId: channel.tenant_id,
         botId: bot.id,
         channel,
         from,
-        text,
+        text, // Pasamos el texto extraído correctamente al bot
         convId,
         isNewConversation,
       });
 
       if (!usedRule) {
-        // 3) Fallback a flow "default" (lo que ya tenías)
-        let reply = `👋 Hola! Recibimos tu mensaje: "${text}"`;
+        // 3) Fallback Default
+        let reply = `👋 Hola! Recibimos tu mensaje: "${text}"`; // El eco también mostrará el botón clicado
 
         const { data: flow } = await supabase
           .from("flows")
