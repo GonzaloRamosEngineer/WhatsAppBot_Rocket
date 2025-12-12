@@ -1,3 +1,4 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\channel-setup\components\CredentialsForm.jsx
 import React, { useState } from "react";
 import Input from "../../../components/ui/Input";
 import Button from "../../../components/ui/Button";
@@ -17,48 +18,34 @@ const CredentialsForm = ({ credentials, onCredentialsChange, onSave, isLoading }
   const current = credentials || emptyCreds;
 
   const handleInputChange = (field, value) => {
-    const updated = {
-      ...current,
-      [field]: value,
-    };
-
-    if (onCredentialsChange) {
-      onCredentialsChange(updated);
-    }
-
-    if (errors?.[field]) {
-      setErrors((prev) => ({
-        ...prev,
-        [field]: "",
-      }));
-    }
+    const updated = { ...current, [field]: value };
+    if (onCredentialsChange) onCredentialsChange(updated);
+    if (errors?.[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
   };
 
   const validateForm = () => {
     const newErrors = {};
 
     if (!current?.phoneNumberId?.trim()) {
-      newErrors.phoneNumberId = "El Phone Number ID es obligatorio";
+      newErrors.phoneNumberId = "Phone Number ID is required";
     } else if (!/^\d{5,20}$/.test(current.phoneNumberId)) {
-      newErrors.phoneNumberId = "El Phone Number ID debe ser numérico";
+      newErrors.phoneNumberId = "Phone Number ID must be numeric";
     }
 
     if (!current?.wabaId?.trim()) {
-      newErrors.wabaId = "El WhatsApp Business Account ID es obligatorio";
+      newErrors.wabaId = "WABA ID is required";
     } else if (!/^(\d{5,20}|waba_\d{5,30})$/.test(current.wabaId)) {
-      newErrors.wabaId =
-        'El WABA ID debe ser numérico o comenzar con "waba_" seguido de números';
+      newErrors.wabaId = "WABA ID must be numeric or start with 'waba_'";
     }
 
     if (!current?.accessToken?.trim()) {
-      newErrors.accessToken = "El Access Token es obligatorio";
+      newErrors.accessToken = "Access Token is required";
     } else if (current.accessToken.length < 50) {
-      newErrors.accessToken =
-        "El Access Token parece inválido (demasiado corto)";
+      newErrors.accessToken = "Access Token seems too short (invalid)";
     }
 
     if (!current?.businessName?.trim()) {
-      newErrors.businessName = "El nombre del negocio es obligatorio";
+      newErrors.businessName = "Business Name is required";
     }
 
     setErrors(newErrors);
@@ -66,62 +53,49 @@ const CredentialsForm = ({ credentials, onCredentialsChange, onSave, isLoading }
   };
 
   const handleSave = () => {
-    if (validateForm()) {
-      if (onSave) {
-        onSave(current);
-      }
+    if (validateForm() && onSave) {
+      onSave(current);
     }
   };
 
   const instructionSteps = [
     {
-      title: "Obtener Phone Number ID",
-      description:
-        "En Meta Business Manager, ir a WhatsApp Manager → Phone Numbers → seleccionar tu número → copiar el Phone Number ID.",
+      title: "Get Phone Number ID",
+      description: "Go to Meta Business Manager → WhatsApp Manager → Phone Numbers → Select number → Copy Phone Number ID.",
     },
     {
-      title: "Obtener WABA ID",
-      description:
-        "En WhatsApp Manager, localizar tu WhatsApp Business Account ID (WABA ID).",
+      title: "Get WABA ID",
+      description: "In WhatsApp Manager, find your WhatsApp Business Account ID (top of the page).",
     },
     {
-      title: "Generar Access Token",
-      description:
-        "Ir a Meta for Developers → Tu App → WhatsApp → Getting Started → generar un token de acceso permanente.",
+      title: "Generate Access Token",
+      description: "Go to Meta for Developers → Your App → WhatsApp → Getting Started → Generate a permanent token.",
     },
   ];
 
   return (
-    <div className="bg-card border border-border rounded-lg p-6">
+    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
       <div className="flex items-center space-x-3 mb-6">
-        <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-          <Icon name="Key" size={20} className="text-primary" />
+        <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center border border-indigo-100">
+          <Icon name="Key" size={20} className="text-indigo-600" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-foreground">
-            Credenciales de WhatsApp Business
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Ingresá las credenciales de la API de Meta Graph
-          </p>
+          <h3 className="text-lg font-bold text-slate-800">API Credentials</h3>
+          <p className="text-sm text-slate-500">Manual configuration for Meta Graph API.</p>
         </div>
       </div>
 
-      {/* Instrucciones */}
-      <div className="mb-6 p-4 bg-muted rounded-md">
-        <h4 className="font-medium text-foreground mb-3 flex items-center">
-          <Icon name="Info" size={16} className="mr-2" />
-          Cómo obtener tus credenciales
+      {/* Instructions */}
+      <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
+        <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+          <Icon name="Info" size={16} />
+          How to get these IDs?
         </h4>
-        <div className="space-y-2">
+        <div className="space-y-3">
           {instructionSteps.map((step, index) => (
-            <div key={index} className="text-sm">
-              <span className="font-medium text-foreground">
-                {step.title}:
-              </span>
-              <span className="text-muted-foreground ml-1">
-                {step.description}
-              </span>
+            <div key={index} className="text-xs">
+              <span className="font-semibold text-slate-800">{step.title}: </span>
+              <span className="text-slate-500">{step.description}</span>
             </div>
           ))}
         </div>
@@ -129,104 +103,88 @@ const CredentialsForm = ({ credentials, onCredentialsChange, onSave, isLoading }
           href="https://developers.facebook.com/docs/whatsapp/business-management-api/get-started"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center space-x-1 text-sm text-primary hover:underline mt-2"
+          className="inline-flex items-center space-x-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 mt-3"
         >
-          <span>Ver guía de configuración detallada</span>
-          <Icon name="ExternalLink" size={14} />
+          <span>View official setup guide</span>
+          <Icon name="ExternalLink" size={12} />
         </a>
       </div>
 
-      {/* Campos del formulario */}
-      <div className="space-y-4">
+      {/* Form Fields */}
+      <div className="space-y-5">
         <Input
-          label="Nombre del negocio"
+          label="Business Display Name"
           type="text"
-          placeholder="Ingresá el nombre de tu negocio"
+          placeholder="e.g. Acme Corp"
           value={current.businessName}
           onChange={(e) => handleInputChange("businessName", e.target.value)}
           error={errors?.businessName}
           required
-          description="Nombre que verán los usuarios en tu cuenta de WhatsApp Business"
+          description="The name visible to your customers."
         />
 
         <Input
           label="Phone Number ID"
           type="text"
-          placeholder="123456789012345"
+          placeholder="e.g. 10005550001"
           value={current.phoneNumberId}
           onChange={(e) => handleInputChange("phoneNumberId", e.target.value)}
           error={errors?.phoneNumberId}
           required
-          description="ID numérico del número de teléfono en WhatsApp Manager"
+          description="Numeric ID for the specific phone number."
         />
 
         <Input
-          label="WhatsApp Business Account ID (WABA ID)"
+          label="WABA ID (WhatsApp Business Account ID)"
           type="text"
-          placeholder="1200748598356181 o waba_123456789"
+          placeholder="e.g. 20005550002"
           value={current.wabaId}
           onChange={(e) => handleInputChange("wabaId", e.target.value)}
           error={errors?.wabaId}
           required
-          description="ID de tu cuenta de WhatsApp Business"
+          description="Numeric ID for your Business Account."
         />
 
         <div className="relative">
           <Input
-            label="Access Token"
+            label="System User Access Token"
             type={showToken ? "text" : "password"}
             placeholder="EAABwzLixnjY..."
             value={current.accessToken}
             onChange={(e) => handleInputChange("accessToken", e.target.value)}
             error={errors?.accessToken}
             required
-            description="Token de acceso permanente generado en Meta for Developers"
+            description="Permanent token with 'whatsapp_business_messaging' permission."
           />
           <button
             type="button"
             onClick={() => setShowToken(!showToken)}
-            className="absolute right-3 top-8 text-muted-foreground hover:text-foreground"
+            className="absolute right-3 top-9 text-slate-400 hover:text-slate-600"
           >
             <Icon name={showToken ? "EyeOff" : "Eye"} size={16} />
           </button>
         </div>
       </div>
 
-      {/* Aviso de seguridad */}
-      <div className="mt-6 p-4 bg-success/10 border border-success/20 rounded-md">
-        <div className="flex items-start space-x-3">
-          <Icon
-            name="Shield"
-            size={20}
-            className="text-success flex-shrink-0 mt-0.5"
-          />
-          <div>
-            <h5 className="font-medium text-success mb-1">
-              Almacenamiento seguro
-            </h5>
-            <p className="text-sm text-success/80">
-              Las credenciales se almacenan de forma segura. Tus tokens de
-              acceso no se registran en logs ni se exponen públicamente.
-            </p>
-          </div>
+      {/* Security Notice */}
+      <div className="mt-6 p-3 bg-emerald-50/50 border border-emerald-100 rounded-md flex gap-3">
+        <Icon name="Shield" size={18} className="text-emerald-600 mt-0.5" />
+        <div>
+           <p className="text-xs text-emerald-800 font-medium">Secure Storage</p>
+           <p className="text-[11px] text-emerald-600">Credentials are encrypted. We never log your access tokens.</p>
         </div>
       </div>
 
-      {/* Botón guardar */}
+      {/* Save Button */}
       <div className="mt-6 flex justify-end">
         <Button
           onClick={handleSave}
           loading={isLoading}
           iconName="Save"
           iconPosition="left"
-          disabled={
-            !current.phoneNumberId ||
-            !current.wabaId ||
-            !current.accessToken ||
-            !current.businessName
-          }
+          disabled={!current.phoneNumberId || !current.wabaId || !current.accessToken || !current.businessName}
         >
-          {isLoading ? "Guardando credenciales..." : "Guardar credenciales"}
+          {isLoading ? "Saving..." : "Save Credentials"}
         </Button>
       </div>
     </div>

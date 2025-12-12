@@ -1,3 +1,4 @@
+// C:\Projects\WhatsAppBot_Rocket\src\pages\channel-setup\components\TroubleshootingCard.jsx
 import React, { useState } from "react";
 import Button from "../../../components/ui/Button";
 import Icon from "../../../components/AppIcon";
@@ -8,42 +9,31 @@ const TroubleshootingCard = () => {
   const troubleshootingItems = [
     {
       id: "invalid-credentials",
-      title: "Error de credenciales inválidas",
-      description:
-        "La prueba de conexión falla por errores de autenticación",
-      solution: `Verificá que tu Phone Number ID y WABA ID sean correctos.\nAsegurate de que el access token sea permanente y no esté vencido.\nConfirmá que tu app tenga los permisos de WhatsApp necesarios.\nRevisá que el número esté verificado en Meta Business Manager.`,
+      title: "Invalid Credentials Error",
+      description: "Connection test fails due to authentication.",
+      solution: `Verify your Phone Number ID and WABA ID are correct.\nCheck if the Access Token is expired.\nEnsure the app has 'whatsapp_business_messaging' permission.\nConfirm the number is verified in Meta Business Manager.`,
       icon: "Key",
     },
     {
       id: "webhook-not-receiving",
-      title: "El webhook no recibe mensajes",
-      description: "Los mensajes no aparecen en el panel de DigitalMatch",
-      solution: `Verificá que la URL de webhook esté configurada correctamente en Meta Business Manager.\nComprobá que el verify token coincida exactamente.\nAsegurate de tener suscripciones activas a los eventos de mensajes.\nProbá la accesibilidad del endpoint desde redes externas.`,
+      title: "Webhook Not Receiving Messages",
+      description: "Messages do not appear in the dashboard.",
+      solution: `Check Webhook URL in Meta Business Manager.\nVerify the 'Verify Token' matches exactly.\nEnsure subscriptions to 'messages' are active.\nTest endpoint accessibility from external networks.`,
       icon: "Webhook",
     },
     {
       id: "rate-limits",
-      title: "Problemas de rate limit",
-      description:
-        "Las llamadas a la API son limitadas o rechazadas por exceso",
-      solution: `Revisá el uso actual de la API en Meta Business Manager.\nImplementá un sistema de colas para alto volumen de mensajes.\nConsiderá actualizar el nivel de tu API de WhatsApp Business.\nMonitoreá los headers de rate limit en las respuestas de la API.`,
+      title: "API Rate Limits",
+      description: "Calls are rejected due to excess volume.",
+      solution: `Check current usage in Meta Dashboard.\nImplement queues for high volume.\nConsider upgrading your Business Verification level.\nMonitor rate-limit headers in API responses.`,
       icon: "Clock",
     },
     {
       id: "message-delivery",
-      title: "Problemas de entrega de mensajes",
-      description:
-        "Los mensajes no llegan a los destinatarios o quedan pendientes",
-      solution: `Verificá el formato de los números de destinatario (incluyendo código de país).\nComprobá que tu negocio esté aprobado para enviar mensajes.\nSi usás plantillas, asegurate de que estén aprobadas.\nRevisá que el contenido no viole políticas de WhatsApp.`,
+      title: "Message Delivery Issues",
+      description: "Messages stuck in pending or failing.",
+      solution: `Check recipient number format (must include country code).\nConfirm your business is approved for messaging.\nIf using templates, ensure they are APPROVED.\nCheck if content violates WhatsApp Policy.`,
       icon: "MessageCircle",
-    },
-    {
-      id: "permissions",
-      title: "Errores de permisos denegados",
-      description:
-        "La API devuelve errores de permisos o acceso denegado",
-      solution: `Verificá que tu app tenga el permiso whatsapp_business_messaging.\nRevisá que el access token incluya los scopes correspondientes.\nConfirmá que tu cuenta de Business Manager tenga los roles adecuados.\nComprobá que el número haya sido agregado correctamente a tu WABA.`,
-      icon: "Shield",
     },
   ];
 
@@ -52,65 +42,51 @@ const TroubleshootingCard = () => {
   };
 
   const contactSupport = () => {
-    window.open(
-      "mailto:soporte@digitalmatchglobal.com?subject=Ayuda%20en%20configuraci%C3%B3n%20de%20canal",
-      "_blank"
-    );
+    window.open("mailto:support@matchbot.com?subject=Channel%20Setup%20Help", "_blank");
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-6">
+    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mt-8">
       <div className="flex items-center space-x-3 mb-6">
-        <div className="w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center">
-          <Icon name="HelpCircle" size={20} className="text-warning" />
+        <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center border border-amber-100">
+          <Icon name="HelpCircle" size={20} className="text-amber-600" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-foreground">
-            Guía de resolución de problemas
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Errores frecuentes y cómo solucionarlos
-          </p>
+          <h3 className="text-lg font-bold text-slate-800">Troubleshooting Guide</h3>
+          <p className="text-sm text-slate-500">Common issues and solutions.</p>
         </div>
       </div>
+
       <div className="space-y-3">
         {troubleshootingItems.map((item) => (
-          <div key={item.id} className="border border-border rounded-md">
+          <div key={item.id} className="border border-slate-200 rounded-lg overflow-hidden">
             <button
               onClick={() => toggleExpanded(item.id)}
-              className="w-full flex items-center justify-between p-4 text-left hover:bg-muted micro-animation"
+              className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-50 transition-colors"
             >
               <div className="flex items-center space-x-3">
-                <Icon
-                  name={item.icon}
-                  size={20}
-                  className="text-muted-foreground"
-                />
+                <Icon name={item.icon} size={18} className="text-slate-400" />
                 <div>
-                  <h4 className="font-medium text-foreground">
-                    {item.title}
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    {item.description}
-                  </p>
+                  <h4 className="text-sm font-semibold text-slate-700">{item.title}</h4>
+                  <p className="text-xs text-slate-500">{item.description}</p>
                 </div>
               </div>
               <Icon
                 name={expandedItem === item.id ? "ChevronUp" : "ChevronDown"}
-                size={20}
-                className="text-muted-foreground flex-shrink-0"
+                size={16}
+                className="text-slate-400"
               />
             </button>
 
             {expandedItem === item.id && (
-              <div className="px-4 pb-4">
-                <div className="pl-8 border-l-2 border-primary/20">
-                  <h5 className="font-medium text-foreground mb-2">
-                    Solución:
-                  </h5>
-                  <div className="text-sm text-muted-foreground space-y-1">
+              <div className="px-4 pb-4 bg-slate-50/50">
+                <div className="pl-8 pt-2 border-l-2 border-slate-200 ml-2">
+                  <h5 className="text-xs font-bold text-slate-700 mb-2 uppercase">Solution:</h5>
+                  <div className="text-sm text-slate-600 space-y-1">
                     {item.solution.split("\n").map((line, index) => (
-                      <p key={index}>• {line}</p>
+                      <p key={index} className="flex gap-2">
+                        <span className="text-slate-400">•</span> {line}
+                      </p>
                     ))}
                   </div>
                 </div>
@@ -120,76 +96,14 @@ const TroubleshootingCard = () => {
         ))}
       </div>
 
-      {/* Links rápidos */}
-      <div className="mt-6 p-4 bg-muted rounded-md">
-        <h4 className="font-medium text-foreground mb-3">
-          Enlaces útiles
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <a
-            href="https://developers.facebook.com/docs/whatsapp/business-management-api"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center space-x-2 text-sm text-primary hover:underline"
-          >
-            <Icon name="ExternalLink" size={14} />
-            <span>Docs WhatsApp Business API</span>
-          </a>
-          <a
-            href="https://business.facebook.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center space-x-2 text-sm text-primary hover:underline"
-          >
-            <Icon name="ExternalLink" size={14} />
-            <span>Meta Business Manager</span>
-          </a>
-          <a
-            href="https://developers.facebook.com/tools/debug/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center space-x-2 text-sm text-primary hover:underline"
-          >
-            <Icon name="ExternalLink" size={14} />
-            <span>Access Token Debugger</span>
-          </a>
-          <button
-            onClick={contactSupport}
-            className="flex items-center space-x-2 text-sm text-primary hover:underline text-left"
-          >
-            <Icon name="Mail" size={14} />
-            <span>Contactar soporte</span>
-          </button>
+      <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-100 flex justify-between items-center">
+        <div>
+           <h4 className="text-sm font-bold text-slate-700">Still stuck?</h4>
+           <p className="text-xs text-slate-500">Our team can help verify your Meta setup.</p>
         </div>
-      </div>
-
-      {/* Contacto soporte */}
-      <div className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-md">
-        <div className="flex items-start space-x-3">
-          <Icon
-            name="MessageSquare"
-            size={20}
-            className="text-primary flex-shrink-0 mt-0.5"
-          />
-          <div>
-            <h5 className="font-medium text-primary mb-1">
-              ¿Necesitás ayuda adicional?
-            </h5>
-            <p className="text-sm text-primary/80 mb-3">
-              Nuestro equipo puede ayudarte con casos complejos de
-              configuración o integraciones personalizadas.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              iconName="Mail"
-              iconPosition="left"
-              onClick={contactSupport}
-            >
-              Escribir al equipo de soporte
-            </Button>
-          </div>
-        </div>
+        <Button variant="outline" size="sm" onClick={contactSupport} iconName="Mail" iconPosition="left">
+           Contact Support
+        </Button>
       </div>
     </div>
   );
