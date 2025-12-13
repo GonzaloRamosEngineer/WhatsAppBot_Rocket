@@ -15,6 +15,12 @@ export default function ProtectedRoute({ children, roles }) {
   const isAuthLoading = loading && !session;
   const isProfileLoading = !!session && !!roles && !profile;
 
+  // Agrega esto para forzar el loader y verlo
+  const [showLoader, setShowLoader] = React.useState(true);
+  React.useEffect(() => {
+     setTimeout(() => setShowLoader(false), 2000); // Muestra por 2 segundos
+  }, []);
+  
   // 1) ESTADO DE CARGA
   // Aquí es donde ocurre la magia visual. La lógica de CUÁNDO mostrarlo es la misma,
   // pero el QUÉ mostramos es tu nuevo loader Pro.

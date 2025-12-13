@@ -152,7 +152,7 @@ const MessagesLog = () => {
 
   // --- RENDER REFACTORIZADO (Layout Pattern) ---
   return (
-    <div className="h-full overflow-y-auto bg-slate-50">
+    <div className="h-full overflow-y-auto bg-slate-50 animate-fade-in">
       
       {/* Header Unificado & Responsive */}
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-3 md:py-4 sticky top-0 z-20 shadow-sm transition-all">

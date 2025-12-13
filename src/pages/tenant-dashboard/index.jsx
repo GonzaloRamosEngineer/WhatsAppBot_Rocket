@@ -268,7 +268,7 @@ const TenantDashboard = () => {
 
   // --- RENDERIZADO OPTIMIZADO (Layout Pattern) ---
   return (
-    <div className="h-full overflow-y-auto bg-slate-50">
+    <div className="h-full overflow-y-auto bg-slate-50 animate-fade-in">
       
       {/* Header Dashboard (Limpio y conectado al Layout) */}
       <header className="bg-white border-b border-slate-200 px-4 py-3 md:px-6 md:py-4 sticky top-0 z-30 shadow-sm">
