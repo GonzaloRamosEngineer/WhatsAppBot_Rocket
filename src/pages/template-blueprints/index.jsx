@@ -88,9 +88,10 @@ export default function TemplateBlueprintsPage() {
     await logout();
   };
 
-  // --- RENDER REFACTORIZADO (Layout Pattern) ---
+  // --- RENDER REFACTORIZADO (Layout Pattern + Scroll Fix) ---
   return (
-    <div className="min-h-screen bg-slate-50">
+    // 👇 CAMBIO CLAVE: h-full + overflow-y-auto para permitir scroll fluido en móvil
+    <div className="h-full overflow-y-auto bg-slate-50">
       
       {/* Header Unificado & Responsive */}
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-3 md:py-4 sticky top-0 z-20 shadow-sm transition-all">
@@ -99,7 +100,7 @@ export default function TemplateBlueprintsPage() {
           {/* IZQUIERDA: Menú + Icono + Título */}
           <div className="flex items-center gap-3">
              
-             {/* Botón Menú (Solo Móvil) - Llama al Layout */}
+             {/* Botón Menú (Solo Móvil) - Estilo Índigo Unificado */}
              <button 
                onClick={toggleMobileMenu}
                className="md:hidden p-2 mr-1 text-indigo-600 bg-white border border-indigo-100 rounded-lg shadow-sm hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-md transition-all active:scale-95"
@@ -126,8 +127,8 @@ export default function TemplateBlueprintsPage() {
         </div>
       </header>
 
-      {/* Main Content (Sin márgenes extra) */}
-      <main className="p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+      {/* Main Content (Sin márgenes extra + Padding Bottom para móvil) */}
+      <main className="p-4 md:p-8 max-w-[1600px] mx-auto w-full pb-24">
         
         {/* 🔍 FILTERS BAR */}
         <div className="mb-8 space-y-4">
