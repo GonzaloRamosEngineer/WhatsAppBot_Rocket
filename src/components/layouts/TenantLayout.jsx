@@ -1,3 +1,5 @@
+// C:\Projects\WhatsAppBot_Rocket\src\components\layouts\TenantLayout.jsx
+
 import React, { useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import NavigationSidebar from "../ui/NavigationSidebar";
@@ -27,9 +29,10 @@ const TenantLayout = () => {
   }, [location.pathname]);
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    // 👇 CAMBIO CLAVE 1: Agregamos h-[100dvh] para que en móvil respete el alto real sin barra de navegación
+    <div className="flex h-screen h-[100dvh] bg-slate-50 overflow-hidden">
       
-      {/* 1. SIDEBAR (Instancia ÚNICA para toda la app) */}
+      {/* 1. SIDEBAR */}
       <NavigationSidebar 
         isCollapsed={isCollapsed} 
         onToggleCollapse={toggleCollapse}
@@ -37,11 +40,12 @@ const TenantLayout = () => {
         onMobileClose={() => setIsMobileOpen(false)}
       />
 
-      {/* 2. AREA DE CONTENIDO (Donde se renderizan tus páginas) */}
-      {/* Pasamos context para que las páginas puedan controlar el menú móvil si quieren */}
-      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${isCollapsed ? "md:ml-16" : "md:ml-60"}`}>
+      {/* 2. AREA DE CONTENIDO */}
+      {/* 👇 CAMBIO CLAVE 2: Agregamos 'relative' y mantenemos 'overflow-hidden' aquí */}
+      {/* Esto crea el marco fijo. La página hija (Outlet) será la que tenga el scroll (overflow-y-auto) */}
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out relative overflow-hidden ${isCollapsed ? "md:ml-16" : "md:ml-60"}`}>
         
-        {/* Aquí se inyectan las páginas (Dashboard, Inbox, etc.) */}
+        {/* Las páginas se renderizan aquí y ellas controlan su propio scroll interno */}
         <Outlet context={{ 
             isSidebarCollapsed: isCollapsed, 
             toggleMobileMenu: () => setIsMobileOpen(!isMobileOpen) 
@@ -49,7 +53,7 @@ const TenantLayout = () => {
         
       </div>
 
-      {/* Overlay Móvil (Backdrop oscuro) */}
+      {/* Overlay Móvil */}
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden animate-in fade-in"
