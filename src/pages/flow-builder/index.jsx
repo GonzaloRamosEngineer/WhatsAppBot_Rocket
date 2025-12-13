@@ -301,7 +301,7 @@ const FlowBuilder = () => {
 
   // --- RENDER REFACTORIZADO (Layout Pattern) ---
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="h-full overflow-y-auto bg-slate-50">
       
       {/* Header - Flow Builder (Estilo Unificado & Responsive Pro) */}
       <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-3 md:py-4 sticky top-0 z-20 shadow-sm transition-all">
