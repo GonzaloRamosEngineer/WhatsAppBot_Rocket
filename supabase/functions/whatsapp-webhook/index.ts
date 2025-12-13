@@ -355,6 +355,12 @@ serve(async (req) => {
         isNewConversation,
       });
 
+      // 🛑 CAMBIO CRÍTICO: SILENCIAR EL FALLBACK POR DEFECTO
+      /* Comentamos todo este bloque para que el bot NO responda nada
+         si no encontró una regla específica. Así queda "Mudo" para la demo manual.
+      */
+      
+      /*
       if (!usedRule) {
         // 3) Fallback Default
         let reply = `👋 Hola! Recibimos tu mensaje: "${text}"`; // El eco también mostrará el botón clicado
@@ -410,6 +416,7 @@ serve(async (req) => {
           });
         }
       }
+      */
     }
   }
 
