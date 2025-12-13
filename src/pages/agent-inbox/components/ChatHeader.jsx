@@ -5,10 +5,10 @@ import clsx from "clsx";
 import Icon from "../../../components/AppIcon"; // Asegúrate de importar tus iconos
 
 const STATUS_LABELS = {
-  new: "Nueva",
-  open: "Abierta",
-  pending: "Pendiente agente",
-  closed: "Cerrada",
+  new: "New",
+  open: "Open",
+  pending: "Pending Agent",
+  closed: "Close",
 };
 
 const STATUS_COLORS = {

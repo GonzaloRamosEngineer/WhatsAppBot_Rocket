@@ -6,11 +6,11 @@ import Icon from "../../../components/AppIcon"; // Asegúrate de tener este impo
 
 // Mantenemos tus mapeos de etiquetas
 const STATUS_LABELS = {
-  new: "Nueva",
-  open: "Abierta",
-  pending: "Pendiente",
-  pending_agent: "Agente Req", // Abreviado para que entre mejor
-  closed: "Cerrada",
+  new: "New",
+  open: "Open",
+  pending: "Pending",
+  pending_agent: "Pending Agent", // Abreviado para que entre mejor
+  closed: "Close",
 };
 
 // Colores refinados para estilo "Pill"
@@ -69,7 +69,7 @@ function summarizeContext(conversation) {
   if (state === "info_servicios") return "Viendo servicios";
   if (state === "auto_closed") return "Cerrada por inactividad";
 
-  return conversation.topic || "Click para ver chat";
+  return conversation.topic || "Click to view chat";
 }
 
 export default function ConversationListItem({
