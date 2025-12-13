@@ -137,7 +137,7 @@ export default function AgentInboxPage() {
     setSelectedConversation(null);
   };
 
-  const handleSendMessage = async (text) => {
+const handleSendMessage = async (text) => {
     if (!text.trim()) return;
     if (!selectedConversation) return;
     if (!tenant?.id) return;
@@ -160,8 +160,12 @@ export default function AgentInboxPage() {
         console.error("[AgentInbox] send message error", error);
         setSendError(error.message || "Error sending message");
       } else {
-        const inserted = data?.message;
-
+        // ✅ CORRECCIÓN AQUI:
+        // Comentamos o borramos estas líneas.
+        // No agregamos el mensaje manualmente "setMessages(...)".
+        // Esperamos a que el useEffect del realtime lo reciba y lo pinte.
+        
+        /* const inserted = data?.message;
         const newMessage = inserted || {
           id: (crypto.randomUUID && crypto.randomUUID()) || `temp-${Date.now().toString()}`,
           conversation_id: selectedConversation.id,
@@ -173,8 +177,10 @@ export default function AgentInboxPage() {
           meta: { via: "agent" },
           created_at: new Date().toISOString(),
         };
+        setMessages((prev) => [...prev, newMessage]); 
+        */
 
-        setMessages((prev) => [...prev, newMessage]);
+        // Mantenemos esto para que la lista lateral (sidebar) suba la conversación al tope
         loadConversations();
       }
     } catch (e) {

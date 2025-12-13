@@ -32,7 +32,7 @@ const FacebookCallback = () => {
   const params = useFacebookParams();
 
   const [status, setStatus] = useState(
-    "Procesando autenticación con Meta..."
+    "Processing authentication with Meta..."
   );
   const [isError, setIsError] = useState(false);
   const [metaErrorDetails, setMetaErrorDetails] = useState(null);
@@ -156,7 +156,7 @@ const FacebookCallback = () => {
 
         console.log("[FacebookCallback] conexión con Meta OK", data);
         setStatus(
-          "¡Conexión con Meta completada! Ya podés cerrar esta ventana."
+          "¡Connection to Meta complete! You can now close this window."
         );
 
         // Avisar éxito a la ventana padre
@@ -210,7 +210,7 @@ const FacebookCallback = () => {
           />
         </div>
         <h1 className="text-lg font-semibold mb-2">
-          Conexión con Meta (Facebook)
+          Connection with Meta (Facebook)
         </h1>
         <p className="text-sm text-muted-foreground">{status}</p>
 

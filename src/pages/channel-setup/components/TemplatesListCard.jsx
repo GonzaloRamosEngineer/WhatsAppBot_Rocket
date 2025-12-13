@@ -265,7 +265,7 @@ const handleSend = async (e) => {
 
       // 3. Manejo de respuesta (Adaptado a si devuelve { message: ... } o { success: ... })
       if (res && !res.error) {
-          alert("✅ Message sent successfully!");
+          alert("✅ Message sent successfully! ✅");
           onCancel(); 
       } else {
           alert("❌ Error: " + (res.error || "Unknown error"));

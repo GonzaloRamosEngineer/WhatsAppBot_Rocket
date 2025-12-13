@@ -314,7 +314,7 @@ const ChannelSetup = () => {
       });
       if (error) throw error;
       await refreshChannels();
-      alert("Channel connected successfully!");
+      alert("✅ Channel connected successfully ✅");
     } catch (e) {
       console.error(e);
       alert("Error connecting number");
