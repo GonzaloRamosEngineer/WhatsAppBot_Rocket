@@ -2,13 +2,7 @@
 
 /**
  * Suscribe un WABA (WhatsApp Business Account) a TU app,
- * para que empiece a enviar webhooks a la URL configurada
- * en el panel de developers.
- *
- * IMPORTANTE:
- *  - accessToken: debe ser el token del tenant (usuario) que conectó el WABA,
- *    con permisos whatsapp_business_management / business_management.
- *  - wabaId: el ID de la cuenta de WhatsApp Business (meta_waba_id en tu tabla channels).
+ * enviando explícitamente la URL del webhook y el verify token.
  */
 export async function subscribeWaba(options: {
   accessToken: string;
@@ -16,32 +10,44 @@ export async function subscribeWaba(options: {
 }) {
   const { accessToken, wabaId } = options;
 
-  if (!accessToken) {
-    console.error("[subscribeWaba] missing accessToken");
-    throw new Error("Missing access token for subscribeWaba");
-  }
+  if (!accessToken) throw new Error("Missing access token for subscribeWaba");
+  if (!wabaId) throw new Error("Missing WABA ID for subscribeWaba");
 
-  if (!wabaId) {
-    console.error("[subscribeWaba] missing wabaId");
-    throw new Error("Missing WABA ID for subscribeWaba");
-  }
+  // 1. Construimos la URL de tu Webhook dinámicamente
+  // SUPABASE_URL suele ser "https://<project_ref>.supabase.co"
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""; 
+  // Ojo: Asegúrate de que apunte a tu webhook. 
+  // Si SUPABASE_URL no te funciona, puedes usar una variable de entorno propia como "WEBHOOK_BASE_URL"
+  
+  // La ruta estándar de Supabase Edge Functions:
+  const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
+  
+  const verifyToken = Deno.env.get("META_VERIFY_TOKEN") ?? "matchbot_verify_token";
 
   const url = `https://graph.facebook.com/v20.0/${wabaId}/subscribed_apps`;
 
-  console.log("[subscribeWaba] subscribing WABA", { wabaId, url });
+  console.log("[subscribeWaba] subscribing WABA...", { 
+    wabaId, 
+    webhookUrl 
+  });
 
+  // 2. Enviamos el Webhook URL y el Token en el body
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({
+      override_callback_uri: webhookUrl,
+      verify_token: verifyToken,
+    }),
   });
 
-  let json: unknown = null;
+  let json: any = null;
   try {
     json = await res.json();
   } catch {
-    // si no hay body, lo dejamos en null
     json = null;
   }
 
@@ -50,8 +56,9 @@ export async function subscribeWaba(options: {
       status: res.status,
       body: json,
     });
+    // Si falla porque el usuario no es admin del negocio, esto lanzará error
     throw new Error(
-      `Failed to subscribe WABA ${wabaId}. Status ${res.status}`,
+      `Failed to subscribe WABA ${wabaId}. Status ${res.status} - ${JSON.stringify(json)}`
     );
   }
 

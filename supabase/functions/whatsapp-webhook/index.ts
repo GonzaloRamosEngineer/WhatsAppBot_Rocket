@@ -355,15 +355,10 @@ serve(async (req) => {
         isNewConversation,
       });
 
-      // 🛑 CAMBIO CRÍTICO: SILENCIAR EL FALLBACK POR DEFECTO
-      /* Comentamos todo este bloque para que el bot NO responda nada
-         si no encontró una regla específica. Así queda "Mudo" para la demo manual.
-      */
-      
-      /*
+      // ✅ 3) Fallback Default (DESCOMENTADO)
       if (!usedRule) {
-        // 3) Fallback Default
-        let reply = `👋 Hola! Recibimos tu mensaje: "${text}"`; // El eco también mostrará el botón clicado
+        // Si no hay reglas, intentamos usar el flujo 'default' o un mensaje básico
+        let reply = `👋 Hola! Recibimos tu mensaje: "${text}"`; 
 
         const { data: flow } = await supabase
           .from("flows")
@@ -416,7 +411,6 @@ serve(async (req) => {
           });
         }
       }
-      */
     }
   }
 

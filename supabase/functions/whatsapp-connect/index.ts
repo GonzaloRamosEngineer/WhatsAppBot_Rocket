@@ -200,6 +200,7 @@ serve(async (req) => {
     }
 
     // 4.bis) SUSCRIBIR el WABA a tu app (para webhooks)
+    // ESTO GARANTIZA QUE LLEGUEN LOS MENSAJES AUTOMÁTICAMENTE
     try {
       const accessToken = await resolveMetaToken(
         supabase,
@@ -227,7 +228,7 @@ serve(async (req) => {
       }
     } catch (e) {
       console.error("[whatsapp-connect] subscribeWaba error", e);
-      // no cortamos el flujo si falla
+      // no cortamos el flujo si falla, pero queda logueado
     }
 
     // 5) Bot default
@@ -259,110 +260,110 @@ serve(async (req) => {
       }
     }
 
-    // 6) Flows default + rules_v1
-    // if (bot?.id) {
-    //   const { data: existingFlow } = await supabase
-    //     .from("flows")
-    //     .select("id")
-    //     .eq("bot_id", bot.id)
-    //     .eq("key", "default")
-    //     .maybeSingle();
+    // 6) Flows default + rules_v1 (YA DESCOMENTADO PARA PRODUCCIÓN)
+    if (bot?.id) {
+      const { data: existingFlow } = await supabase
+        .from("flows")
+        .select("id")
+        .eq("bot_id", bot.id)
+        .eq("key", "default")
+        .maybeSingle();
 
-    //   if (!existingFlow) {
-    //     const def = {
-    //       version: 1,
-    //       nodes: [
-    //         { id: "start", type: "start" },
-    //         {
-    //           id: "saludo",
-    //           type: "message",
-    //           text: "Hola! Ya te vamos a atender 🙌",
-    //         },
-    //         {
-    //           id: "fallback",
-    //           type: "message",
-    //           text: "En estos momentos no estamos disponibles, llamá luego.",
-    //         },
-    //       ],
-    //       edges: [
-    //         { from: "start", to: "saludo" },
-    //         { from: "saludo", to: "fallback", on: "*" },
-    //       ],
-    //     };
+      if (!existingFlow) {
+        const def = {
+          version: 1,
+          nodes: [
+            { id: "start", type: "start" },
+            {
+              id: "saludo",
+              type: "message",
+              text: "Hola! Ya te vamos a atender 🙌",
+            },
+            {
+              id: "fallback",
+              type: "message",
+              text: "En estos momentos no estamos disponibles, llamá luego.",
+            },
+          ],
+          edges: [
+            { from: "start", to: "saludo" },
+            { from: "saludo", to: "fallback", on: "*" },
+          ],
+        };
 
-    //     const { error: flowError } = await supabase
-    //       .from("flows")
-    //       .insert({
-    //         bot_id: bot.id,
-    //         key: "default",
-    //         definition: def,
-    //       });
+        const { error: flowError } = await supabase
+          .from("flows")
+          .insert({
+            bot_id: bot.id,
+            key: "default",
+            definition: def,
+          });
 
-    //     if (flowError) {
-    //       console.error("Error creating default flow:", flowError);
-    //     }
-    //   }
+        if (flowError) {
+          console.error("Error creating default flow:", flowError);
+        }
+      }
 
-    //   const { data: existingRulesFlow } = await supabase
-    //     .from("flows")
-    //     .select("id")
-    //     .eq("bot_id", bot.id)
-    //     .eq("key", "rules_v1")
-    //     .maybeSingle();
+      const { data: existingRulesFlow } = await supabase
+        .from("flows")
+        .select("id")
+        .eq("bot_id", bot.id)
+        .eq("key", "rules_v1")
+        .maybeSingle();
 
-    //   if (!existingRulesFlow) {
-    //     const rulesDef = {
-    //       version: 1,
-    //       engine: "rules_v1",
-    //       rules: [
-    //         {
-    //           id: "welcome_default",
-    //           name: "Bienvenida básica",
-    //           description:
-    //             "Mensaje de bienvenida cuando inicia la conversación.",
-    //           triggerType: "welcome",
-    //           keywords: [],
-    //           isActive: true,
-    //           responses: [
-    //             {
-    //               message:
-    //                 "¡Hola! 👋 Gracias por escribirnos. En unos minutos alguien de nuestro equipo te va a responder.",
-    //               delay: 0,
-    //             },
-    //           ],
-    //         },
-    //         {
-    //           id: "fallback_default",
-    //           name: "Respuesta por defecto",
-    //           description:
-    //             "Se usa cuando ninguna otra regla coincide con el mensaje.",
-    //           triggerType: "fallback",
-    //           keywords: [],
-    //           isActive: true,
-    //           responses: [
-    //             {
-    //               message:
-    //                 "En estos momentos no estamos disponibles, pero ya registramos tu mensaje 🙌",
-    //               delay: 0,
-    //             },
-    //           ],
-    //         },
-    //       ],
-    //     };
+      if (!existingRulesFlow) {
+        const rulesDef = {
+          version: 1,
+          engine: "rules_v1",
+          rules: [
+            {
+              id: "welcome_default",
+              name: "Bienvenida básica",
+              description:
+                "Mensaje de bienvenida cuando inicia la conversación.",
+              triggerType: "welcome",
+              keywords: [],
+              isActive: true,
+              responses: [
+                {
+                  message:
+                    "¡Hola! 👋 Gracias por escribirnos. En unos minutos alguien de nuestro equipo te va a responder.",
+                  delay: 0,
+                },
+              ],
+            },
+            {
+              id: "fallback_default",
+              name: "Respuesta por defecto",
+              description:
+                "Se usa cuando ninguna otra regla coincide con el mensaje.",
+              triggerType: "fallback",
+              keywords: [],
+              isActive: true,
+              responses: [
+                {
+                  message:
+                    "En estos momentos no estamos disponibles, pero ya registramos tu mensaje 🙌",
+                  delay: 0,
+                },
+              ],
+            },
+          ],
+        };
 
-    //     const { error: rulesFlowError } = await supabase
-    //       .from("flows")
-    //       .insert({
-    //         bot_id: bot.id,
-    //         key: "rules_v1",
-    //         definition: rulesDef,
-    //       });
+        const { error: rulesFlowError } = await supabase
+          .from("flows")
+          .insert({
+            bot_id: bot.id,
+            key: "rules_v1",
+            definition: rulesDef,
+          });
 
-    //     if (rulesFlowError) {
-    //       console.error("Error creating rules_v1 flow:", rulesFlowError);
-    //     }
-    //   }
-    // }
+        if (rulesFlowError) {
+          console.error("Error creating rules_v1 flow:", rulesFlowError);
+        }
+      }
+    }
 
     return new Response(
       JSON.stringify({
