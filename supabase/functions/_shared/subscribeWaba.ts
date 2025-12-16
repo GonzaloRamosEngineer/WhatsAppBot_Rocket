@@ -1,8 +1,9 @@
 // supabase/functions/_shared/subscribeWaba.ts
 
 /**
- * Suscribe un WABA (WhatsApp Business Account) a TU app,
- * enviando explícitamente la URL del webhook y el verify token.
+ * Suscribe un WABA (WhatsApp Business Account) a TU app.
+ * Envía la URL del webhook, el token de verificación y
+ * LOS CAMPOS (fields) que queremos escuchar.
  */
 export async function subscribeWaba(options: {
   accessToken: string;
@@ -13,25 +14,30 @@ export async function subscribeWaba(options: {
   if (!accessToken) throw new Error("Missing access token for subscribeWaba");
   if (!wabaId) throw new Error("Missing WABA ID for subscribeWaba");
 
-  // 1. Construimos la URL de tu Webhook dinámicamente
-  // SUPABASE_URL suele ser "https://<project_ref>.supabase.co"
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""; 
-  // Ojo: Asegúrate de que apunte a tu webhook. 
-  // Si SUPABASE_URL no te funciona, puedes usar una variable de entorno propia como "WEBHOOK_BASE_URL"
+  const supabaseUrl = Deno.env.get("PROJECT_URL") ?? ""; 
+  // OJO: En local a veces PROJECT_URL no está, asegúrate de que esto resuelva bien.
+  // Si en tus logs salía bien la URL, entonces PROJECT_URL está bien.
   
-  // La ruta estándar de Supabase Edge Functions:
   const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
-  
   const verifyToken = Deno.env.get("META_VERIFY_TOKEN") ?? "matchbot_verify_token";
+
+  // Estos son los eventos que necesitamos para que el chat funcione
+  const fields = [
+    "messages",              // Mensajes de texto, audio, img
+    "messaging_postbacks",   // Clics en botones
+    "message_deliveries",    // Estado (entregado)
+    "message_reads",         // Estado (leído - doble check azul)
+    "message_failures"       // Errores de envío
+  ];
 
   const url = `https://graph.facebook.com/v20.0/${wabaId}/subscribed_apps`;
 
   console.log("[subscribeWaba] subscribing WABA...", { 
     wabaId, 
-    webhookUrl 
+    webhookUrl,
+    fields 
   });
 
-  // 2. Enviamos el Webhook URL y el Token en el body
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -41,6 +47,8 @@ export async function subscribeWaba(options: {
     body: JSON.stringify({
       override_callback_uri: webhookUrl,
       verify_token: verifyToken,
+      // ⚠️ AQUÍ ESTÁ LA MAGIA QUE FALTABA:
+      subscribed_fields: fields 
     }),
   });
 
@@ -56,9 +64,8 @@ export async function subscribeWaba(options: {
       status: res.status,
       body: json,
     });
-    // Si falla porque el usuario no es admin del negocio, esto lanzará error
     throw new Error(
-      `Failed to subscribe WABA ${wabaId}. Status ${res.status} - ${JSON.stringify(json)}`
+      `Failed to subscribe WABA ${wabaId}. Status ${res.status}`
     );
   }
 
